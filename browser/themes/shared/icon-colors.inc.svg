@@ -1,0 +1,21 @@
+<style>
+
+.fieldtext {
+  fill: GrayText;
+}
+
+.highlighttext {
+  fill: highlighttext;
+}
+
+.black {
+  fill: black;
+  fill-opacity: .6;
+}
+
+.white {
+  fill: white;
+  fill-opacity: .7;
+}
+
+</style>

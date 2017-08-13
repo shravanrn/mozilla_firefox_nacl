@@ -1,0 +1,20 @@
+[package]
+name = "canvas_traits"
+version = "0.0.1"
+authors = ["The Servo Project Developers"]
+license = "MPL-2.0"
+publish = false
+
+[lib]
+name = "canvas_traits"
+path = "lib.rs"
+
+[dependencies]
+cssparser = "0.14.0"
+euclid = "0.13"
+heapsize = "0.4"
+heapsize_derive = "0.1"
+ipc-channel = "0.7"
+serde = "0.9"
+serde_derive = "0.9"
+webrender_traits = {git = "https://github.com/servo/webrender", features = ["ipc"]}
