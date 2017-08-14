@@ -24,7 +24,8 @@
 #define mozilla_image_decoders_iccjpeg_h
 
 #include <stdio.h>  /* needed to define "FILE", "NULL" */
-#include "jpeglib.h"
+#include "jpeglib_naclport.h"
+//#include "jpeglib.h"
 
 /*
  * Reading a JPEG file that may contain an ICC profile requires two steps:

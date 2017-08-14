@@ -84,9 +84,12 @@ private:
   StreamingLexer<State> mLexer;
 
 public:
-  struct jpeg_decompress_struct mInfo;
-  struct jpeg_source_mgr mSourceMgr;
-  decoder_error_mgr mErr;
+  // struct jpeg_decompress_struct mInfo;
+  struct jpeg_decompress_struct* p_mInfo;
+  // struct jpeg_source_mgr mSourceMgr;
+  struct jpeg_source_mgr* p_mSourceMgr;
+  // decoder_error_mgr mErr;
+  decoder_error_mgr* p_mErr;
   jstate mState;
 
   uint32_t mBytesToSkip;
