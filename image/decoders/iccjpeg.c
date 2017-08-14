@@ -51,7 +51,7 @@ void
 setup_read_icc_profile (j_decompress_ptr cinfo)
 {
   /* Tell the library to keep any APP2 data it may find */
-  jpeg_save_markers(cinfo, ICC_MARKER, 0xFFFF);
+  d_jpeg_save_markers(cinfo, ICC_MARKER, 0xFFFF);
 }
 
 
@@ -127,6 +127,8 @@ read_icc_profile (j_decompress_ptr cinfo,
   }
 
   for (marker = cinfo->marker_list; marker != NULL; marker = marker->next) {
+    marker = (jpeg_saved_marker_ptr) getUnsandboxedJpegPtr((uintptr_t) marker);
+
     if (marker_is_icc(marker)) {
       if (num_markers == 0) {
         num_markers = GETJOCTET(marker->data[13]);
@@ -174,6 +176,8 @@ read_icc_profile (j_decompress_ptr cinfo,
 
   /* and fill it in */
   for (marker = cinfo->marker_list; marker != NULL; marker = marker->next) {
+    marker = (jpeg_saved_marker_ptr) getUnsandboxedJpegPtr((uintptr_t) marker);
+
     if (marker_is_icc(marker)) {
       JOCTET FAR* src_ptr;
       JOCTET* dst_ptr;

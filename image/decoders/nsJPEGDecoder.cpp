@@ -78,6 +78,22 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
           Transition::TerminateSuccess())
  , mDecodeStyle(aDecodeStyle)
 {
+
+  initializeLibJpegSandbox();
+
+  p_mInfo = (struct jpeg_decompress_struct *) mallocInJpegSandbox(sizeof(struct jpeg_decompress_struct));
+  p_mErr = (decoder_error_mgr *) mallocInJpegSandbox(sizeof(decoder_error_mgr));
+  p_mSourceMgr = (struct jpeg_source_mgr *) mallocInJpegSandbox(sizeof(struct jpeg_source_mgr));
+
+  if(p_mInfo == nullptr || p_mErr == nullptr || p_mSourceMgr == nullptr)
+  {
+      MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Error,
+         ("nsJPEGDecoder::nsJPEGDecoder: Failed in mallocing objects in sandbox"));
+  }
+
+  struct jpeg_decompress_struct &mInfo = *p_mInfo;
+  struct jpeg_source_mgr &mSourceMgr = *p_mSourceMgr;
+
   mState = JPEG_HEADER;
   mReading = true;
   mImageData = nullptr;
@@ -106,8 +122,9 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
 nsJPEGDecoder::~nsJPEGDecoder()
 {
   // Step 8: Release JPEG decompression object
+  struct jpeg_decompress_struct &mInfo = *p_mInfo;
   mInfo.src = nullptr;
-  jpeg_destroy_decompress(&mInfo);
+  d_jpeg_destroy_decompress(&mInfo);
 
   PR_FREEIF(mBackBuffer);
   if (mTransform) {
@@ -116,6 +133,10 @@ nsJPEGDecoder::~nsJPEGDecoder()
   if (mInProfile) {
     qcms_profile_release(mInProfile);
   }
+
+  freeInJpegSandbox(p_mSourceMgr);
+  freeInJpegSandbox(p_mErr);
+  freeInJpegSandbox(p_mInfo);
 
   MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
          ("nsJPEGDecoder::~nsJPEGDecoder: Destroying JPEG decoder %p",
@@ -136,10 +157,16 @@ nsJPEGDecoder::InitInternal()
     mCMSMode = eCMSMode_Off;
   }
 
+  struct jpeg_decompress_struct &mInfo = *p_mInfo;
+  decoder_error_mgr &mErr = *p_mErr;
+
   // We set up the normal JPEG error routines, then override error_exit.
-  mInfo.err = jpeg_std_error(&mErr.pub);
+  mInfo.err = (struct jpeg_error_mgr *) getSandboxedJpegPtr((uintptr_t) d_jpeg_std_error(&mErr.pub));
   //   mInfo.err = jpeg_std_error(&mErr.pub);
-  mErr.pub.error_exit = my_error_exit;
+
+  // mErr.pub.error_exit = my_error_exit;
+  mErr.pub.error_exit = d_my_error_exit(my_error_exit);
+
   // Establish the setjmp return context for my_error_exit to use.
   if (setjmp(mErr.setjmp_buffer)) {
     // If we get here, the JPEG code has signaled an error, and initialization
@@ -148,22 +175,24 @@ nsJPEGDecoder::InitInternal()
   }
 
   // Step 1: allocate and initialize JPEG decompression object
-  jpeg_create_decompress(&mInfo);
+  //jpeg_create_decompress(&mInfo);
+  d_jpeg_CreateDecompress(&mInfo, JPEG_LIB_VERSION, (size_t) sizeof(struct jpeg_decompress_struct));
+
+  struct jpeg_source_mgr &mSourceMgr = *p_mSourceMgr;
   // Set the source manager
-  mInfo.src = &mSourceMgr;
+  mInfo.src = (struct jpeg_source_mgr *) getSandboxedJpegPtr((uintptr_t) &mSourceMgr);
 
   // Step 2: specify data source (eg, a file)
-
   // Setup callback functions.
-  mSourceMgr.init_source = init_source;
-  mSourceMgr.fill_input_buffer = fill_input_buffer;
-  mSourceMgr.skip_input_data = skip_input_data;
-  mSourceMgr.resync_to_restart = jpeg_resync_to_restart;
-  mSourceMgr.term_source = term_source;
+  mSourceMgr.init_source = d_init_source(init_source);
+  mSourceMgr.fill_input_buffer = d_fill_input_buffer(fill_input_buffer);
+  mSourceMgr.skip_input_data = d_skip_input_data(skip_input_data);
+  mSourceMgr.resync_to_restart = d_jpeg_resync_to_restart(jpeg_resync_to_restart);
+  mSourceMgr.term_source = d_term_source(term_source);
 
   // Record app markers for ICC data
   for (uint32_t m = 0; m < 16; m++) {
-    jpeg_save_markers(&mInfo, JPEG_APP0 + m, 0xFFFF);
+    d_jpeg_save_markers(&mInfo, JPEG_APP0 + m, 0xFFFF);
   }
 
   return NS_OK;
@@ -204,6 +233,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 {
   mSegment = reinterpret_cast<const JOCTET*>(aData);
   mSegmentLen = aLength;
+  decoder_error_mgr &mErr = *p_mErr;
 
   // Return here if there is a fatal error within libjpeg.
   nsresult error_code;
@@ -229,13 +259,15 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
   MOZ_LOG(sJPEGLog, LogLevel::Debug,
          ("[this=%p] nsJPEGDecoder::Write -- processing JPEG data\n", this));
 
+  struct jpeg_decompress_struct &mInfo = *p_mInfo;
+
   switch (mState) {
     case JPEG_HEADER: {
       LOG_SCOPE((mozilla::LogModule*)sJPEGLog, "nsJPEGDecoder::Write -- entering JPEG_HEADER"
                 " case");
 
       // Step 3: read file parameters with jpeg_read_header()
-      if (jpeg_read_header(&mInfo, TRUE) == JPEG_SUSPENDED) {
+      if (d_jpeg_read_header(&mInfo, TRUE) == JPEG_SUSPENDED) {
         MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
                ("} (JPEG_SUSPENDED)"));
         return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
@@ -375,10 +407,10 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
     // Don't allocate a giant and superfluous memory buffer
     // when not doing a progressive decode.
     mInfo.buffered_image = mDecodeStyle == PROGRESSIVE &&
-                           jpeg_has_multiple_scans(&mInfo);
+                           d_jpeg_has_multiple_scans(&mInfo);
 
     /* Used to set up image size so arrays can be allocated */
-    jpeg_calc_output_dimensions(&mInfo);
+    d_jpeg_calc_output_dimensions(&mInfo);
 
     MOZ_ASSERT(!mImageData, "Already have a buffer allocated?");
     nsresult rv = AllocateFrame(/* aFrameNum = */ 0, OutputSize(),
@@ -426,7 +458,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
     mInfo.do_block_smoothing = TRUE;
 
     // Step 5: Start decompressor
-    if (jpeg_start_decompress(&mInfo) == FALSE) {
+    if (d_jpeg_start_decompress(&mInfo) == FALSE) {
       MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
              ("} (I/O suspension after jpeg_start_decompress())"));
       return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
@@ -467,7 +499,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 
       int status;
       do {
-        status = jpeg_consume_input(&mInfo);
+        status = d_jpeg_consume_input(&mInfo);
       } while ((status != JPEG_SUSPENDED) &&
                (status != JPEG_REACHED_EOI));
 
@@ -483,7 +515,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
               (status != JPEG_REACHED_EOI))
             scan--;
 
-          if (!jpeg_start_output(&mInfo, scan)) {
+          if (!d_jpeg_start_output(&mInfo, scan)) {
             MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
                    ("} (I/O suspension after jpeg_start_output() -"
                     " PROGRESSIVE)"));
@@ -510,14 +542,14 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
         }
 
         if (mInfo.output_scanline == mInfo.output_height) {
-          if (!jpeg_finish_output(&mInfo)) {
+          if (!d_jpeg_finish_output(&mInfo)) {
             MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
                    ("} (I/O suspension after jpeg_finish_output() -"
                     " PROGRESSIVE)"));
             return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
           }
 
-          if (jpeg_input_complete(&mInfo) &&
+          if (d_jpeg_input_complete(&mInfo) &&
               (mInfo.input_scan_number == mInfo.output_scan_number))
             break;
 
@@ -539,7 +571,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 
     // Step 7: Finish decompression
 
-    if (jpeg_finish_decompress(&mInfo) == FALSE) {
+    if (d_jpeg_finish_decompress(&mInfo) == FALSE) {
       MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
              ("} (I/O suspension after jpeg_finish_decompress() - DONE)"));
       return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
@@ -585,9 +617,12 @@ Orientation
 nsJPEGDecoder::ReadOrientationFromEXIF()
 {
   jpeg_saved_marker_ptr marker;
+  struct jpeg_decompress_struct &mInfo = *p_mInfo;
 
   // Locate the APP1 marker, where EXIF data is stored, in the marker list.
   for (marker = mInfo.marker_list ; marker != nullptr ; marker = marker->next) {
+    marker = (jpeg_saved_marker_ptr) getUnsandboxedJpegPtr((uintptr_t) marker);
+
     if (marker->marker == JPEG_APP0 + 1) {
       break;
     }
@@ -615,8 +650,24 @@ void
 nsJPEGDecoder::OutputScanlines(bool* suspend)
 {
   *suspend = false;
+  struct jpeg_decompress_struct &mInfo = *p_mInfo;
 
   const uint32_t top = mInfo.output_scanline;
+
+  JSAMPARRAY pBufferSys;
+  unsigned int row_stride = mInfo.output_width * mInfo.output_components;
+  {
+    //Unfortunately, the buffer for image data used by firefox is very complex
+    //So figuring out how to allocate that buffer in the sandbox needs tracking down of too many internals of firefox
+    //use a simpler approach for now
+    //allocate a new buffer on the target sandbox and then copy it
+    //We will most likely loose perf because of this
+    struct jpeg_memory_mgr * mem_mgr = (struct jpeg_memory_mgr *) getUnsandboxedJpegPtr((uintptr_t) mInfo.mem);
+    void* p_alloc_sarray = (void*) getUnsandboxedJpegPtr((uintptr_t) mem_mgr->alloc_sarray);
+
+    pBufferSys = d_alloc_sarray(p_alloc_sarray,(j_common_ptr) &mInfo, JPOOL_IMAGE, row_stride, 1);
+  }
+
 
   while ((mInfo.output_scanline < mInfo.output_height)) {
       uint32_t* imageRow = nullptr;
@@ -631,7 +682,12 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
       if (mInfo.out_color_space == MOZ_JCS_EXT_NATIVE_ENDIAN_XRGB) {
         // Special case: scanline will be directly converted into packed ARGB
-        if (jpeg_read_scanlines(&mInfo, (JSAMPARRAY)&imageRow, 1) != 1) {
+        //if (jpeg_read_scanlines(&mInfo, (JSAMPARRAY)&imageRow, 1) != 1) {
+
+        JDIMENSION readScanLinesRet = d_jpeg_read_scanlines(&mInfo, pBufferSys, 1);
+        memcpy((void *)imageRow, (void *)pBufferSys, row_stride);
+
+        if (readScanLinesRet != 1) {
           *suspend = true; // suspend
           break;
         }
@@ -648,7 +704,12 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       }
 
       // Request one scanline.  Returns 0 or 1 scanlines.
-      if (jpeg_read_scanlines(&mInfo, &sampleRow, 1) != 1) {
+      // if (jpeg_read_scanlines(&mInfo, &sampleRow, 1) != 1) {
+
+      JDIMENSION readScanLinesRet2 = d_jpeg_read_scanlines(&mInfo, pBufferSys, 1);
+      memcpy((void *)sampleRow, (void *)pBufferSys, row_stride);
+
+      if (readScanLinesRet2 != 1) {
         *suspend = true; // suspend
         break;
       }
@@ -735,7 +796,8 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 METHODDEF(void)
 my_error_exit (j_common_ptr cinfo)
 {
-  decoder_error_mgr* err = (decoder_error_mgr*) cinfo->err;
+  // decoder_error_mgr* err = (decoder_error_mgr*) cinfo->err;
+  decoder_error_mgr* err = (decoder_error_mgr *) getUnsandboxedJpegPtr((uintptr_t) cinfo->err);
 
   // Convert error to a browser error code
   nsresult error_code = err->pub.msg_code == JERR_OUT_OF_MEMORY
@@ -743,12 +805,17 @@ my_error_exit (j_common_ptr cinfo)
                       : NS_ERROR_FAILURE;
 
 #ifdef DEBUG
-  char buffer[JMSG_LENGTH_MAX];
+  //char buffer[JMSG_LENGTH_MAX];
+  char* buffer = (char *) mallocInJpegSandbox(sizeof(char[JMSG_LENGTH_MAX]));
 
   // Create the message
-  (*err->pub.format_message) (cinfo, buffer);
+  // (*err->pub.format_message) (cinfo, buffer);
+  void* p_format_message = (void*) getUnsandboxedJpegPtr((uintptr_t) err->pub.format_message);
+  d_format_message(p_format_message, cinfo, buffer);
 
   fprintf(stderr, "JPEG decoding error:\n%s\n", buffer);
+
+  freeInJpegSandbox(buffer);
 #endif
 
   // Return control to the setjmp point.  We pass an nsresult masquerading as
@@ -815,7 +882,8 @@ init_source (j_decompress_ptr jd)
 METHODDEF(void)
 skip_input_data (j_decompress_ptr jd, long num_bytes)
 {
-  struct jpeg_source_mgr* src = jd->src;
+  struct jpeg_source_mgr* src = (struct jpeg_source_mgr*) getUnsandboxedJpegPtr((uintptr_t)jd->src);
+
   nsJPEGDecoder* decoder = (nsJPEGDecoder*)(jd->client_data);
 
   if (num_bytes > (long)src->bytes_in_buffer) {
@@ -849,7 +917,7 @@ skip_input_data (j_decompress_ptr jd, long num_bytes)
 METHODDEF(boolean)
 fill_input_buffer (j_decompress_ptr jd)
 {
-  struct jpeg_source_mgr* src = jd->src;
+  struct jpeg_source_mgr* src = (struct jpeg_source_mgr*) getUnsandboxedJpegPtr((uintptr_t)jd->src);
   nsJPEGDecoder* decoder = (nsJPEGDecoder*)(jd->client_data);
 
   if (decoder->mReading) {
@@ -899,7 +967,7 @@ fill_input_buffer (j_decompress_ptr jd)
     // Check for malformed MARKER segment lengths, before allocating space
     // for it
     if (new_backtrack_buflen > MAX_JPEG_MARKER_LENGTH) {
-      my_error_exit((j_common_ptr)(&decoder->mInfo));
+      my_error_exit((j_common_ptr)(decoder->p_mInfo));
     }
 
     // Round up to multiple of 256 bytes.
@@ -907,8 +975,9 @@ fill_input_buffer (j_decompress_ptr jd)
     JOCTET* buf = (JOCTET*)PR_REALLOC(decoder->mBackBuffer, roundup_buflen);
     // Check for OOM
     if (!buf) {
-      decoder->mInfo.err->msg_code = JERR_OUT_OF_MEMORY;
-      my_error_exit((j_common_ptr)(&decoder->mInfo));
+      struct jpeg_error_mgr* err = (struct jpeg_error_mgr*) getUnsandboxedJpegPtr((uintptr_t) decoder->p_mInfo->err);
+      err->msg_code = JERR_OUT_OF_MEMORY;
+      my_error_exit((j_common_ptr)(decoder->p_mInfo));
     }
     decoder->mBackBuffer = buf;
     decoder->mBackBufferSize = roundup_buflen;

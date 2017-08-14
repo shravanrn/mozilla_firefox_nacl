@@ -1,3 +1,16 @@
+My notes
+========
+Version of firefox modified to use a sandboxed version of libjpeg. Update the paths in media/libjpeg_naclport/moz.build and then build with ./mach build. 
+
+The sandboxed version of libjpeg is compiled with NaCl's gcc compiler. 
+This binary is then loaded with the help of the library from https://github.com/shravanrn/Sandboxing_NaCl.git
+
+Note if you are building the Sandoxing_NaCl library from scratch, make sure to use settings compatible with firefox compile settings.
+To do this, replace the SConstruct file with SConstruct_Firefox and the built it
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+
 An explanation of the Mozilla Source Code Directory Structure and links to
 project pages with documentation can be found at:
 

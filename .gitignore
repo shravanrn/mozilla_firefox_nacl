@@ -134,3 +134,4 @@ lextab.py
 .vscode/*
 !.vscode/extensions.json
 !.vscode/tasks.json
+/firefox_32bit_*/
