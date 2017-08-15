@@ -1,16 +1,24 @@
 #include <dlfcn.h>
+#include <stdlib.h>
 
 #include "jpeglib_naclport.h"
-#include "dyn_ldr_lib.h"
 
-#define MY_ERROR_EXIT_CALLBACK_SLOT 0
-#define INIT_SOURCE_SLOT 1
-#define FILL_INPUT_BUFFER_SLOT 2
-#define SKIP_INPUT_DATA_SLOT 3
-#define JPEG_RESYNC_TO_RESTART_SLOT 4
-#define TERM_SOURCE_SLOT 5
+//Note USE_SANDBOXING MAY be defined as a macro in the moz.build of this folder
 
-NaClSandbox* jpegSandbox;
+#ifdef USE_SANDBOXING
+  #include "dyn_ldr_lib.h"
+
+  #define MY_ERROR_EXIT_CALLBACK_SLOT 0
+  #define INIT_SOURCE_SLOT 1
+  #define FILL_INPUT_BUFFER_SLOT 2
+  #define SKIP_INPUT_DATA_SLOT 3
+  #define JPEG_RESYNC_TO_RESTART_SLOT 4
+  #define TERM_SOURCE_SLOT 5
+
+  NaClSandbox* jpegSandbox;
+
+#endif
+
 void* dlPtr;
 int finishedInit = 0;
 
@@ -64,25 +72,30 @@ t_jpeg_consume_input          ptr_jpeg_consume_input;
 
 int initializeLibJpegSandbox()
 {
-  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_DL_PATH are defined as macros in the moz.build of this folder
-  // #define JPEG_DL_PATH "/home/shr/Code/libjpeg-turbo/nacl_build/.libs/libjpeg.so" 
-  // #define STARTUP_LIBRARY_PATH "/home/shr/Code/nacl2/native_client/toolchain/linux_x86/nacl_x86_glibc/x86_64-nacl/lib32/" 
-  // #define SANDBOX_INIT_APP "/home/shr/Code/nacl2/native_client/scons-out/nacl-x86-32-glibc/staging/dyn_ldr_sandbox_init.nexe"
+  if(finishedInit) return 1;
+  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_DL_PATH, JPEG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
   finishedInit = 1;
-  printf("Creating NaCl Sandbox");
 
-  initializeDlSandboxCreator(0 /* Should enable detailed logging */);
-  jpegSandbox = createDlSandbox(STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
+  #ifdef USE_SANDBOXING
+    printf("Creating NaCl Sandbox");
 
-  if(!jpegSandbox)
-  {
-    printf("Error creating jpegSandbox");
-    return 0;
-  }
+    initializeDlSandboxCreator(0 /* Should enable detailed logging */);
+    jpegSandbox = createDlSandbox(STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
+
+    if(!jpegSandbox)
+    {
+      printf("Error creating jpeg Sandbox");
+      return 0;
+    }
+  #endif
 
   printf("Loading dynamic library %s\n", JPEG_DL_PATH);
 
-  dlPtr = dlopenInSandbox(jpegSandbox, JPEG_DL_PATH, RTLD_LAZY);
+  #ifdef USE_SANDBOXING
+    dlPtr = dlopenInSandbox(jpegSandbox, JPEG_DL_PATH, RTLD_LAZY);
+  #else
+    dlPtr = dlopen(JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
+  #endif
 
   if(!dlPtr)
   {
@@ -90,84 +103,52 @@ int initializeLibJpegSandbox()
     return 0;
   }
 
-  printf("Loading symbols\n");
-
-  void* p_jpeg_std_error = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_std_error");
-  void* p_jpeg_CreateCompress = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_CreateCompress");
-  void* p_jpeg_stdio_dest = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_stdio_dest");
-  void* p_jpeg_set_defaults = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_set_defaults");
-  void* p_jpeg_set_quality = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_set_quality");
-  void* p_jpeg_start_compress = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_start_compress");
-  void* p_jpeg_write_scanlines = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_write_scanlines");
-  void* p_jpeg_finish_compress = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_finish_compress");
-  void* p_jpeg_destroy_compress = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_destroy_compress");
-  void* p_jpeg_CreateDecompress = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_CreateDecompress");
-  void* p_jpeg_stdio_src = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_stdio_src");
-  void* p_jpeg_read_header = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_read_header");
-  void* p_jpeg_start_decompress = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_start_decompress");
-  void* p_jpeg_read_scanlines = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_read_scanlines");
-  void* p_jpeg_finish_decompress = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_finish_decompress");
-  void* p_jpeg_destroy_decompress = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_destroy_decompress");
-  void* p_jpeg_save_markers = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_save_markers");
-  void* p_jpeg_has_multiple_scans = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_has_multiple_scans");
-  void* p_jpeg_calc_output_dimensions = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_calc_output_dimensions");
-  void* p_jpeg_start_output = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_start_output");
-  void* p_jpeg_finish_output = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_finish_output");
-  void* p_jpeg_input_complete = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_input_complete");
-  void* p_jpeg_consume_input = dlsymInSandbox(jpegSandbox, dlPtr, "jpeg_consume_input");
-
+  printf("Loading symbols.\n");
   int failed = 0;
-  if(p_jpeg_std_error == NULL) { printf("Symbol resolution failed for jpeg_std_error\n"); failed = 1; }
-  if(p_jpeg_CreateCompress == NULL) { printf("Symbol resolution failed for jpeg_CreateCompress\n"); failed = 1; }
-  if(p_jpeg_stdio_dest == NULL) { printf("Symbol resolution failed for jpeg_stdio_dest\n"); failed = 1; }
-  if(p_jpeg_set_defaults == NULL) { printf("Symbol resolution failed for jpeg_set_defaults\n"); failed = 1; }
-  if(p_jpeg_set_quality == NULL) { printf("Symbol resolution failed for jpeg_set_quality\n"); failed = 1; }
-  if(p_jpeg_start_compress == NULL) { printf("Symbol resolution failed for jpeg_start_compress\n"); failed = 1; }
-  if(p_jpeg_write_scanlines == NULL) { printf("Symbol resolution failed for jpeg_write_scanlines\n"); failed = 1; }
-  if(p_jpeg_finish_compress == NULL) { printf("Symbol resolution failed for jpeg_finish_compress\n"); failed = 1; }
-  if(p_jpeg_destroy_compress == NULL) { printf("Symbol resolution failed for jpeg_destroy_compress\n"); failed = 1; }
-  if(p_jpeg_CreateDecompress == NULL) { printf("Symbol resolution failed for jpeg_CreateDecompress\n"); failed = 1; }
-  if(p_jpeg_stdio_src == NULL) { printf("Symbol resolution failed for jpeg_stdio_src\n"); failed = 1; }
-  if(p_jpeg_read_header == NULL) { printf("Symbol resolution failed for jpeg_read_header\n"); failed = 1; }
-  if(p_jpeg_start_decompress == NULL) { printf("Symbol resolution failed for jpeg_start_decompress\n"); failed = 1; }
-  if(p_jpeg_read_scanlines == NULL) { printf("Symbol resolution failed for jpeg_read_scanlines\n"); failed = 1; }
-  if(p_jpeg_finish_decompress == NULL) { printf("Symbol resolution failed for jpeg_finish_decompress\n"); failed = 1; }
-  if(p_jpeg_destroy_decompress == NULL) { printf("Symbol resolution failed for jpeg_destroy_decompress\n"); failed = 1; }
-  if(p_jpeg_save_markers == NULL) { printf("Symbol resolution failed for jpeg_save_markers\n"); failed = 1; }
-  if(p_jpeg_has_multiple_scans == NULL) { printf("Symbol resolution failed for jpeg_has_multiple_scans\n"); failed = 1; }
-  if(p_jpeg_calc_output_dimensions == NULL) { printf("Symbol resolution failed for jpeg_calc_output_dimensions\n"); failed = 1; }
 
-  if(p_jpeg_start_output == NULL) { printf("Symbol resolution failed for jpeg_start_output\n"); failed = 1; }
-  if(p_jpeg_finish_output == NULL) { printf("Symbol resolution failed for jpeg_finish_output\n"); failed = 1; }
-  if(p_jpeg_input_complete == NULL) { printf("Symbol resolution failed for jpeg_input_complete\n"); failed = 1; }
-  if(p_jpeg_consume_input == NULL) { printf("Symbol resolution failed for jpeg_consume_input\n"); failed = 1; }
+  #ifdef USE_SANDBOXING
+    #define loadSymbol(symbol) do { \
+      void* dlSymRes = dlsymInSandbox(jpegSandbox, dlPtr, #symbol); \
+      if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
+      *((void **) &ptr_##symbol) = dlSymRes; \
+    } while(0)
 
+  #else
+    #define loadSymbol(symbol) do { \
+      void* dlSymRes = dlsym(dlPtr, #symbol); \
+      if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
+      *((void **) &ptr_##symbol) = dlSymRes; \
+    } while(0)
+  
+  #endif
+
+  loadSymbol(jpeg_std_error);
+  loadSymbol(jpeg_CreateCompress);
+  loadSymbol(jpeg_stdio_dest);
+  loadSymbol(jpeg_set_defaults);
+  loadSymbol(jpeg_set_quality);
+  loadSymbol(jpeg_start_compress);
+  loadSymbol(jpeg_write_scanlines);
+  loadSymbol(jpeg_finish_compress);
+  loadSymbol(jpeg_destroy_compress);
+  loadSymbol(jpeg_CreateDecompress);
+  loadSymbol(jpeg_stdio_src);
+  loadSymbol(jpeg_read_header);
+  loadSymbol(jpeg_start_decompress);
+  loadSymbol(jpeg_read_scanlines);
+  loadSymbol(jpeg_finish_decompress);
+  loadSymbol(jpeg_destroy_decompress);
+  loadSymbol(jpeg_save_markers);
+  loadSymbol(jpeg_has_multiple_scans);
+  loadSymbol(jpeg_calc_output_dimensions);
+  loadSymbol(jpeg_start_output);
+  loadSymbol(jpeg_finish_output);
+  loadSymbol(jpeg_input_complete);
+  loadSymbol(jpeg_consume_input);
+
+  #undef loadSymbol
 
   if(failed) { return 0; }
-
-  *((void **) &ptr_jpeg_std_error) = p_jpeg_std_error;
-  *((void **) &ptr_jpeg_CreateCompress) = p_jpeg_CreateCompress;
-  *((void **) &ptr_jpeg_stdio_dest) = p_jpeg_stdio_dest;
-  *((void **) &ptr_jpeg_set_defaults) = p_jpeg_set_defaults;
-  *((void **) &ptr_jpeg_set_quality) = p_jpeg_set_quality;
-  *((void **) &ptr_jpeg_start_compress) = p_jpeg_start_compress;
-  *((void **) &ptr_jpeg_write_scanlines) = p_jpeg_write_scanlines;
-  *((void **) &ptr_jpeg_finish_compress) = p_jpeg_finish_compress;
-  *((void **) &ptr_jpeg_destroy_compress) = p_jpeg_destroy_compress;
-  *((void **) &ptr_jpeg_CreateDecompress) = p_jpeg_CreateDecompress;
-  *((void **) &ptr_jpeg_stdio_src) = p_jpeg_stdio_src;
-  *((void **) &ptr_jpeg_read_header) = p_jpeg_read_header;
-  *((void **) &ptr_jpeg_start_decompress) = p_jpeg_start_decompress;
-  *((void **) &ptr_jpeg_read_scanlines) = p_jpeg_read_scanlines;
-  *((void **) &ptr_jpeg_finish_decompress) = p_jpeg_finish_decompress;
-  *((void **) &ptr_jpeg_destroy_decompress) = p_jpeg_destroy_decompress;
-  *((void **) &ptr_jpeg_save_markers) = p_jpeg_save_markers;
-  *((void **) &ptr_jpeg_has_multiple_scans) = p_jpeg_has_multiple_scans;
-  *((void **) &ptr_jpeg_calc_output_dimensions) = p_jpeg_calc_output_dimensions;
-  *((void **) &ptr_jpeg_start_output) = p_jpeg_start_output;
-  *((void **) &ptr_jpeg_finish_output) = p_jpeg_finish_output;
-  *((void **) &ptr_jpeg_input_complete) = p_jpeg_input_complete;
-  *((void **) &ptr_jpeg_consume_input) = p_jpeg_consume_input;
 
   printf("Loaded symbols\n");
 
@@ -175,335 +156,561 @@ int initializeLibJpegSandbox()
 }
 uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr)
 {
-  return NaClUserToSysOrNull(jpegSandbox->nap, uaddr);
+  #ifdef USE_SANDBOXING
+    return NaClUserToSysOrNull(jpegSandbox->nap, uaddr);
+  #else
+    return uaddr;
+  #endif
 }
 uintptr_t getSandboxedJpegPtr(uintptr_t uaddr)
 {
-  return NaClSysToUserOrNull(jpegSandbox->nap, uaddr);
+  #ifdef USE_SANDBOXING
+    return NaClSysToUserOrNull(jpegSandbox->nap, uaddr);    
+  #else
+    return uaddr;
+  #endif
+}
+int isAddressInJpegSandboxMemoryOrNull(uintptr_t uaddr)
+{
+  #ifdef USE_SANDBOXING
+    return isAddressInSandboxMemoryOrNull(jpegSandbox, uaddr);
+  #else
+    return 0;
+  #endif
+}
+int isAddressInNonJpegSandboxMemoryOrNull(uintptr_t uaddr)
+{
+  #ifdef USE_SANDBOXING
+    return isAddressInNonSandboxMemoryOrNull(jpegSandbox, uaddr);
+  #else
+    return 0;
+  #endif
 }
 void* mallocInJpegSandbox(size_t size)
 {
-  return mallocInSandbox(jpegSandbox, size);
+ #ifdef USE_SANDBOXING
+    return mallocInSandbox(jpegSandbox, size);
+  #else
+    return malloc(size);
+  #endif 
 }
 void freeInJpegSandbox(void* ptr)
 {
-  freeInSandbox(jpegSandbox, ptr);
+  #ifdef USE_SANDBOXING
+    freeInSandbox(jpegSandbox, ptr);
+  #else
+    free(ptr);
+  #endif 
 }
 
 
-//API stubs
+#ifdef USE_SANDBOXING
 
-struct jpeg_error_mgr * d_jpeg_std_error(struct jpeg_error_mgr * err)
-{
-  preFunctionCall(jpegSandbox, sizeof(err), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, struct jpeg_error_mgr *, err);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_std_error);
-  return (struct jpeg_error_mgr *)functionCallReturnPtr(jpegSandbox);
-}
-void d_jpeg_CreateCompress(j_compress_ptr cinfo, int version, size_t structsize)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(version) + sizeof(structsize), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-  PUSH_VAL_TO_STACK(jpegSandbox, int, version);
-  PUSH_VAL_TO_STACK(jpegSandbox, size_t, structsize);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_CreateCompress);
-}
-void d_jpeg_stdio_dest(j_compress_ptr cinfo, FILE * outfile)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(outfile), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-  PUSH_PTR_TO_STACK(jpegSandbox, FILE *, outfile);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_stdio_dest);
-}
-void d_jpeg_set_defaults(j_compress_ptr cinfo)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_set_defaults);
-}
-void d_jpeg_set_quality(j_compress_ptr cinfo, int quality, boolean force_baseline)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(quality) + sizeof(force_baseline), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-  PUSH_VAL_TO_STACK(jpegSandbox, int, quality);
-  PUSH_VAL_TO_STACK(jpegSandbox, boolean, force_baseline);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_set_quality);
-}
-void d_jpeg_start_compress(j_compress_ptr cinfo, boolean write_all_tables)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(write_all_tables), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-  PUSH_VAL_TO_STACK(jpegSandbox, boolean, write_all_tables);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_start_compress);
-}
-JDIMENSION d_jpeg_write_scanlines(j_compress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION num_lines)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(scanlines) + sizeof(num_lines), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-  PUSH_PTR_TO_STACK(jpegSandbox, JSAMPARRAY, scanlines);
-  PUSH_VAL_TO_STACK(jpegSandbox, JDIMENSION, num_lines);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_write_scanlines);
-  return (JDIMENSION) functionCallReturnRawPrimitiveInt(jpegSandbox);
-}
-void d_jpeg_finish_compress(j_compress_ptr cinfo)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_finish_compress);
-}
-void d_jpeg_destroy_compress(j_compress_ptr cinfo)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_destroy_compress);
-}
-void d_jpeg_CreateDecompress(j_decompress_ptr cinfo, int version, size_t structsize)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(version) + sizeof(structsize), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  PUSH_VAL_TO_STACK(jpegSandbox, int, version);
-  PUSH_VAL_TO_STACK(jpegSandbox, size_t, structsize);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_CreateDecompress);
-}
-void d_jpeg_stdio_src(j_decompress_ptr cinfo, FILE * infile)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(infile), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  PUSH_PTR_TO_STACK(jpegSandbox, FILE *, infile);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_stdio_src);
-}
-int d_jpeg_read_header(j_decompress_ptr cinfo, boolean require_image)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(require_image), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  PUSH_VAL_TO_STACK(jpegSandbox, boolean, require_image);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_read_header);
-  return (int) functionCallReturnRawPrimitiveInt(jpegSandbox);
-}
-boolean d_jpeg_start_decompress(j_decompress_ptr cinfo)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_start_decompress);
-  return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
-}
-JDIMENSION d_jpeg_read_scanlines(j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(scanlines) + sizeof(max_lines), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  PUSH_PTR_TO_STACK(jpegSandbox, JSAMPARRAY, scanlines);
-  PUSH_VAL_TO_STACK(jpegSandbox, JDIMENSION, max_lines);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_read_scanlines);
-  return (JDIMENSION) functionCallReturnRawPrimitiveInt(jpegSandbox);
-}
-boolean d_jpeg_finish_decompress(j_decompress_ptr cinfo)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_finish_decompress);
-  return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
-}
-void d_jpeg_destroy_decompress(j_decompress_ptr cinfo)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_destroy_decompress);
-}
-void d_jpeg_save_markers (j_decompress_ptr cinfo, int marker_code, unsigned int length_limit)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(marker_code) + sizeof(length_limit), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  PUSH_VAL_TO_STACK(jpegSandbox, int, marker_code);
-  PUSH_VAL_TO_STACK(jpegSandbox, unsigned int, length_limit);
-  invokeFunctionCall(jpegSandbox, ptr_jpeg_save_markers);
-}
-boolean d_jpeg_has_multiple_scans (j_decompress_ptr cinfo)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_has_multiple_scans);
-  return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
-}
-void d_jpeg_calc_output_dimensions (j_decompress_ptr cinfo)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_calc_output_dimensions);
-}
-boolean d_jpeg_start_output (j_decompress_ptr cinfo, int scan_number)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_start_output);
-  return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
-}
-boolean d_jpeg_finish_output (j_decompress_ptr cinfo)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_finish_output);
-  return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
-}
-boolean d_jpeg_input_complete (j_decompress_ptr cinfo)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_input_complete);
-  return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
-}
-int d_jpeg_consume_input (j_decompress_ptr cinfo)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-  invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_consume_input);
-  return (int) functionCallReturnRawPrimitiveInt(jpegSandbox);
-}
+  //API stubs
 
-//Fn pointer calls
-JSAMPARRAY d_alloc_sarray(void* alloc_sarray, j_common_ptr cinfo, int pool_id, JDIMENSION samplesperrow, JDIMENSION numrows)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(pool_id) + sizeof(samplesperrow) + sizeof(numrows), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_common_ptr, cinfo);
-  PUSH_VAL_TO_STACK(jpegSandbox, int, pool_id);
-  PUSH_VAL_TO_STACK(jpegSandbox, JDIMENSION, samplesperrow);
-  PUSH_VAL_TO_STACK(jpegSandbox, JDIMENSION, numrows);
-  invokeFunctionCall(jpegSandbox, alloc_sarray);
-  return (JSAMPARRAY)functionCallReturnPtr(jpegSandbox);
-}
-
-void d_format_message(void* format_message, j_common_ptr cinfo, char *buffer)
-{
-  preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(buffer), 0 /* size of any arrays being pushed on the stack */);
-  PUSH_PTR_TO_STACK(jpegSandbox, j_common_ptr, cinfo);
-  PUSH_PTR_TO_STACK(jpegSandbox, char *, buffer);
-  invokeFunctionCall(jpegSandbox, format_message);
-}
-
-
-//Callback stubs
-t_my_error_exit          cb_my_error_exit;
-t_init_source            cb_init_source;
-t_fill_input_buffer      cb_fill_input_buffer;
-t_skip_input_data        cb_skip_input_data;
-t_jpeg_resync_to_restart cb_jpeg_resync_to_restart;
-t_term_source            cb_term_source;
-
-SANDBOX_CALLBACK void my_error_exit_stub(uintptr_t sandboxPtr)
-{
-  NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
-  j_common_ptr cinfo = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_common_ptr);
-  CALLBACK_PARAMS_FINISHED(sandboxC);
-
-  //We should not assume anything about - need to have some sort of validation here
-  cb_my_error_exit(cinfo);
-}
-SANDBOX_CALLBACK void init_source_stub(uintptr_t sandboxPtr)
-{
-  NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
-  j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
-  CALLBACK_PARAMS_FINISHED(sandboxC);
-
-  //We should not assume anything about - need to have some sort of validation here
-  cb_init_source(jd);
-}
-SANDBOX_CALLBACK void skip_input_data_stub(uintptr_t sandboxPtr)
-{
-  NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
-  j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
-  long num_bytes = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(sandboxC, long);
-  CALLBACK_PARAMS_FINISHED(sandboxC);
-
-  //We should not assume anything about - need to have some sort of validation here
-  cb_skip_input_data(jd, num_bytes);
-}
-
-SANDBOX_CALLBACK boolean fill_input_buffer_stub(uintptr_t sandboxPtr)
-{
-  NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
-  j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
-  CALLBACK_PARAMS_FINISHED(sandboxC);
-
-  //We should not assume anything about - need to have some sort of validation here
-  return cb_fill_input_buffer(jd);
-}
-SANDBOX_CALLBACK void term_source_stub(uintptr_t sandboxPtr)
-{
-  NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
-  j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
-  CALLBACK_PARAMS_FINISHED(sandboxC);
-
-  //We should not assume anything about - need to have some sort of validation here
-  cb_term_source(jd);
-}
-
-SANDBOX_CALLBACK boolean jpeg_resync_to_restart_stub(uintptr_t sandboxPtr)
-{
-  NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
-  j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
-  int desired = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(sandboxC, int);
-  CALLBACK_PARAMS_FINISHED(sandboxC);
-
-  //We should not assume anything about - need to have some sort of validation here
-  return cb_jpeg_resync_to_restart(jd, desired);
-}
-
-t_my_error_exit d_my_error_exit(t_my_error_exit callback)
-{
-  cb_my_error_exit = callback;
-  uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, MY_ERROR_EXIT_CALLBACK_SLOT, (uintptr_t) my_error_exit_stub);
-  if(registeredCallback == 0)
+  struct jpeg_error_mgr * d_jpeg_std_error(struct jpeg_error_mgr * err)
   {
-      printf("Failed in registering the error handler my_error_exit");
+    printf("Calling func d_jpeg_std_error\n");
+    preFunctionCall(jpegSandbox, sizeof(err), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, struct jpeg_error_mgr *, err);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_std_error);
+    return (struct jpeg_error_mgr *)functionCallReturnPtr(jpegSandbox);
   }
-  return (t_my_error_exit) registeredCallback;
-}
-t_init_source d_init_source(t_init_source callback)
-{
-  cb_init_source = callback;
-  uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, MY_ERROR_EXIT_CALLBACK_SLOT, (uintptr_t) init_source_stub);
-  if(registeredCallback == 0)
+  void d_jpeg_CreateCompress(j_compress_ptr cinfo, int version, size_t structsize)
   {
-      printf("Failed in registering the error handler init_source");
+    printf("Calling func d_jpeg_CreateCompress\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(version) + sizeof(structsize), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(jpegSandbox, int, version);
+    PUSH_VAL_TO_STACK(jpegSandbox, size_t, structsize);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_CreateCompress);
   }
-  return (t_init_source) registeredCallback;
-}
-t_skip_input_data d_skip_input_data(t_skip_input_data callback)
-{
-  cb_skip_input_data = callback;
-  uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, MY_ERROR_EXIT_CALLBACK_SLOT, (uintptr_t) skip_input_data_stub);
-  if(registeredCallback == 0)
+  void d_jpeg_stdio_dest(j_compress_ptr cinfo, FILE * outfile)
   {
-      printf("Failed in registering the error handler skip_input_data");
+    printf("Calling func d_jpeg_stdio_dest\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(outfile), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
+    PUSH_PTR_TO_STACK(jpegSandbox, FILE *, outfile);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_stdio_dest);
   }
-  return (t_skip_input_data) registeredCallback;
-}
-t_fill_input_buffer d_fill_input_buffer(t_fill_input_buffer callback)
-{
-  cb_fill_input_buffer = callback;
-  uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, MY_ERROR_EXIT_CALLBACK_SLOT, (uintptr_t) fill_input_buffer_stub);
-  if(registeredCallback == 0)
+  void d_jpeg_set_defaults(j_compress_ptr cinfo)
   {
-      printf("Failed in registering the error handler fill_input_buffer");
+    printf("Calling func d_jpeg_set_defaults\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_set_defaults);
   }
-  return (t_fill_input_buffer) registeredCallback;
-}
-t_term_source d_term_source(t_term_source callback)
-{
-  cb_term_source = callback;
-  uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, MY_ERROR_EXIT_CALLBACK_SLOT, (uintptr_t) term_source_stub);
-  if(registeredCallback == 0)
+  void d_jpeg_set_quality(j_compress_ptr cinfo, int quality, boolean force_baseline)
   {
-      printf("Failed in registering the error handler term_source");
+    printf("Calling func d_jpeg_set_quality\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(quality) + sizeof(force_baseline), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(jpegSandbox, int, quality);
+    PUSH_VAL_TO_STACK(jpegSandbox, boolean, force_baseline);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_set_quality);
   }
-  return (t_term_source) registeredCallback;
-}
-t_jpeg_resync_to_restart d_jpeg_resync_to_restart(t_jpeg_resync_to_restart callback)
-{
-  cb_jpeg_resync_to_restart = callback;
-  uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, MY_ERROR_EXIT_CALLBACK_SLOT, (uintptr_t) jpeg_resync_to_restart_stub);
-  if(registeredCallback == 0)
+  void d_jpeg_start_compress(j_compress_ptr cinfo, boolean write_all_tables)
   {
-      printf("Failed in registering the error handler jpeg_resync_to_restart");
+    printf("Calling func d_jpeg_start_compress\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(write_all_tables), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(jpegSandbox, boolean, write_all_tables);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_start_compress);
   }
-  return (t_jpeg_resync_to_restart) registeredCallback;
-}
+  JDIMENSION d_jpeg_write_scanlines(j_compress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION num_lines)
+  {
+    printf("Calling func d_jpeg_write_scanlines\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(scanlines) + sizeof(num_lines), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
+    PUSH_PTR_TO_STACK(jpegSandbox, JSAMPARRAY, scanlines);
+    PUSH_VAL_TO_STACK(jpegSandbox, JDIMENSION, num_lines);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_write_scanlines);
+    return (JDIMENSION) functionCallReturnRawPrimitiveInt(jpegSandbox);
+  }
+  void d_jpeg_finish_compress(j_compress_ptr cinfo)
+  {
+    printf("Calling func d_jpeg_finish_compress\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_finish_compress);
+  }
+  void d_jpeg_destroy_compress(j_compress_ptr cinfo)
+  {
+    printf("Calling func d_jpeg_destroy_compress\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_destroy_compress);
+  }
+  void d_jpeg_CreateDecompress(j_decompress_ptr cinfo, int version, size_t structsize)
+  {
+    printf("Calling func d_jpeg_CreateDecompress\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(version) + sizeof(structsize), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(jpegSandbox, int, version);
+    PUSH_VAL_TO_STACK(jpegSandbox, size_t, structsize);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_CreateDecompress);
+  }
+  void d_jpeg_stdio_src(j_decompress_ptr cinfo, FILE * infile)
+  {
+    printf("Calling func d_jpeg_stdio_src\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(infile), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    PUSH_PTR_TO_STACK(jpegSandbox, FILE *, infile);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_stdio_src);
+  }
+  int d_jpeg_read_header(j_decompress_ptr cinfo, boolean require_image)
+  {
+    printf("Calling func d_jpeg_read_header\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(require_image), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(jpegSandbox, boolean, require_image);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_read_header);
+    return (int) functionCallReturnRawPrimitiveInt(jpegSandbox);
+  }
+  boolean d_jpeg_start_decompress(j_decompress_ptr cinfo)
+  {
+    printf("Calling func d_jpeg_start_decompress\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_start_decompress);
+    return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
+  }
+  JDIMENSION d_jpeg_read_scanlines(j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines)
+  {
+    printf("Calling func d_jpeg_read_scanlines\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(scanlines) + sizeof(max_lines), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    PUSH_PTR_TO_STACK(jpegSandbox, JSAMPARRAY, scanlines);
+    PUSH_VAL_TO_STACK(jpegSandbox, JDIMENSION, max_lines);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_read_scanlines);
+    return (JDIMENSION) functionCallReturnRawPrimitiveInt(jpegSandbox);
+  }
+  boolean d_jpeg_finish_decompress(j_decompress_ptr cinfo)
+  {
+    printf("Calling func d_jpeg_finish_decompress\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_finish_decompress);
+    return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
+  }
+  void d_jpeg_destroy_decompress(j_decompress_ptr cinfo)
+  {
+    printf("Calling func d_jpeg_destroy_decompress\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_destroy_decompress);
+  }
+  void d_jpeg_save_markers (j_decompress_ptr cinfo, int marker_code, unsigned int length_limit)
+  {
+    printf("Calling func d_jpeg_save_markers\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(marker_code) + sizeof(length_limit), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(jpegSandbox, int, marker_code);
+    PUSH_VAL_TO_STACK(jpegSandbox, unsigned int, length_limit);
+    invokeFunctionCall(jpegSandbox, ptr_jpeg_save_markers);
+  }
+  boolean d_jpeg_has_multiple_scans (j_decompress_ptr cinfo)
+  {
+    printf("Calling func d_jpeg_has_multiple_scans\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_has_multiple_scans);
+    return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
+  }
+  void d_jpeg_calc_output_dimensions (j_decompress_ptr cinfo)
+  {
+    printf("Calling func d_jpeg_calc_output_dimensions\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_calc_output_dimensions);
+  }
+  boolean d_jpeg_start_output (j_decompress_ptr cinfo, int scan_number)
+  {
+    printf("Calling func d_jpeg_start_output\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_start_output);
+    return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
+  }
+  boolean d_jpeg_finish_output (j_decompress_ptr cinfo)
+  {
+    printf("Calling func d_jpeg_finish_output\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_finish_output);
+    return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
+  }
+  boolean d_jpeg_input_complete (j_decompress_ptr cinfo)
+  {
+    printf("Calling func d_jpeg_input_complete\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_input_complete);
+    return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
+  }
+  int d_jpeg_consume_input (j_decompress_ptr cinfo)
+  {
+    printf("Calling func d_jpeg_consume_input\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
+    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_consume_input);
+    return (int) functionCallReturnRawPrimitiveInt(jpegSandbox);
+  }
+
+  //Fn pointer calls
+  JSAMPARRAY d_alloc_sarray(void* alloc_sarray, j_common_ptr cinfo, int pool_id, JDIMENSION samplesperrow, JDIMENSION numrows)
+  {
+    printf("Calling func d_alloc_sarray\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(pool_id) + sizeof(samplesperrow) + sizeof(numrows), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_common_ptr, cinfo);
+    PUSH_VAL_TO_STACK(jpegSandbox, int, pool_id);
+    PUSH_VAL_TO_STACK(jpegSandbox, JDIMENSION, samplesperrow);
+    PUSH_VAL_TO_STACK(jpegSandbox, JDIMENSION, numrows);
+    invokeFunctionCall(jpegSandbox, alloc_sarray);
+    return (JSAMPARRAY)functionCallReturnPtr(jpegSandbox);
+  }
+
+  void d_format_message(void* format_message, j_common_ptr cinfo, char *buffer)
+  {
+    printf("Calling func d_format_message\n");
+    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(buffer), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(jpegSandbox, j_common_ptr, cinfo);
+    PUSH_PTR_TO_STACK(jpegSandbox, char *, buffer);
+    invokeFunctionCall(jpegSandbox, format_message);
+  }
+
+
+  //Callback stubs
+  t_my_error_exit          cb_my_error_exit;
+  t_init_source            cb_init_source;
+  t_fill_input_buffer      cb_fill_input_buffer;
+  t_skip_input_data        cb_skip_input_data;
+  t_jpeg_resync_to_restart cb_jpeg_resync_to_restart;
+  t_term_source            cb_term_source;
+
+  SANDBOX_CALLBACK void my_error_exit_stub(uintptr_t sandboxPtr)
+  {
+    printf("Callback my_error_exit_stub\n");
+    NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
+    j_common_ptr cinfo = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_common_ptr);
+    CALLBACK_PARAMS_FINISHED(sandboxC);
+
+    //We should not assume anything about - need to have some sort of validation here
+    cb_my_error_exit(cinfo);
+  }
+  SANDBOX_CALLBACK void init_source_stub(uintptr_t sandboxPtr)
+  {
+    printf("Callback init_source_stub\n");
+    NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
+    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
+    CALLBACK_PARAMS_FINISHED(sandboxC);
+
+    //We should not assume anything about - need to have some sort of validation here
+    cb_init_source(jd);
+  }
+  SANDBOX_CALLBACK void skip_input_data_stub(uintptr_t sandboxPtr)
+  {
+    printf("Callback skip_input_data_stub\n");
+    NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
+    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
+    long num_bytes = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(sandboxC, long);
+    CALLBACK_PARAMS_FINISHED(sandboxC);
+
+    //We should not assume anything about - need to have some sort of validation here
+    cb_skip_input_data(jd, num_bytes);
+  }
+
+  SANDBOX_CALLBACK boolean fill_input_buffer_stub(uintptr_t sandboxPtr)
+  {
+    printf("Callback fill_input_buffer_stub\n");
+    NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
+    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
+    CALLBACK_PARAMS_FINISHED(sandboxC);
+
+    //We should not assume anything about - need to have some sort of validation here
+    return cb_fill_input_buffer(jd);
+  }
+  SANDBOX_CALLBACK void term_source_stub(uintptr_t sandboxPtr)
+  {
+    printf("Callback term_source_stub\n");
+    NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
+    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
+    CALLBACK_PARAMS_FINISHED(sandboxC);
+
+    //We should not assume anything about - need to have some sort of validation here
+    cb_term_source(jd);
+  }
+
+  SANDBOX_CALLBACK boolean jpeg_resync_to_restart_stub(uintptr_t sandboxPtr)
+  {
+    printf("Callback jpeg_resync_to_restart_stub\n");
+    NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
+    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
+    int desired = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(sandboxC, int);
+    CALLBACK_PARAMS_FINISHED(sandboxC);
+
+    //We should not assume anything about - need to have some sort of validation here
+    return cb_jpeg_resync_to_restart(jd, desired);
+  }
+
+  t_my_error_exit d_my_error_exit(t_my_error_exit callback)
+  {
+    cb_my_error_exit = callback;
+    uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, MY_ERROR_EXIT_CALLBACK_SLOT, (uintptr_t) my_error_exit_stub);
+    if(registeredCallback == 0)
+    {
+        printf("Failed in registering the error handler my_error_exit");
+    }
+    return (t_my_error_exit) registeredCallback;
+  }
+  t_init_source d_init_source(t_init_source callback)
+  {
+    cb_init_source = callback;
+    uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, INIT_SOURCE_SLOT, (uintptr_t) init_source_stub);
+    if(registeredCallback == 0)
+    {
+        printf("Failed in registering the error handler init_source");
+    }
+    return (t_init_source) registeredCallback;
+  }
+  t_skip_input_data d_skip_input_data(t_skip_input_data callback)
+  {
+    cb_skip_input_data = callback;
+    uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, FILL_INPUT_BUFFER_SLOT, (uintptr_t) skip_input_data_stub);
+    if(registeredCallback == 0)
+    {
+        printf("Failed in registering the error handler skip_input_data");
+    }
+    return (t_skip_input_data) registeredCallback;
+  }
+  t_fill_input_buffer d_fill_input_buffer(t_fill_input_buffer callback)
+  {
+    cb_fill_input_buffer = callback;
+    uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, SKIP_INPUT_DATA_SLOT, (uintptr_t) fill_input_buffer_stub);
+    if(registeredCallback == 0)
+    {
+        printf("Failed in registering the error handler fill_input_buffer");
+    }
+    return (t_fill_input_buffer) registeredCallback;
+  }
+  t_term_source d_term_source(t_term_source callback)
+  {
+    cb_term_source = callback;
+    uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, JPEG_RESYNC_TO_RESTART_SLOT, (uintptr_t) term_source_stub);
+    if(registeredCallback == 0)
+    {
+        printf("Failed in registering the error handler term_source");
+    }
+    return (t_term_source) registeredCallback;
+  }
+  t_jpeg_resync_to_restart d_jpeg_resync_to_restart(t_jpeg_resync_to_restart callback)
+  {
+    cb_jpeg_resync_to_restart = callback;
+    uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, TERM_SOURCE_SLOT, (uintptr_t) jpeg_resync_to_restart_stub);
+    if(registeredCallback == 0)
+    {
+        printf("Failed in registering the error handler jpeg_resync_to_restart");
+    }
+    return (t_jpeg_resync_to_restart) registeredCallback;
+  }
+#else
+
+  struct jpeg_error_mgr * d_jpeg_std_error(struct jpeg_error_mgr * err)
+  {
+    printf("jpeg_std_error\n");
+    return ptr_jpeg_std_error(err);
+  }
+  void d_jpeg_CreateCompress(j_compress_ptr cinfo, int version, size_t structsize)
+  {
+    printf("jpeg_CreateCompress\n");
+    ptr_jpeg_CreateCompress(cinfo, version, structsize);
+  }
+  void d_jpeg_stdio_dest(j_compress_ptr cinfo, FILE * outfile)
+  {
+    printf("jpeg_stdio_dest\n");
+    ptr_jpeg_stdio_dest(cinfo, outfile);
+  }
+  void d_jpeg_set_defaults(j_compress_ptr cinfo)
+  {
+    printf("jpeg_set_defaults\n");
+    ptr_jpeg_set_defaults(cinfo);
+  }
+  void d_jpeg_set_quality(j_compress_ptr cinfo, int quality, boolean force_baseline)
+  {
+    printf("jpeg_set_quality\n");
+    ptr_jpeg_set_quality(cinfo, quality, force_baseline);
+  }
+  void d_jpeg_start_compress(j_compress_ptr cinfo, boolean write_all_tables)
+  {
+    printf("jpeg_start_compress\n");
+    ptr_jpeg_start_compress(cinfo, write_all_tables);
+  }
+  JDIMENSION d_jpeg_write_scanlines(j_compress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION num_lines)
+  {
+    printf("jpeg_write_scanlines\n");
+    return ptr_jpeg_write_scanlines(cinfo, scanlines, num_lines);
+  }
+  void d_jpeg_finish_compress(j_compress_ptr cinfo)
+  {
+    printf("jpeg_finish_compress\n");
+    ptr_jpeg_finish_compress(cinfo);
+  }
+  void d_jpeg_destroy_compress(j_compress_ptr cinfo)
+  {
+    printf("jpeg_destroy_compress\n");
+    ptr_jpeg_destroy_compress(cinfo);
+  }
+  void d_jpeg_CreateDecompress(j_decompress_ptr cinfo, int version, size_t structsize)
+  {
+    printf("jpeg_CreateDecompress\n");
+    ptr_jpeg_CreateDecompress(cinfo, version, structsize);
+  }
+  void d_jpeg_stdio_src(j_decompress_ptr cinfo, FILE * infile)
+  {
+    printf("jpeg_stdio_src\n");
+    ptr_jpeg_stdio_src(cinfo, infile);
+  }
+  int d_jpeg_read_header(j_decompress_ptr cinfo, boolean require_image)
+  {
+    printf("jpeg_read_header\n");
+    return ptr_jpeg_read_header(cinfo, require_image);
+  }
+  boolean d_jpeg_start_decompress(j_decompress_ptr cinfo)
+  {
+    printf("jpeg_start_decompress\n");
+    return ptr_jpeg_start_decompress(cinfo);
+  }
+  JDIMENSION d_jpeg_read_scanlines(j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines)
+  {
+    printf("jpeg_read_scanlines\n");
+    return ptr_jpeg_read_scanlines(cinfo, scanlines, max_lines);
+  }
+  boolean d_jpeg_finish_decompress(j_decompress_ptr cinfo)
+  {
+    printf("jpeg_finish_decompress\n");
+    return ptr_jpeg_finish_decompress(cinfo);
+  }
+  void d_jpeg_destroy_decompress(j_decompress_ptr cinfo)
+  {
+    printf("jpeg_destroy_decompress\n");
+    ptr_jpeg_destroy_decompress(cinfo);
+  }
+  void d_jpeg_save_markers (j_decompress_ptr cinfo, int marker_code, unsigned int length_limit)
+  {
+    printf("jpeg_save_markers\n");
+    ptr_jpeg_save_markers(cinfo, marker_code, length_limit);
+  }
+  boolean d_jpeg_has_multiple_scans (j_decompress_ptr cinfo)
+  {
+    printf("jpeg_has_multiple_scans\n");
+    return ptr_jpeg_has_multiple_scans(cinfo);
+  }
+  void d_jpeg_calc_output_dimensions (j_decompress_ptr cinfo)
+  {
+    printf("jpeg_calc_output_dimensions\n");
+    ptr_jpeg_calc_output_dimensions(cinfo);
+  }
+  boolean d_jpeg_start_output (j_decompress_ptr cinfo, int scan_number)
+  {
+    printf("jpeg_start_output\n");
+    return ptr_jpeg_start_output(cinfo, scan_number);
+  }
+  boolean d_jpeg_finish_output (j_decompress_ptr cinfo)
+  {
+    printf("jpeg_finish_output\n");
+    return ptr_jpeg_finish_output(cinfo);
+  }
+  boolean d_jpeg_input_complete (j_decompress_ptr cinfo)
+  {
+    printf("jpeg_input_complete\n");
+    return ptr_jpeg_input_complete(cinfo);
+  }
+  int d_jpeg_consume_input (j_decompress_ptr cinfo)
+  {
+    printf("jpeg_consume_input\n");
+    return ptr_jpeg_consume_input(cinfo);
+  }
+  JSAMPARRAY d_alloc_sarray(void* alloc_sarray, j_common_ptr cinfo, int pool_id, JDIMENSION samplesperrow, JDIMENSION numrows)
+  {
+    printf("alloc_sarray\n");
+
+    typedef JSAMPARRAY (*t_alloc_sarray)(j_common_ptr, int, JDIMENSION, JDIMENSION);
+    t_alloc_sarray ptr_alloc_sarray = (t_alloc_sarray) alloc_sarray;
+
+    return ptr_alloc_sarray(cinfo, pool_id, samplesperrow, numrows);
+  }
+  void d_format_message(void* format_message, j_common_ptr cinfo, char *buffer)
+  {
+    printf("format_message\n");
+
+    typedef void (*t_format_message)(j_common_ptr, char *);
+    t_format_message ptr_format_message = (t_format_message) format_message;
+
+    ptr_format_message(cinfo, buffer);
+  }
+  t_my_error_exit d_my_error_exit(t_my_error_exit callback)
+  {
+    return callback;
+  }
+  t_init_source d_init_source(t_init_source callback)
+  {
+    return callback;
+  }
+  t_skip_input_data d_skip_input_data(t_skip_input_data callback)
+  {
+    return callback;
+  }
+  t_fill_input_buffer d_fill_input_buffer(t_fill_input_buffer callback)
+  {
+    return callback;
+  }
+  t_term_source d_term_source(t_term_source callback)
+  {
+    return callback;
+  }
+  t_jpeg_resync_to_restart d_jpeg_resync_to_restart(t_jpeg_resync_to_restart callback)
+  {
+    return callback;
+  }
+
+#endif

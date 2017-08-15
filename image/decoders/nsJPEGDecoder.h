@@ -97,6 +97,11 @@ public:
   const JOCTET* mSegment;   // The current segment we are decoding from
   uint32_t mSegmentLen;     // amount of data in mSegment
 
+  JOCTET* s_mSegment;
+  uint32_t s_mSegmentLen;
+  JOCTET* s_mBackBuffer;
+  uint32_t s_mBackBufferLen;
+
   JOCTET* mBackBuffer;
   uint32_t mBackBufferLen; // Offset of end of active backtrack data
   uint32_t mBackBufferSize; // size in bytes what mBackBuffer was created with

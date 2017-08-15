@@ -1,6 +1,11 @@
 My notes
 ========
-Version of firefox modified to use a sandboxed version of libjpeg. Update the paths in media/libjpeg_naclport/moz.build and then build with ./mach build. 
+Version of firefox modified to use a sandboxed version of libjpeg. Update the paths in media/libjpeg_naclport/moz.build and then build with ./mach build.
+
+To run use
+# for the purposes of testing we are turning of seccomp. Eventually, we should perform all initialization prior to seccomp init
+export MOZ_DISABLE_CONTENT_SANDBOX=1
+./mach run
 
 The sandboxed version of libjpeg is compiled with NaCl's gcc compiler. 
 This binary is then loaded with the help of the library from https://github.com/shravanrn/Sandboxing_NaCl.git

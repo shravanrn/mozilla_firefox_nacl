@@ -78,7 +78,7 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
           Transition::TerminateSuccess())
  , mDecodeStyle(aDecodeStyle)
 {
-
+  printf("FF Flag nsJPEGDecoder\n");
   initializeLibJpegSandbox();
 
   p_mInfo = (struct jpeg_decompress_struct *) mallocInJpegSandbox(sizeof(struct jpeg_decompress_struct));
@@ -114,6 +114,11 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
 
   mCMSMode = 0;
 
+  s_mSegment = nullptr;
+  s_mSegmentLen = 0;
+  s_mBackBuffer = nullptr;
+  s_mBackBufferLen = 0;
+
   MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
          ("nsJPEGDecoder::nsJPEGDecoder: Creating JPEG decoder %p",
           this));
@@ -121,6 +126,7 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
 
 nsJPEGDecoder::~nsJPEGDecoder()
 {
+  printf("FF Flag ~nsJPEGDecoder\n");
   // Step 8: Release JPEG decompression object
   struct jpeg_decompress_struct &mInfo = *p_mInfo;
   mInfo.src = nullptr;
@@ -138,6 +144,16 @@ nsJPEGDecoder::~nsJPEGDecoder()
   freeInJpegSandbox(p_mSourceMgr);
   freeInJpegSandbox(p_mErr);
   freeInJpegSandbox(p_mInfo);
+  if(s_mSegmentLen != 0)
+  {
+    freeInJpegSandbox(s_mSegment);
+  }
+  if(s_mBackBufferLen != 0)
+  {
+    freeInJpegSandbox(s_mBackBuffer);
+  }
+
+  printf("FF Flag ~nsJPEGDecoder Done\n");
 
   MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
          ("nsJPEGDecoder::~nsJPEGDecoder: Destroying JPEG decoder %p",
@@ -153,6 +169,7 @@ nsJPEGDecoder::SpeedHistogram() const
 nsresult
 nsJPEGDecoder::InitInternal()
 {
+  printf("FF Flag InitInternal\n");
   mCMSMode = gfxPlatform::GetCMSMode();
   if (GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
     mCMSMode = eCMSMode_Off;
@@ -202,6 +219,7 @@ nsJPEGDecoder::InitInternal()
 nsresult
 nsJPEGDecoder::FinishInternal()
 {
+  printf("FF Flag FinishInternal\n");
   // If we're not in any sort of error case, force our state to JPEG_DONE.
   if ((mState != JPEG_DONE && mState != JPEG_SINK_NON_JPEG_TRAILER) &&
       (mState != JPEG_ERROR) &&
@@ -215,6 +233,7 @@ nsJPEGDecoder::FinishInternal()
 LexerResult
 nsJPEGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
+  printf("FF Flag DoDecode\n");
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
 
   return mLexer.Lex(aIterator, aOnResume,
@@ -232,6 +251,7 @@ nsJPEGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 LexerTransition<nsJPEGDecoder::State>
 nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 {
+  printf("FF Flag ReadJPEGData\n");
   mSegment = reinterpret_cast<const JOCTET*>(aData);
   mSegmentLen = aLength;
   decoder_error_mgr &mErr = *p_mErr;
@@ -261,7 +281,6 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
          ("[this=%p] nsJPEGDecoder::Write -- processing JPEG data\n", this));
 
   struct jpeg_decompress_struct &mInfo = *p_mInfo;
-
   switch (mState) {
     case JPEG_HEADER: {
       LOG_SCOPE((mozilla::LogModule*)sJPEGLog, "nsJPEGDecoder::Write -- entering JPEG_HEADER"
@@ -273,10 +292,10 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
                ("} (JPEG_SUSPENDED)"));
         return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
       }
-
       // Post our size to the superclass
       PostSize(mInfo.image_width, mInfo.image_height,
                ReadOrientationFromEXIF());
+
       if (HasError()) {
         // Setting the size led to an error.
         mState = JPEG_ERROR;
@@ -608,6 +627,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 LexerTransition<nsJPEGDecoder::State>
 nsJPEGDecoder::FinishedJPEGData()
 {
+  printf("FF Flag FinishedJPEGData\n");
   // Since we set up an unbuffered read for SIZE_MAX bytes, if we actually read
   // all that data something is really wrong.
   MOZ_ASSERT_UNREACHABLE("Read the entire address space?");
@@ -617,9 +637,10 @@ nsJPEGDecoder::FinishedJPEGData()
 Orientation
 nsJPEGDecoder::ReadOrientationFromEXIF()
 {
+  printf("FF Flag ReadOrientationFromEXIF\n");
+
   jpeg_saved_marker_ptr marker;
   struct jpeg_decompress_struct &mInfo = *p_mInfo;
-
   // Locate the APP1 marker, where EXIF data is stored, in the marker list.
   for (marker = mInfo.marker_list ; marker != nullptr ; marker = marker->next) {
     marker = (jpeg_saved_marker_ptr) getUnsandboxedJpegPtr((uintptr_t) marker);
@@ -634,15 +655,18 @@ nsJPEGDecoder::ReadOrientationFromEXIF()
     return Orientation();
   }
 
+  JOCTET* dataConv = (JOCTET*) getUnsandboxedJpegPtr((uintptr_t)marker->data);
   // Extract the orientation information.
-  EXIFData exif = EXIFParser::Parse(marker->data,
+  EXIFData exif = EXIFParser::Parse(dataConv,
                                     static_cast<uint32_t>(marker->data_length));
+
   return exif.orientation;
 }
 
 void
 nsJPEGDecoder::NotifyDone()
 {
+  printf("FF Flag NotifyDone\n");
   PostFrameStop(Opacity::FULLY_OPAQUE);
   PostDecodeDone();
 }
@@ -650,19 +674,22 @@ nsJPEGDecoder::NotifyDone()
 void
 nsJPEGDecoder::OutputScanlines(bool* suspend)
 {
+  printf("FF Flag OutputScanlines\n");
   *suspend = false;
   struct jpeg_decompress_struct &mInfo = *p_mInfo;
 
   const uint32_t top = mInfo.output_scanline;
 
-  JSAMPARRAY pBufferSys;
   unsigned int row_stride = mInfo.output_width * mInfo.output_components;
+  JSAMPARRAY pBufferSys;
   {
     //Unfortunately, the buffer for image data used by firefox is very complex
     //So figuring out how to allocate that buffer in the sandbox needs tracking down of too many internals of firefox
     //use a simpler approach for now
     //allocate a new buffer on the target sandbox and then copy it
     //We will most likely loose perf because of this
+    //Jpeg provides an api to allocate a buffer for a particular image, that will be destroyed automatically
+    //we use this instead of malloc
     struct jpeg_memory_mgr * mem_mgr = (struct jpeg_memory_mgr *) getUnsandboxedJpegPtr((uintptr_t) mInfo.mem);
     void* p_alloc_sarray = (void*) getUnsandboxedJpegPtr((uintptr_t) mem_mgr->alloc_sarray);
 
@@ -672,6 +699,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
   while ((mInfo.output_scanline < mInfo.output_height)) {
       uint32_t* imageRow = nullptr;
+
       if (mDownscaler) {
         imageRow = reinterpret_cast<uint32_t*>(mDownscaler->RowBuffer());
       } else {
@@ -683,10 +711,13 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
       if (mInfo.out_color_space == MOZ_JCS_EXT_NATIVE_ENDIAN_XRGB) {
         // Special case: scanline will be directly converted into packed ARGB
-        //if (jpeg_read_scanlines(&mInfo, (JSAMPARRAY)&imageRow, 1) != 1) {
+        // if (jpeg_read_scanlines(&mInfo, (JSAMPARRAY)&imageRow, 1) != 1) {
 
-        JDIMENSION readScanLinesRet = d_jpeg_read_scanlines(&mInfo, pBufferSys, 1);
-        memcpy((void *)imageRow, (void *)pBufferSys, row_stride);
+        JDIMENSION readScanLinesRet;
+        readScanLinesRet = d_jpeg_read_scanlines(&mInfo, pBufferSys, 1);
+
+        void* pBufferSysMemCpyTarget = (void *)getUnsandboxedJpegPtr((uintptr_t)*pBufferSys);
+        memcpy((void *)imageRow, pBufferSysMemCpyTarget, row_stride);
 
         if (readScanLinesRet != 1) {
           *suspend = true; // suspend
@@ -698,6 +729,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
         continue; // all done for this row!
       }
 
+
       JSAMPROW sampleRow = (JSAMPROW)imageRow;
       if (mInfo.output_components == 3) {
         // Put the pixels at end of row to enable in-place expansion
@@ -708,7 +740,8 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       // if (jpeg_read_scanlines(&mInfo, &sampleRow, 1) != 1) {
 
       JDIMENSION readScanLinesRet2 = d_jpeg_read_scanlines(&mInfo, pBufferSys, 1);
-      memcpy((void *)sampleRow, (void *)pBufferSys, row_stride);
+      void* pBufferSysMemCpyTarget2 = (void *)getUnsandboxedJpegPtr((uintptr_t)*pBufferSys);
+      memcpy((void *)sampleRow, pBufferSysMemCpyTarget2, row_stride);
 
       if (readScanLinesRet2 != 1) {
         *suspend = true; // suspend
@@ -915,6 +948,23 @@ skip_input_data (j_decompress_ptr jd, long num_bytes)
         if TRUE is returned.  A FALSE return should only be used when I/O
         suspension is desired.
 */
+void ensureBufferLength(JOCTET*& currBuff, uint32_t& currLen, uint32_t newLen)
+{
+  if(currLen != 0 && newLen > currLen)
+  {
+    printf("Free segment/back buffer: %u -> %u\n", (unsigned) currLen, (unsigned) newLen); 
+    freeInJpegSandbox(currBuff);
+    currLen = 0;
+  }
+
+  if(currLen == 0)
+  {
+    printf("Allocing segment/back buffer: %u\n", (unsigned) newLen);
+    currBuff = (JOCTET*) mallocInJpegSandbox(newLen);
+    currLen = newLen;
+  }
+}
+
 METHODDEF(boolean)
 fill_input_buffer (j_decompress_ptr jd)
 {
@@ -946,14 +996,18 @@ fill_input_buffer (j_decompress_ptr jd)
 
     decoder->mBackBufferUnreadLen = src->bytes_in_buffer;
 
-    src->next_input_byte = new_buffer;
+    ensureBufferLength(decoder->s_mSegment, decoder->s_mSegmentLen, new_buflen);    
+    memcpy(decoder->s_mSegment, new_buffer, new_buflen);
+
+    src->next_input_byte = (const JOCTET*) getSandboxedJpegPtr((uintptr_t) decoder->s_mSegment);
     src->bytes_in_buffer = (size_t)new_buflen;
     decoder->mReading = false;
 
     return true;
   }
 
-  if (src->next_input_byte != decoder->mSegment) {
+  // if (src->next_input_byte != decoder->mSegment) {
+  if ((const JOCTET*) getUnsandboxedJpegPtr((uintptr_t) src->next_input_byte) != decoder->s_mSegment) {
     // Backtrack data has been permanently consumed.
     decoder->mBackBufferUnreadLen = 0;
     decoder->mBackBufferLen = 0;
@@ -986,13 +1040,20 @@ fill_input_buffer (j_decompress_ptr jd)
 
   // Copy remainder of netlib segment into backtrack buffer.
   memmove(decoder->mBackBuffer + decoder->mBackBufferLen,
-          src->next_input_byte,
+          // src->next_input_byte,
+          (const JOCTET*) getUnsandboxedJpegPtr((uintptr_t) src->next_input_byte),
           src->bytes_in_buffer);
 
   // Point to start of data to be rescanned.
-  src->next_input_byte = decoder->mBackBuffer + decoder->mBackBufferLen -
+  JOCTET* new_input_byte_val = decoder->mBackBuffer + decoder->mBackBufferLen -
                          decoder->mBackBufferUnreadLen;
   src->bytes_in_buffer += decoder->mBackBufferUnreadLen;
+
+  ensureBufferLength(decoder->s_mBackBuffer, decoder->s_mBackBufferLen, src->bytes_in_buffer);
+  JOCTET* new_backBuffer = decoder->s_mBackBuffer;  
+  memcpy(new_backBuffer, new_input_byte_val, src->bytes_in_buffer);
+  src->next_input_byte = (const JOCTET*) getSandboxedJpegPtr((uintptr_t) new_backBuffer);
+
   decoder->mBackBufferLen = (size_t)new_backtrack_buflen;
   decoder->mReading = true;
 
