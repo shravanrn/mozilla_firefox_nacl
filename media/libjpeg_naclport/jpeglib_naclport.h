@@ -11,6 +11,8 @@ extern "C" {
 int initializeLibJpegSandbox();
 uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr);
 uintptr_t getSandboxedJpegPtr(uintptr_t uaddr);
+int isAddressInJpegSandboxMemoryOrNull(uintptr_t uaddr);
+int isAddressInNonJpegSandboxMemoryOrNull(uintptr_t uaddr);
 void* mallocInJpegSandbox(size_t size);
 void freeInJpegSandbox(void* ptr);
 
