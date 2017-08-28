@@ -79,7 +79,12 @@ int initializeLibJpegSandbox()
   #ifdef USE_SANDBOXING
     printf("Creating NaCl Sandbox");
 
-    initializeDlSandboxCreator(0 /* Should enable detailed logging */);
+    if(!initializeDlSandboxCreator(0 /* Should enable detailed logging */))
+    {
+      printf("Error creating jpeg Sandbox");
+      return 0;
+    }
+
     jpegSandbox = createDlSandbox(STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
 
     if(!jpegSandbox)
@@ -157,7 +162,7 @@ int initializeLibJpegSandbox()
 uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr)
 {
   #ifdef USE_SANDBOXING
-    return NaClUserToSysOrNull(jpegSandbox->nap, uaddr);
+    return getUnsandboxedAddress(jpegSandbox, uaddr);
   #else
     return uaddr;
   #endif
@@ -165,7 +170,7 @@ uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr)
 uintptr_t getSandboxedJpegPtr(uintptr_t uaddr)
 {
   #ifdef USE_SANDBOXING
-    return NaClSysToUserOrNull(jpegSandbox->nap, uaddr);    
+    return getSandboxedAddress(jpegSandbox, uaddr);    
   #else
     return uaddr;
   #endif
@@ -211,212 +216,212 @@ void freeInJpegSandbox(void* ptr)
   struct jpeg_error_mgr * d_jpeg_std_error(struct jpeg_error_mgr * err)
   {
     printf("Calling func d_jpeg_std_error\n");
-    preFunctionCall(jpegSandbox, sizeof(err), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, struct jpeg_error_mgr *, err);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_std_error);
-    return (struct jpeg_error_mgr *)functionCallReturnPtr(jpegSandbox);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(err), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, struct jpeg_error_mgr *, err);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_std_error);
+    return (struct jpeg_error_mgr *)functionCallReturnPtr(threadData);
   }
   void d_jpeg_CreateCompress(j_compress_ptr cinfo, int version, size_t structsize)
   {
     printf("Calling func d_jpeg_CreateCompress\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(version) + sizeof(structsize), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-    PUSH_VAL_TO_STACK(jpegSandbox, int, version);
-    PUSH_VAL_TO_STACK(jpegSandbox, size_t, structsize);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_CreateCompress);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(version) + sizeof(structsize), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(threadData, int, version);
+    PUSH_VAL_TO_STACK(threadData, size_t, structsize);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_CreateCompress);
   }
   void d_jpeg_stdio_dest(j_compress_ptr cinfo, FILE * outfile)
   {
     printf("Calling func d_jpeg_stdio_dest\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(outfile), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-    PUSH_PTR_TO_STACK(jpegSandbox, FILE *, outfile);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_stdio_dest);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(outfile), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
+    PUSH_PTR_TO_STACK(threadData, FILE *, outfile);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_stdio_dest);
   }
   void d_jpeg_set_defaults(j_compress_ptr cinfo)
   {
     printf("Calling func d_jpeg_set_defaults\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_set_defaults);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_set_defaults);
   }
   void d_jpeg_set_quality(j_compress_ptr cinfo, int quality, boolean force_baseline)
   {
     printf("Calling func d_jpeg_set_quality\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(quality) + sizeof(force_baseline), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-    PUSH_VAL_TO_STACK(jpegSandbox, int, quality);
-    PUSH_VAL_TO_STACK(jpegSandbox, boolean, force_baseline);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_set_quality);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(quality) + sizeof(force_baseline), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(threadData, int, quality);
+    PUSH_VAL_TO_STACK(threadData, boolean, force_baseline);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_set_quality);
   }
   void d_jpeg_start_compress(j_compress_ptr cinfo, boolean write_all_tables)
   {
     printf("Calling func d_jpeg_start_compress\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(write_all_tables), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-    PUSH_VAL_TO_STACK(jpegSandbox, boolean, write_all_tables);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_start_compress);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(write_all_tables), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(threadData, boolean, write_all_tables);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_start_compress);
   }
   JDIMENSION d_jpeg_write_scanlines(j_compress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION num_lines)
   {
     printf("Calling func d_jpeg_write_scanlines\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(scanlines) + sizeof(num_lines), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-    PUSH_PTR_TO_STACK(jpegSandbox, JSAMPARRAY, scanlines);
-    PUSH_VAL_TO_STACK(jpegSandbox, JDIMENSION, num_lines);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_write_scanlines);
-    return (JDIMENSION) functionCallReturnRawPrimitiveInt(jpegSandbox);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(scanlines) + sizeof(num_lines), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
+    PUSH_PTR_TO_STACK(threadData, JSAMPARRAY, scanlines);
+    PUSH_VAL_TO_STACK(threadData, JDIMENSION, num_lines);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_write_scanlines);
+    return (JDIMENSION) functionCallReturnRawPrimitiveInt(threadData);
   }
   void d_jpeg_finish_compress(j_compress_ptr cinfo)
   {
     printf("Calling func d_jpeg_finish_compress\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_finish_compress);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_finish_compress);
   }
   void d_jpeg_destroy_compress(j_compress_ptr cinfo)
   {
     printf("Calling func d_jpeg_destroy_compress\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_compress_ptr, cinfo);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_destroy_compress);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_destroy_compress);
   }
   void d_jpeg_CreateDecompress(j_decompress_ptr cinfo, int version, size_t structsize)
   {
     printf("Calling func d_jpeg_CreateDecompress\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(version) + sizeof(structsize), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    PUSH_VAL_TO_STACK(jpegSandbox, int, version);
-    PUSH_VAL_TO_STACK(jpegSandbox, size_t, structsize);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_CreateDecompress);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(version) + sizeof(structsize), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(threadData, int, version);
+    PUSH_VAL_TO_STACK(threadData, size_t, structsize);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_CreateDecompress);
   }
   void d_jpeg_stdio_src(j_decompress_ptr cinfo, FILE * infile)
   {
     printf("Calling func d_jpeg_stdio_src\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(infile), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    PUSH_PTR_TO_STACK(jpegSandbox, FILE *, infile);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_stdio_src);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(infile), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    PUSH_PTR_TO_STACK(threadData, FILE *, infile);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_stdio_src);
   }
   int d_jpeg_read_header(j_decompress_ptr cinfo, boolean require_image)
   {
     printf("Calling func d_jpeg_read_header\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(require_image), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    PUSH_VAL_TO_STACK(jpegSandbox, boolean, require_image);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_read_header);
-    return (int) functionCallReturnRawPrimitiveInt(jpegSandbox);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(require_image), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(threadData, boolean, require_image);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_read_header);
+    return (int) functionCallReturnRawPrimitiveInt(threadData);
   }
   boolean d_jpeg_start_decompress(j_decompress_ptr cinfo)
   {
     printf("Calling func d_jpeg_start_decompress\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_start_decompress);
-    return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_start_decompress);
+    return (boolean) functionCallReturnRawPrimitiveInt(threadData);
   }
   JDIMENSION d_jpeg_read_scanlines(j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines)
   {
     printf("Calling func d_jpeg_read_scanlines\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(scanlines) + sizeof(max_lines), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    PUSH_PTR_TO_STACK(jpegSandbox, JSAMPARRAY, scanlines);
-    PUSH_VAL_TO_STACK(jpegSandbox, JDIMENSION, max_lines);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_read_scanlines);
-    return (JDIMENSION) functionCallReturnRawPrimitiveInt(jpegSandbox);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(scanlines) + sizeof(max_lines), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    PUSH_PTR_TO_STACK(threadData, JSAMPARRAY, scanlines);
+    PUSH_VAL_TO_STACK(threadData, JDIMENSION, max_lines);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_read_scanlines);
+    return (JDIMENSION) functionCallReturnRawPrimitiveInt(threadData);
   }
   boolean d_jpeg_finish_decompress(j_decompress_ptr cinfo)
   {
     printf("Calling func d_jpeg_finish_decompress\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_finish_decompress);
-    return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_finish_decompress);
+    return (boolean) functionCallReturnRawPrimitiveInt(threadData);
   }
   void d_jpeg_destroy_decompress(j_decompress_ptr cinfo)
   {
     printf("Calling func d_jpeg_destroy_decompress\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_destroy_decompress);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_destroy_decompress);
   }
   void d_jpeg_save_markers (j_decompress_ptr cinfo, int marker_code, unsigned int length_limit)
   {
     printf("Calling func d_jpeg_save_markers\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(marker_code) + sizeof(length_limit), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    PUSH_VAL_TO_STACK(jpegSandbox, int, marker_code);
-    PUSH_VAL_TO_STACK(jpegSandbox, unsigned int, length_limit);
-    invokeFunctionCall(jpegSandbox, ptr_jpeg_save_markers);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(marker_code) + sizeof(length_limit), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(threadData, int, marker_code);
+    PUSH_VAL_TO_STACK(threadData, unsigned int, length_limit);
+    invokeFunctionCall(threadData, ptr_jpeg_save_markers);
   }
   boolean d_jpeg_has_multiple_scans (j_decompress_ptr cinfo)
   {
     printf("Calling func d_jpeg_has_multiple_scans\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_has_multiple_scans);
-    return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_has_multiple_scans);
+    return (boolean) functionCallReturnRawPrimitiveInt(threadData);
   }
   void d_jpeg_calc_output_dimensions (j_decompress_ptr cinfo)
   {
     printf("Calling func d_jpeg_calc_output_dimensions\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_calc_output_dimensions);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_calc_output_dimensions);
   }
   boolean d_jpeg_start_output (j_decompress_ptr cinfo, int scan_number)
   {
     printf("Calling func d_jpeg_start_output\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_start_output);
-    return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_start_output);
+    return (boolean) functionCallReturnRawPrimitiveInt(threadData);
   }
   boolean d_jpeg_finish_output (j_decompress_ptr cinfo)
   {
     printf("Calling func d_jpeg_finish_output\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_finish_output);
-    return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_finish_output);
+    return (boolean) functionCallReturnRawPrimitiveInt(threadData);
   }
   boolean d_jpeg_input_complete (j_decompress_ptr cinfo)
   {
     printf("Calling func d_jpeg_input_complete\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_input_complete);
-    return (boolean) functionCallReturnRawPrimitiveInt(jpegSandbox);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_input_complete);
+    return (boolean) functionCallReturnRawPrimitiveInt(threadData);
   }
   int d_jpeg_consume_input (j_decompress_ptr cinfo)
   {
     printf("Calling func d_jpeg_consume_input\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_decompress_ptr, cinfo);
-    invokeFunctionCall(jpegSandbox, (void *)ptr_jpeg_consume_input);
-    return (int) functionCallReturnRawPrimitiveInt(jpegSandbox);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    invokeFunctionCall(threadData, (void *)ptr_jpeg_consume_input);
+    return (int) functionCallReturnRawPrimitiveInt(threadData);
   }
 
   //Fn pointer calls
   JSAMPARRAY d_alloc_sarray(void* alloc_sarray, j_common_ptr cinfo, int pool_id, JDIMENSION samplesperrow, JDIMENSION numrows)
   {
     printf("Calling func d_alloc_sarray\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(pool_id) + sizeof(samplesperrow) + sizeof(numrows), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_common_ptr, cinfo);
-    PUSH_VAL_TO_STACK(jpegSandbox, int, pool_id);
-    PUSH_VAL_TO_STACK(jpegSandbox, JDIMENSION, samplesperrow);
-    PUSH_VAL_TO_STACK(jpegSandbox, JDIMENSION, numrows);
-    invokeFunctionCall(jpegSandbox, alloc_sarray);
-    return (JSAMPARRAY)functionCallReturnPtr(jpegSandbox);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(pool_id) + sizeof(samplesperrow) + sizeof(numrows), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_common_ptr, cinfo);
+    PUSH_VAL_TO_STACK(threadData, int, pool_id);
+    PUSH_VAL_TO_STACK(threadData, JDIMENSION, samplesperrow);
+    PUSH_VAL_TO_STACK(threadData, JDIMENSION, numrows);
+    invokeFunctionCall(threadData, alloc_sarray);
+    return (JSAMPARRAY)functionCallReturnPtr(threadData);
   }
 
   void d_format_message(void* format_message, j_common_ptr cinfo, char *buffer)
   {
     printf("Calling func d_format_message\n");
-    preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(buffer), 0 /* size of any arrays being pushed on the stack */);
-    PUSH_PTR_TO_STACK(jpegSandbox, j_common_ptr, cinfo);
-    PUSH_PTR_TO_STACK(jpegSandbox, char *, buffer);
-    invokeFunctionCall(jpegSandbox, format_message);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(buffer), 0 /* size of any arrays being pushed on the stack */);
+    PUSH_PTR_TO_STACK(threadData, j_common_ptr, cinfo);
+    PUSH_PTR_TO_STACK(threadData, char *, buffer);
+    invokeFunctionCall(threadData, format_message);
   }
 
 
@@ -432,8 +437,8 @@ void freeInJpegSandbox(void* ptr)
   {
     printf("Callback my_error_exit_stub\n");
     NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
-    j_common_ptr cinfo = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_common_ptr);
-    CALLBACK_PARAMS_FINISHED(sandboxC);
+    NaClSandbox_Thread* threadData = callbackParamsBegin(sandboxC);
+    j_common_ptr cinfo = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, j_common_ptr);
 
     //We should not assume anything about - need to have some sort of validation here
     cb_my_error_exit(cinfo);
@@ -442,8 +447,8 @@ void freeInJpegSandbox(void* ptr)
   {
     printf("Callback init_source_stub\n");
     NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
-    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
-    CALLBACK_PARAMS_FINISHED(sandboxC);
+    NaClSandbox_Thread* threadData = callbackParamsBegin(sandboxC);
+    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, j_decompress_ptr);
 
     //We should not assume anything about - need to have some sort of validation here
     cb_init_source(jd);
@@ -452,9 +457,9 @@ void freeInJpegSandbox(void* ptr)
   {
     printf("Callback skip_input_data_stub\n");
     NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
-    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
-    long num_bytes = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(sandboxC, long);
-    CALLBACK_PARAMS_FINISHED(sandboxC);
+    NaClSandbox_Thread* threadData = callbackParamsBegin(sandboxC);
+    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, j_decompress_ptr);
+    long num_bytes = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(threadData, long);
 
     //We should not assume anything about - need to have some sort of validation here
     cb_skip_input_data(jd, num_bytes);
@@ -464,8 +469,8 @@ void freeInJpegSandbox(void* ptr)
   {
     printf("Callback fill_input_buffer_stub\n");
     NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
-    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
-    CALLBACK_PARAMS_FINISHED(sandboxC);
+    NaClSandbox_Thread* threadData = callbackParamsBegin(sandboxC);
+    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, j_decompress_ptr);
 
     //We should not assume anything about - need to have some sort of validation here
     return cb_fill_input_buffer(jd);
@@ -474,8 +479,8 @@ void freeInJpegSandbox(void* ptr)
   {
     printf("Callback term_source_stub\n");
     NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
-    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
-    CALLBACK_PARAMS_FINISHED(sandboxC);
+    NaClSandbox_Thread* threadData = callbackParamsBegin(sandboxC);
+    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, j_decompress_ptr);
 
     //We should not assume anything about - need to have some sort of validation here
     cb_term_source(jd);
@@ -485,9 +490,9 @@ void freeInJpegSandbox(void* ptr)
   {
     printf("Callback jpeg_resync_to_restart_stub\n");
     NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
-    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(sandboxC, j_decompress_ptr);
-    int desired = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(sandboxC, int);
-    CALLBACK_PARAMS_FINISHED(sandboxC);
+    NaClSandbox_Thread* threadData = callbackParamsBegin(sandboxC);
+    j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, j_decompress_ptr);
+    int desired = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(threadData, int);
 
     //We should not assume anything about - need to have some sort of validation here
     return cb_jpeg_resync_to_restart(jd, desired);
