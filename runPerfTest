@@ -1,0 +1,31 @@
+export MOZ_DISABLE_CONTENT_SANDBOX=1
+
+if [ -z "$1" ]; then 
+	echo "Expected argument ./runPerfTest outputfile.txt"; 
+	exit 1; 
+fi
+
+sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
+sleep 5
+./mach talos-test --activeTests jpeg_page_render
+
+echo -e "NACL\n" >> "$1"
+cat /home/shr/Code/mozilla-release/testing/mozharness/build/local.json >> "$1"
+echo -e "\n---------------------\n" >> "$1"
+
+mv firefox_32bit_optdebug firefox_32bit_optdebug_nacl
+mv firefox_32bit_optdebug_nonnacl firefox_32bit_optdebug
+
+sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
+sleep 5
+./mach talos-test --activeTests jpeg_page_render
+
+echo -e "Non-NACL\n" >> "$1"
+cat /home/shr/Code/mozilla-release/testing/mozharness/build/local.json >> "$1"
+echo -e "\n---------------------\n" >> "$1"
+
+mv firefox_32bit_optdebug firefox_32bit_optdebug_nonnacl
+mv firefox_32bit_optdebug_nacl firefox_32bit_optdebug
+
+echo "Output results to $1"
+cat "$1"

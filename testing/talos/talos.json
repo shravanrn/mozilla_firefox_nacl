@@ -62,6 +62,9 @@
             "talos_options": ["--disable-stylo"],
             "pagesets_name": "tp5n.zip"
         },
+        "jpeg_tests": {
+            "tests": ["jpeg_page_render"]
+        },
         "svgr-e10s": {
             "tests": ["tsvgx", "tsvgr_opacity", "tart", "tscrollx", "tsvg_static"]
         },
