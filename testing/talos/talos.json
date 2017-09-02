@@ -74,6 +74,9 @@
             "tests": ["ts_paint_webext", "tp5o_webext"],
             "pagesets_name": "tp5n.zip"
         },
+        "jpeg_tests": {
+            "tests": ["jpeg_page_render"]
+        },
         "svgr": {
             "tests": ["tsvgx", "tsvgr_opacity", "tart", "tscrollx", "cart", "tsvg_static"],
             "talos_options": ["--disable-e10s"]

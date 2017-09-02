@@ -13,6 +13,9 @@ This binary is then loaded with the help of the library from https://github.com/
 Note if you are building the Sandoxing_NaCl library from scratch, make sure to use settings compatible with firefox compile settings.
 To do this, replace the SConstruct file with SConstruct_Firefox and the built it
 
+For perf testing use the script
+./runPerfTest outputfile.txt
+
 /////////////////////////////////////////////////////////////////////////////////////
 
 
