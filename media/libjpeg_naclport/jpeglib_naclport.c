@@ -92,13 +92,13 @@ int initializeLibJpegSandbox()
       printf("Error creating jpeg Sandbox");
       return 0;
     }
-  #endif
 
-  printf("Loading dynamic library %s\n", JPEG_DL_PATH);
+    printf("Loading dynamic library %s\n", JPEG_DL_PATH);
 
-  #ifdef USE_SANDBOXING
     dlPtr = dlopenInSandbox(jpegSandbox, JPEG_DL_PATH, RTLD_LAZY);
   #else
+
+    printf("Loading dynamic library %s\n", JPEG_NON_NACL_DL_PATH);
     dlPtr = dlopen(JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
   #endif
 
