@@ -20,6 +20,7 @@
 #endif
 
 void* dlPtr;
+int startedInit = 0;
 int finishedInit = 0;
 
 typedef struct jpeg_error_mgr * (*t_jpeg_std_error) (struct jpeg_error_mgr * err);
@@ -72,9 +73,14 @@ t_jpeg_consume_input          ptr_jpeg_consume_input;
 
 int initializeLibJpegSandbox()
 {
-  if(finishedInit) return 1;
+  if(startedInit)
+  {
+    while(!finishedInit){}
+    return 1;
+  }
+  
+  startedInit = 1;
   //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_DL_PATH, JPEG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
-  finishedInit = 1;
 
   #ifdef USE_SANDBOXING
     printf("Creating NaCl Sandbox");
@@ -156,6 +162,7 @@ int initializeLibJpegSandbox()
   if(failed) { return 0; }
 
   printf("Loaded symbols\n");
+  finishedInit = 1;
 
   return 1;
 }
