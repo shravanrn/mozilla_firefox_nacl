@@ -13,8 +13,11 @@ echo -e "NACL\n" >> "$1"
 cat /home/shr/Code/mozilla-release/testing/mozharness/build/local.json >> "$1"
 echo -e "\n---------------------\n" >> "$1"
 
+sleep 2
 mv firefox_32bit_optdebug firefox_32bit_optdebug_nacl
+sleep 2
 mv firefox_32bit_optdebug_nonnacl firefox_32bit_optdebug
+sleep 2
 
 sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 sleep 5
@@ -24,8 +27,11 @@ echo -e "Non-NACL\n" >> "$1"
 cat /home/shr/Code/mozilla-release/testing/mozharness/build/local.json >> "$1"
 echo -e "\n---------------------\n" >> "$1"
 
+sleep 2
 mv firefox_32bit_optdebug firefox_32bit_optdebug_nonnacl
+sleep 2
 mv firefox_32bit_optdebug_nacl firefox_32bit_optdebug
+sleep 2
 
 echo "Output results to $1"
-cat "$1"
+cat "$1" | grep -E "NACL|name|value"
