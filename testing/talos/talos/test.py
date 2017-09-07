@@ -741,9 +741,37 @@ class tsvgr_opacity(PageloaderTest):
 @register_test()
 class jpeg_page_render(PageloaderTest):
     """
-    Test the time taken to render Alexa top 500 pages. Used to measure the overhead of changing the jpeg renderer
+    Test the time taken to render 1 jpeg image
     """
     tpmanifest = '${talos}/tests/jpeg_page_render/jpeg_page_render.manifest'
+    tpcycles = 1
+    tppagecycles = 25
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+
+@register_test()
+class jpeg_page_render_25(PageloaderTest):
+    """
+    Test the time taken to render 25 jpeg image
+    """
+    tpmanifest = '${talos}/tests/jpeg_page_render/jpeg_page_render_25.manifest'
+    tpcycles = 1
+    tppagecycles = 25
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+
+@register_test()
+class jpeg_page_render_50(PageloaderTest):
+    """
+    Test the time taken to render 50 jpeg image
+    """
+    tpmanifest = '${talos}/tests/jpeg_page_render/jpeg_page_render_50.manifest'
     tpcycles = 1
     tppagecycles = 25
     tpmozafterpaint = True
