@@ -63,7 +63,7 @@
             "pagesets_name": "tp5n.zip"
         },
         "jpeg_tests": {
-            "tests": ["jpeg_page_render"]
+            "tests": ["jpeg_page_render", "jpeg_page_render_25", "jpeg_page_render_50"]
         },
         "svgr-e10s": {
             "tests": ["tsvgx", "tsvgr_opacity", "tart", "tscrollx", "tsvg_static"]

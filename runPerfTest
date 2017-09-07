@@ -5,33 +5,54 @@ if [ -z "$1" ]; then
 	exit 1; 
 fi
 
-sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
-sleep 5
-./mach talos-test --activeTests jpeg_page_render
+sudo echo "Get root"
 
-echo -e "NACL\n" >> "$1"
-cat /home/shr/Code/mozilla-release/testing/mozharness/build/local.json >> "$1"
-echo -e "\n---------------------\n" >> "$1"
+# param: outputFile
+# param: testName
+function runTest(){
+	sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
+	sleep 5
+	./mach talos-test --activeTests $2
+	cat /home/shr/Code/mozilla-release/testing/mozharness/build/local.json >> "$1"
+}
 
-sleep 2
-mv firefox_32bit_optdebug firefox_32bit_optdebug_nacl
-sleep 2
-mv firefox_32bit_optdebug_nonnacl firefox_32bit_optdebug
-sleep 2
+function switchToSandboxedFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug firefox_32bit_optdebug_nonnacl
+	sleep 2
+	mv firefox_32bit_optdebug_nacl firefox_32bit_optdebug
+	sleep 2
+}
 
-sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
-sleep 5
-./mach talos-test --activeTests jpeg_page_render
+function switchToUnsandboxedFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug firefox_32bit_optdebug_nacl
+	sleep 2
+	mv firefox_32bit_optdebug_nonnacl firefox_32bit_optdebug
+	sleep 2	
+}
 
-echo -e "Non-NACL\n" >> "$1"
-cat /home/shr/Code/mozilla-release/testing/mozharness/build/local.json >> "$1"
-echo -e "\n---------------------\n" >> "$1"
+for i in 1 2
+do
 
-sleep 2
-mv firefox_32bit_optdebug firefox_32bit_optdebug_nonnacl
-sleep 2
-mv firefox_32bit_optdebug_nacl firefox_32bit_optdebug
-sleep 2
+	echo -e "NACL\n" >> "$1"
+	#runTest "$1" "jpeg_page_render"
+	#runTest "$1" "jpeg_page_render_25"
+	runTest "$1" "jpeg_page_render_50"
+	echo -e "\n---------------------\n" >> "$1"
+
+	switchToUnsandboxedFirefox
+
+
+	echo -e "Non-NACL\n" >> "$1"
+	#runTest "$1" "jpeg_page_render"
+	#runTest "$1" "jpeg_page_render_25"
+	runTest "$1" "jpeg_page_render_50"
+	echo -e "\n---------------------\n" >> "$1"
+
+	switchToSandboxedFirefox
+
+done
 
 echo "Output results to $1"
 cat "$1" | grep -E "NACL|name|value"
