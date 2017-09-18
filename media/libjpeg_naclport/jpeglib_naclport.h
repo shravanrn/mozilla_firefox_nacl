@@ -49,9 +49,8 @@ void d_format_message(void* format_message, j_common_ptr cinfo, char *buffer);
 
 typedef void (*t_my_error_exit) (j_common_ptr cinfo);
 typedef void (*t_init_source) (j_decompress_ptr jd);
-typedef boolean (*t_fill_input_buffer) (j_decompress_ptr jd);
 typedef void (*t_skip_input_data) (j_decompress_ptr jd, long num_bytes);
-typedef boolean (*t_jpeg_resync_to_restart) (j_decompress_ptr cinfo, int desired);
+typedef boolean (*t_fill_input_buffer) (j_decompress_ptr jd);
 typedef void (*t_term_source) (j_decompress_ptr jd);
 typedef boolean (*t_jpeg_resync_to_restart) (j_decompress_ptr cinfo, int desired);
 
