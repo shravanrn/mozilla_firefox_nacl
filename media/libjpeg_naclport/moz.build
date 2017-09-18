@@ -12,11 +12,14 @@ EXPORTS += [
 ]
 
 SOURCES += [
-    'jpeglib_naclport.c',
+    'jpeglib_naclport.cpp',
 ]
 
 # Comment out the following if you don't want NaCl sandboxing. The value '42' below is disregarded
-DEFINES['USE_SANDBOXING'] = 42
+#DEFINES['USE_SANDBOXING'] = 42
+
+# Comment out the following if you don't want to print the time spent in jpeg rendering. The value '42' below is disregarded
+DEFINES['PRINT_FUNCTION_TIMES'] = 42
 
 ############ Update these paths as required
 DEFINES['JPEG_DL_PATH'] = '"/home/shr/Code/libjpeg-turbo/nacl_build/.libs/libjpeg.so"'
