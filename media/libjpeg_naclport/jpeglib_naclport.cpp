@@ -35,7 +35,7 @@
 
   #define END_TIMER()   SandboxExitTime = high_resolution_clock::now(); \
     timeSpentInJpeg+= duration_cast<nanoseconds>(SandboxExitTime - SandboxEnterTime).count(); \
-    printf("JPEG Time (%p)(inv = %10" PRId64 ") = %10" PRId64 "\n", (void*)&timeSpentInJpeg, sandboxFuncOrCallbackInvocations, timeSpentInJpeg)
+    printf("%10" PRId64 ",JPEG_Time,%p,%10" PRId64 "\n", sandboxFuncOrCallbackInvocations, (void*)&timeSpentInJpeg, timeSpentInJpeg)
 
 #else
   #define START_TIMER() do {} while(0)
