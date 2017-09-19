@@ -5,15 +5,58 @@ if [ -z "$1" ]; then
 	exit 1; 
 fi
 
-sudo echo "Get root"
+#Get root
+sudo echo "Starting. Make sure to disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
+
+#param: outputfile
+#param: logfile
+function writeTimingLinesToOutput() {
+	# Logs are in the format as given below
+	#
+	# stuff | 1,JPEG_Time,0xf7150598,10
+	# stuff | 2,JPEG_Time,0xf7150598,33
+	# stuff | 1,JPEG_Time,0xaaa,31
+	# stuff | 2,JPEG_Time,0xaaa,40
+	#
+	# where the 4 comma separated columns are 
+	# - invocation count for this thread
+	# - const string "JPEG_Time"
+	# - a unique string for each thread
+	# - cumulative time spent in "timed" code
+	#
+	# We want the latest time for each thread i.e.
+	#
+	# stuff | 2,JPEG_Time,0xf7150598,33
+	# stuff | 2,JPEG_Time,0xaaa,40
+
+
+	ORIGINALDATA=$(cat "$2")
+	DATATOFILTER=$(echo "$ORIGINALDATA" | grep -E "JPEG_Time" | grep -o '|.*' | sed 's/| //')
+	OIFS=$IFS
+	IFS=,
+
+	while [ -n "$DATATOFILTER" ]
+	do
+
+		TOPLINE=$(echo "$DATATOFILTER" | sort -r -n | head -1)
+		echo "$TOPLINE" >> "$1"
+		echo -e "\n" >> "$1"
+		read -ra PIECES <<<"$TOPLINE"
+		DATATOFILTER=$(echo "$DATATOFILTER" | grep -v -E "${PIECES[2]}")
+	done
+
+	IFS=$OIFS
+}
 
 # param: outputFile
 # param: testName
 function runTest(){
 	sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 	sleep 5
-	./mach talos-test --activeTests $2
+	taskset -c 3 ./mach talos-test --activeTests $2 2>&1 | tee ./talos_output.txt
 	cat /home/shr/Code/mozilla-release/testing/mozharness/build/local.json >> "$1"
+	writeTimingLinesToOutput "$1" "./talos_output.txt"
+	rm ./talos_output.txt
 }
 
 function switchToSandboxedFirefox(){
@@ -36,18 +79,18 @@ for i in 1 2
 do
 
 	echo -e "NACL\n" >> "$1"
-	#runTest "$1" "jpeg_page_render"
-	#runTest "$1" "jpeg_page_render_25"
-	runTest "$1" "jpeg_page_render_50"
+	runTest "$1" "jpeg_page_render"
+	# runTest "$1" "jpeg_page_render_25"
+	# runTest "$1" "jpeg_page_render_50"
 	echo -e "\n---------------------\n" >> "$1"
 
 	switchToUnsandboxedFirefox
 
 
 	echo -e "Non-NACL\n" >> "$1"
-	#runTest "$1" "jpeg_page_render"
-	#runTest "$1" "jpeg_page_render_25"
-	runTest "$1" "jpeg_page_render_50"
+	runTest "$1" "jpeg_page_render"
+	# runTest "$1" "jpeg_page_render_25"
+	# runTest "$1" "jpeg_page_render_50"
 	echo -e "\n---------------------\n" >> "$1"
 
 	switchToSandboxedFirefox
@@ -55,4 +98,4 @@ do
 done
 
 echo "Output results to $1"
-cat "$1" | grep -E "NACL|name|value"
+cat "$1" | grep -E "NACL|name|value|JPEG_Time"
