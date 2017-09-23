@@ -745,6 +745,7 @@ class jpeg_page_render(PageloaderTest):
     """
     tpmanifest = '${talos}/tests/jpeg_page_render/jpeg_page_render.manifest'
     tpcycles = 1
+    tploadnocache = True
     tppagecycles = 25
     tpmozafterpaint = True
     gecko_profile_interval = 1
@@ -759,6 +760,7 @@ class jpeg_page_render_25(PageloaderTest):
     """
     tpmanifest = '${talos}/tests/jpeg_page_render/jpeg_page_render_25.manifest'
     tpcycles = 1
+    tploadnocache = True
     tppagecycles = 25
     tpmozafterpaint = True
     gecko_profile_interval = 1
@@ -773,6 +775,7 @@ class jpeg_page_render_50(PageloaderTest):
     """
     tpmanifest = '${talos}/tests/jpeg_page_render/jpeg_page_render_50.manifest'
     tpcycles = 1
+    tploadnocache = True
     tppagecycles = 25
     tpmozafterpaint = True
     gecko_profile_interval = 1
