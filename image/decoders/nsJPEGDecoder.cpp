@@ -78,7 +78,7 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
           Transition::TerminateSuccess())
  , mDecodeStyle(aDecodeStyle)
 {
-  printf("FF Flag nsJPEGDecoder\n");
+  //printf("FF Flag nsJPEGDecoder\n");
   initializeLibJpegSandbox();
 
   p_mInfo = (struct jpeg_decompress_struct *) mallocInJpegSandbox(sizeof(struct jpeg_decompress_struct));
@@ -126,7 +126,7 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
 
 nsJPEGDecoder::~nsJPEGDecoder()
 {
-  printf("FF Flag ~nsJPEGDecoder\n");
+  //printf("FF Flag ~nsJPEGDecoder\n");
   // Step 8: Release JPEG decompression object
   struct jpeg_decompress_struct &mInfo = *p_mInfo;
   mInfo.src = nullptr;
@@ -152,7 +152,7 @@ nsJPEGDecoder::~nsJPEGDecoder()
     freeInJpegSandbox(s_mBackBuffer);
   }
 
-  printf("FF Flag ~nsJPEGDecoder Done\n");
+  //printf("FF Flag ~nsJPEGDecoder Done\n");
 
   MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
          ("nsJPEGDecoder::~nsJPEGDecoder: Destroying JPEG decoder %p",
@@ -168,7 +168,7 @@ nsJPEGDecoder::SpeedHistogram() const
 nsresult
 nsJPEGDecoder::InitInternal()
 {
-  printf("FF Flag InitInternal\n");
+  //printf("FF Flag InitInternal\n");
   mCMSMode = gfxPlatform::GetCMSMode();
   if (GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
     mCMSMode = eCMSMode_Off;
@@ -218,7 +218,7 @@ nsJPEGDecoder::InitInternal()
 nsresult
 nsJPEGDecoder::FinishInternal()
 {
-  printf("FF Flag FinishInternal\n");
+  //printf("FF Flag FinishInternal\n");
   // If we're not in any sort of error case, force our state to JPEG_DONE.
   if ((mState != JPEG_DONE && mState != JPEG_SINK_NON_JPEG_TRAILER) &&
       (mState != JPEG_ERROR) &&
@@ -232,7 +232,7 @@ nsJPEGDecoder::FinishInternal()
 LexerResult
 nsJPEGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
-  printf("FF Flag DoDecode\n");
+  //printf("FF Flag DoDecode\n");
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
 
   return mLexer.Lex(aIterator, aOnResume,
@@ -250,7 +250,7 @@ nsJPEGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 LexerTransition<nsJPEGDecoder::State>
 nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 {
-  printf("FF Flag ReadJPEGData\n");
+  //printf("FF Flag ReadJPEGData\n");
   mSegment = reinterpret_cast<const JOCTET*>(aData);
   mSegmentLen = aLength;
   decoder_error_mgr &mErr = *p_mErr;
@@ -626,7 +626,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 LexerTransition<nsJPEGDecoder::State>
 nsJPEGDecoder::FinishedJPEGData()
 {
-  printf("FF Flag FinishedJPEGData\n");
+  //printf("FF Flag FinishedJPEGData\n");
   // Since we set up an unbuffered read for SIZE_MAX bytes, if we actually read
   // all that data something is really wrong.
   MOZ_ASSERT_UNREACHABLE("Read the entire address space?");
@@ -636,7 +636,7 @@ nsJPEGDecoder::FinishedJPEGData()
 Orientation
 nsJPEGDecoder::ReadOrientationFromEXIF()
 {
-  printf("FF Flag ReadOrientationFromEXIF\n");
+  //printf("FF Flag ReadOrientationFromEXIF\n");
 
   jpeg_saved_marker_ptr marker;
   struct jpeg_decompress_struct &mInfo = *p_mInfo;
@@ -665,7 +665,7 @@ nsJPEGDecoder::ReadOrientationFromEXIF()
 void
 nsJPEGDecoder::NotifyDone()
 {
-  printf("FF Flag NotifyDone\n");
+  //printf("FF Flag NotifyDone\n");
   PostFrameStop(Opacity::FULLY_OPAQUE);
   PostDecodeDone();
 }
@@ -673,7 +673,7 @@ nsJPEGDecoder::NotifyDone()
 void
 nsJPEGDecoder::OutputScanlines(bool* suspend)
 {
-  printf("FF Flag OutputScanlines\n");
+  //printf("FF Flag OutputScanlines\n");
   *suspend = false;
   struct jpeg_decompress_struct &mInfo = *p_mInfo;
 
@@ -951,14 +951,14 @@ void ensureBufferLength(JOCTET*& currBuff, uint32_t& currLen, uint32_t newLen)
 {
   if(currLen != 0 && newLen > currLen)
   {
-    printf("Free segment/back buffer: %u -> %u\n", (unsigned) currLen, (unsigned) newLen); 
+    //printf("Free segment/back buffer: %u -> %u\n", (unsigned) currLen, (unsigned) newLen); 
     freeInJpegSandbox(currBuff);
     currLen = 0;
   }
 
   if(currLen == 0)
   {
-    printf("Allocing segment/back buffer: %u\n", (unsigned) newLen);
+    //printf("Allocing segment/back buffer: %u\n", (unsigned) newLen);
     currBuff = (JOCTET*) mallocInJpegSandbox(newLen);
     currLen = newLen;
   }
