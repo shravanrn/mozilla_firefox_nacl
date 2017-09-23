@@ -31,19 +31,26 @@ function writeTimingLinesToOutput() {
 
 
 	ORIGINALDATA=$(cat "$2")
-	DATATOFILTER=$(echo "$ORIGINALDATA" | grep -E "JPEG_Time" | grep -o '|.*' | sed 's/| //')
+	DATATOFILTER=$(echo "$ORIGINALDATA" | grep -E "JPEG_Time" | grep -v "'TOPLINE'" | grep -o '|.*' | sed 's/| //')
 	OIFS=$IFS
 	IFS=,
 
+	FNINVOCATIONS=0
+	FNTIMESPENT=0
 	while [ -n "$DATATOFILTER" ]
 	do
 
 		TOPLINE=$(echo "$DATATOFILTER" | sort -r -n | head -1)
-		echo "$TOPLINE" >> "$1"
-		echo -e "\n" >> "$1"
+		echo "JPEG_Time TOPLINE: $TOPLINE" >> "$1"
 		read -ra PIECES <<<"$TOPLINE"
+		FNINVOCATIONS=$((FNINVOCATIONS + PIECES[0]))
+		FNTIMESPENT=$((FNTIMESPENT + PIECES[3]))
 		DATATOFILTER=$(echo "$DATATOFILTER" | grep -v -E "${PIECES[2]}")
 	done
+
+	COMMASEPTIME=$(printf "%'.f\n" $((FNTIMESPENT / 25)))
+	echo "Final JPEG_Time (for 1 run): inv=$((FNINVOCATIONS / 25)) time=$COMMASEPTIME" >> "$1"
+	echo -e "\n" >> "$1"
 
 	IFS=$OIFS
 }
