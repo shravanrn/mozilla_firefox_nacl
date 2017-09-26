@@ -8,6 +8,11 @@ extern "C" {
 #include <stdio.h>
 #include "jpeglib.h"
 
+unsigned long long getTimeSpentInJpeg();
+unsigned long long getInvocationsInJpeg();
+unsigned long long getTimeSpentInJpegCore();
+unsigned long long getInvocationsInJpegCore();
+
 int initializeLibJpegSandbox();
 uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr);
 uintptr_t getSandboxedJpegPtr(uintptr_t uaddr);

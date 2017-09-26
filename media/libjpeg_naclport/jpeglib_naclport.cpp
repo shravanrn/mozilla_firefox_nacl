@@ -6,7 +6,15 @@
 
 //Note USE_SANDBOXING MAY be defined as a macro in the moz.build of this folder
 
-#ifdef USE_SANDBOXING
+#ifndef USE_SANDBOXING
+  #error "USE_SANDBOXING value not provided"
+#endif
+
+#if(USE_SANDBOXING != 0 && USE_SANDBOXING != 1 && USE_SANDBOXING != 2)
+  #error "Bad USE_SANDBOXING value provided"
+#endif
+
+#if(USE_SANDBOXING == 2)
   #include "dyn_ldr_lib.h"
 
   #define MY_ERROR_EXIT_CALLBACK_SLOT 0
@@ -23,90 +31,30 @@
 #ifdef PRINT_FUNCTION_TIMES
 
   #include <chrono>
+  #include <atomic>
   using namespace std::chrono;
 
-  __thread long long timeSpentInJpeg = 0;
-  __thread long long sandboxFuncOrCallbackInvocations = 0;
-
-  __thread long long d_jpeg_std_error_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_CreateCompress_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_stdio_dest_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_set_defaults_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_set_quality_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_start_compress_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_write_scanlines_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_finish_compress_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_destroy_compress_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_CreateDecompress_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_stdio_src_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_read_header_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_start_decompress_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_read_scanlines_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_finish_decompress_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_destroy_decompress_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_save_markers_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_has_multiple_scans_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_calc_output_dimensions_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_start_output_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_finish_output_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_input_complete_timeSpentInJpeg = 0;
-  __thread long long d_jpeg_consume_input_timeSpentInJpeg = 0;
-  __thread long long d_alloc_sarray_timeSpentInJpeg = 0;
-  __thread long long d_format_message_timeSpentInJpeg = 0;
-  __thread long long my_error_exit_stub_timeSpentInJpeg = 0;
-  __thread long long init_source_stub_timeSpentInJpeg = 0;
-  __thread long long skip_input_data_stub_timeSpentInJpeg = 0;
-  __thread long long fill_input_buffer_stub_timeSpentInJpeg = 0;
-  __thread long long term_source_stub_timeSpentInJpeg = 0;
-  __thread long long jpeg_resync_to_restart_stub_timeSpentInJpeg = 0;
-
-  __thread long long d_jpeg_std_error_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_CreateCompress_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_stdio_dest_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_set_defaults_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_set_quality_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_start_compress_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_write_scanlines_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_finish_compress_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_destroy_compress_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_CreateDecompress_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_stdio_src_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_read_header_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_start_decompress_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_read_scanlines_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_finish_decompress_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_destroy_decompress_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_save_markers_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_has_multiple_scans_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_calc_output_dimensions_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_start_output_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_finish_output_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_input_complete_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_jpeg_consume_input_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_alloc_sarray_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long d_format_message_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long my_error_exit_stub_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long init_source_stub_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long skip_input_data_stub_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long fill_input_buffer_stub_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long term_source_stub_sandboxFuncOrCallbackInvocations = 0;
-  __thread long long jpeg_resync_to_restart_stub_sandboxFuncOrCallbackInvocations = 0;
+  std::atomic_ullong timeSpentInJpeg{0};
+  std::atomic_ullong timeSpentInJpegCore{0};
+  std::atomic_ullong sandboxFuncOrCallbackInvocations{0};
+  std::atomic_ullong sandboxFuncOrCallbackInvocationsCore{0};
 
   __thread high_resolution_clock::time_point SandboxEnterTime;
   __thread high_resolution_clock::time_point SandboxExitTime;
-  
+
   #define START_TIMER(NAME) SandboxEnterTime = high_resolution_clock::now(); \
+    sandboxFuncOrCallbackInvocations++
+
+  #define START_TIMER_CORE(NAME) SandboxEnterTime = high_resolution_clock::now(); \
     sandboxFuncOrCallbackInvocations++; \
-    NAME ## _sandboxFuncOrCallbackInvocations++
+    sandboxFuncOrCallbackInvocationsCore++
 
   #define END_TIMER(NAME)   SandboxExitTime = high_resolution_clock::now(); \
-    timeSpentInJpeg+= duration_cast<nanoseconds>(SandboxExitTime - SandboxEnterTime).count(); \
-    NAME ## _timeSpentInJpeg += duration_cast<nanoseconds>(SandboxExitTime - SandboxEnterTime).count(); \
-    printf("%10" PRId64 ",JPEG_Time,%p,%10" PRId64, sandboxFuncOrCallbackInvocations, (void*)&timeSpentInJpeg, timeSpentInJpeg); \
-    printf(",JPEG_COMPONENTS: d_jpeg_std_error_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_CreateCompress_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_stdio_dest_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_set_defaults_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_set_quality_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_start_compress_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_write_scanlines_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_finish_compress_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_destroy_compress_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_CreateDecompress_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_stdio_src_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_read_header_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_start_decompress_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_read_scanlines_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_finish_decompress_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_destroy_decompress_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_save_markers_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_has_multiple_scans_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_calc_output_dimensions_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_start_output_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_finish_output_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_input_complete_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_jpeg_consume_input_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_alloc_sarray_sandboxFuncOrCallbackInvocations: %10" PRId64 ",d_format_message_sandboxFuncOrCallbackInvocations: %10" PRId64 ",my_error_exit_stub_sandboxFuncOrCallbackInvocations: %10" PRId64 ",init_source_stub_sandboxFuncOrCallbackInvocations: %10" PRId64 ",skip_input_data_stub_sandboxFuncOrCallbackInvocations: %10" PRId64 ",fill_input_buffer_stub_sandboxFuncOrCallbackInvocations: %10" PRId64 ",term_source_stub_sandboxFuncOrCallbackInvocations: %10" PRId64 ",jpeg_resync_to_restart_stub_sandboxFuncOrCallbackInvocations: %10" PRId64, d_jpeg_std_error_sandboxFuncOrCallbackInvocations,d_jpeg_CreateCompress_sandboxFuncOrCallbackInvocations,d_jpeg_stdio_dest_sandboxFuncOrCallbackInvocations,d_jpeg_set_defaults_sandboxFuncOrCallbackInvocations,d_jpeg_set_quality_sandboxFuncOrCallbackInvocations,d_jpeg_start_compress_sandboxFuncOrCallbackInvocations,d_jpeg_write_scanlines_sandboxFuncOrCallbackInvocations,d_jpeg_finish_compress_sandboxFuncOrCallbackInvocations,d_jpeg_destroy_compress_sandboxFuncOrCallbackInvocations,d_jpeg_CreateDecompress_sandboxFuncOrCallbackInvocations,d_jpeg_stdio_src_sandboxFuncOrCallbackInvocations,d_jpeg_read_header_sandboxFuncOrCallbackInvocations,d_jpeg_start_decompress_sandboxFuncOrCallbackInvocations,d_jpeg_read_scanlines_sandboxFuncOrCallbackInvocations,d_jpeg_finish_decompress_sandboxFuncOrCallbackInvocations,d_jpeg_destroy_decompress_sandboxFuncOrCallbackInvocations,d_jpeg_save_markers_sandboxFuncOrCallbackInvocations,d_jpeg_has_multiple_scans_sandboxFuncOrCallbackInvocations,d_jpeg_calc_output_dimensions_sandboxFuncOrCallbackInvocations,d_jpeg_start_output_sandboxFuncOrCallbackInvocations,d_jpeg_finish_output_sandboxFuncOrCallbackInvocations,d_jpeg_input_complete_sandboxFuncOrCallbackInvocations,d_jpeg_consume_input_sandboxFuncOrCallbackInvocations,d_alloc_sarray_sandboxFuncOrCallbackInvocations,d_format_message_sandboxFuncOrCallbackInvocations,my_error_exit_stub_sandboxFuncOrCallbackInvocations,init_source_stub_sandboxFuncOrCallbackInvocations,skip_input_data_stub_sandboxFuncOrCallbackInvocations,fill_input_buffer_stub_sandboxFuncOrCallbackInvocations,term_source_stub_sandboxFuncOrCallbackInvocations,jpeg_resync_to_restart_stub_sandboxFuncOrCallbackInvocations); \
-    printf(",JPEG_COMPONENTS: d_jpeg_std_error_timeSpentInJpeg: %10" PRId64 ",d_jpeg_CreateCompress_timeSpentInJpeg: %10" PRId64 ",d_jpeg_stdio_dest_timeSpentInJpeg: %10" PRId64 ",d_jpeg_set_defaults_timeSpentInJpeg: %10" PRId64 ",d_jpeg_set_quality_timeSpentInJpeg: %10" PRId64 ",d_jpeg_start_compress_timeSpentInJpeg: %10" PRId64 ",d_jpeg_write_scanlines_timeSpentInJpeg: %10" PRId64 ",d_jpeg_finish_compress_timeSpentInJpeg: %10" PRId64 ",d_jpeg_destroy_compress_timeSpentInJpeg: %10" PRId64 ",d_jpeg_CreateDecompress_timeSpentInJpeg: %10" PRId64 ",d_jpeg_stdio_src_timeSpentInJpeg: %10" PRId64 ",d_jpeg_read_header_timeSpentInJpeg: %10" PRId64 ",d_jpeg_start_decompress_timeSpentInJpeg: %10" PRId64 ",d_jpeg_read_scanlines_timeSpentInJpeg: %10" PRId64 ",d_jpeg_finish_decompress_timeSpentInJpeg: %10" PRId64 ",d_jpeg_destroy_decompress_timeSpentInJpeg: %10" PRId64 ",d_jpeg_save_markers_timeSpentInJpeg: %10" PRId64 ",d_jpeg_has_multiple_scans_timeSpentInJpeg: %10" PRId64 ",d_jpeg_calc_output_dimensions_timeSpentInJpeg: %10" PRId64 ",d_jpeg_start_output_timeSpentInJpeg: %10" PRId64 ",d_jpeg_finish_output_timeSpentInJpeg: %10" PRId64 ",d_jpeg_input_complete_timeSpentInJpeg: %10" PRId64 ",d_jpeg_consume_input_timeSpentInJpeg: %10" PRId64 ",d_alloc_sarray_timeSpentInJpeg: %10" PRId64 ",d_format_message_timeSpentInJpeg: %10" PRId64 ",my_error_exit_stub_timeSpentInJpeg: %10" PRId64 ",init_source_stub_timeSpentInJpeg: %10" PRId64 ",skip_input_data_stub_timeSpentInJpeg: %10" PRId64 ",fill_input_buffer_stub_timeSpentInJpeg: %10" PRId64 ",term_source_stub_timeSpentInJpeg: %10" PRId64 ",jpeg_resync_to_restart_stub_timeSpentInJpeg: %10" PRId64, d_jpeg_std_error_timeSpentInJpeg,d_jpeg_CreateCompress_timeSpentInJpeg,d_jpeg_stdio_dest_timeSpentInJpeg,d_jpeg_set_defaults_timeSpentInJpeg,d_jpeg_set_quality_timeSpentInJpeg,d_jpeg_start_compress_timeSpentInJpeg,d_jpeg_write_scanlines_timeSpentInJpeg,d_jpeg_finish_compress_timeSpentInJpeg,d_jpeg_destroy_compress_timeSpentInJpeg,d_jpeg_CreateDecompress_timeSpentInJpeg,d_jpeg_stdio_src_timeSpentInJpeg,d_jpeg_read_header_timeSpentInJpeg,d_jpeg_start_decompress_timeSpentInJpeg,d_jpeg_read_scanlines_timeSpentInJpeg,d_jpeg_finish_decompress_timeSpentInJpeg,d_jpeg_destroy_decompress_timeSpentInJpeg,d_jpeg_save_markers_timeSpentInJpeg,d_jpeg_has_multiple_scans_timeSpentInJpeg,d_jpeg_calc_output_dimensions_timeSpentInJpeg,d_jpeg_start_output_timeSpentInJpeg,d_jpeg_finish_output_timeSpentInJpeg,d_jpeg_input_complete_timeSpentInJpeg,d_jpeg_consume_input_timeSpentInJpeg,d_alloc_sarray_timeSpentInJpeg,d_format_message_timeSpentInJpeg,my_error_exit_stub_timeSpentInJpeg,init_source_stub_timeSpentInJpeg,skip_input_data_stub_timeSpentInJpeg,fill_input_buffer_stub_timeSpentInJpeg,term_source_stub_timeSpentInJpeg,jpeg_resync_to_restart_stub_timeSpentInJpeg); \
-    printf("\n");
+    timeSpentInJpeg+= duration_cast<nanoseconds>(SandboxExitTime - SandboxEnterTime).count()
 
+  #define END_TIMER_CORE(NAME)   SandboxExitTime = high_resolution_clock::now(); \
+    timeSpentInJpeg+= duration_cast<nanoseconds>(SandboxExitTime - SandboxEnterTime).count(); \
+    timeSpentInJpegCore+= duration_cast<nanoseconds>(SandboxExitTime - SandboxEnterTime).count()
 
 #else
   #define START_TIMER(NAME) do {} while(0)
@@ -173,6 +121,39 @@ t_skip_input_data        cb_skip_input_data;
 t_jpeg_resync_to_restart cb_jpeg_resync_to_restart;
 t_term_source            cb_term_source;
 
+unsigned long long getTimeSpentInJpeg()
+{
+  #ifdef PRINT_FUNCTION_TIMES
+    return timeSpentInJpeg;
+  #else
+    return 0;
+  #endif
+}
+unsigned long long getTimeSpentInJpegCore()
+{
+  #ifdef PRINT_FUNCTION_TIMES
+    return timeSpentInJpegCore;
+  #else
+    return 0;
+  #endif
+}
+unsigned long long getInvocationsInJpeg()
+{
+  #ifdef PRINT_FUNCTION_TIMES
+    return sandboxFuncOrCallbackInvocations;
+  #else
+    return 0;
+  #endif
+}
+unsigned long long getInvocationsInJpegCore()
+{
+  #ifdef PRINT_FUNCTION_TIMES
+    return sandboxFuncOrCallbackInvocationsCore;
+  #else
+    return 0;
+  #endif
+}
+
 int initializeLibJpegSandbox()
 {
   if(startedInit)
@@ -182,10 +163,16 @@ int initializeLibJpegSandbox()
   }
   
   startedInit = 1;
+  #if(USE_SANDBOXING == 0)
+    printf("Using static libjpeg\n");
+    finishedInit = 1;
+    return 1;
+  #endif
+
   //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_DL_PATH, JPEG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
 
-  #ifdef USE_SANDBOXING
-    printf("Creating NaCl Sandbox");
+  #if(USE_SANDBOXING == 2)
+    printf("Creating NaCl Sandbox\n");
 
     if(!initializeDlSandboxCreator(0 /* Should enable detailed logging */))
     {
@@ -204,7 +191,7 @@ int initializeLibJpegSandbox()
     printf("Loading dynamic library %s\n", JPEG_DL_PATH);
 
     dlPtr = dlopenInSandbox(jpegSandbox, JPEG_DL_PATH, RTLD_LAZY);
-  #else
+  #elif(USE_SANDBOXING == 1)
 
     printf("Loading dynamic library %s\n", JPEG_NON_NACL_DL_PATH);
     dlPtr = dlopen(JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
@@ -219,20 +206,22 @@ int initializeLibJpegSandbox()
   printf("Loading symbols.\n");
   int failed = 0;
 
-  #ifdef USE_SANDBOXING
+  #if(USE_SANDBOXING == 2)
     #define loadSymbol(symbol) do { \
       void* dlSymRes = dlsymInSandbox(jpegSandbox, dlPtr, #symbol); \
       if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
       *((void **) &ptr_##symbol) = dlSymRes; \
     } while(0)
 
-  #else
+  #elif(USE_SANDBOXING == 1)
     #define loadSymbol(symbol) do { \
       void* dlSymRes = dlsym(dlPtr, #symbol); \
       if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
       *((void **) &ptr_##symbol) = dlSymRes; \
     } while(0)
-  
+
+  #else
+    #define loadSymbol(symbol) do {} while(0)  
   #endif
 
   loadSymbol(jpeg_std_error);
@@ -270,7 +259,7 @@ int initializeLibJpegSandbox()
 }
 uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr)
 {
-  #ifdef USE_SANDBOXING
+  #if(USE_SANDBOXING == 2)
     return getUnsandboxedAddress(jpegSandbox, uaddr);
   #else
     return uaddr;
@@ -278,7 +267,7 @@ uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr)
 }
 uintptr_t getSandboxedJpegPtr(uintptr_t uaddr)
 {
-  #ifdef USE_SANDBOXING
+  #if(USE_SANDBOXING == 2)
     return getSandboxedAddress(jpegSandbox, uaddr);    
   #else
     return uaddr;
@@ -286,7 +275,7 @@ uintptr_t getSandboxedJpegPtr(uintptr_t uaddr)
 }
 int isAddressInJpegSandboxMemoryOrNull(uintptr_t uaddr)
 {
-  #ifdef USE_SANDBOXING
+  #if(USE_SANDBOXING == 2)
     return isAddressInSandboxMemoryOrNull(jpegSandbox, uaddr);
   #else
     return 0;
@@ -294,7 +283,7 @@ int isAddressInJpegSandboxMemoryOrNull(uintptr_t uaddr)
 }
 int isAddressInNonJpegSandboxMemoryOrNull(uintptr_t uaddr)
 {
-  #ifdef USE_SANDBOXING
+  #if(USE_SANDBOXING == 2)
     return isAddressInNonSandboxMemoryOrNull(jpegSandbox, uaddr);
   #else
     return 0;
@@ -302,7 +291,7 @@ int isAddressInNonJpegSandboxMemoryOrNull(uintptr_t uaddr)
 }
 void* mallocInJpegSandbox(size_t size)
 {
- #ifdef USE_SANDBOXING
+ #if(USE_SANDBOXING == 2)
     return mallocInSandbox(jpegSandbox, size);
   #else
     return malloc(size);
@@ -310,7 +299,7 @@ void* mallocInJpegSandbox(size_t size)
 }
 void freeInJpegSandbox(void* ptr)
 {
-  #ifdef USE_SANDBOXING
+  #if(USE_SANDBOXING == 2)
     freeInSandbox(jpegSandbox, ptr);
   #else
     free(ptr);
@@ -318,7 +307,7 @@ void freeInJpegSandbox(void* ptr)
 }
 
 
-#ifdef USE_SANDBOXING
+#if(USE_SANDBOXING == 2)
 
   //API stubs
 
@@ -462,14 +451,14 @@ void freeInJpegSandbox(void* ptr)
   JDIMENSION d_jpeg_read_scanlines(j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines)
   {
     //printf("Calling func d_jpeg_read_scanlines\n");
-    START_TIMER(d_jpeg_read_scanlines);
+    START_TIMER_CORE(d_jpeg_read_scanlines);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(scanlines) + sizeof(max_lines), 0 /* size of any arrays being pushed on the stack */);
     PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
     PUSH_PTR_TO_STACK(threadData, JSAMPARRAY, scanlines);
     PUSH_VAL_TO_STACK(threadData, JDIMENSION, max_lines);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_read_scanlines);
     JDIMENSION ret = (JDIMENSION) functionCallReturnRawPrimitiveInt(threadData);
-    END_TIMER(d_jpeg_read_scanlines);
+    END_TIMER_CORE(d_jpeg_read_scanlines);
     return ret;
   }
   boolean d_jpeg_finish_decompress(j_decompress_ptr cinfo)
@@ -735,7 +724,7 @@ void freeInJpegSandbox(void* ptr)
     }
     return (t_jpeg_resync_to_restart) registeredCallback;
   }
-#else
+#elif(USE_SANDBOXING == 1)
 
   struct jpeg_error_mgr * d_jpeg_std_error(struct jpeg_error_mgr * err)
   {
@@ -835,9 +824,9 @@ void freeInJpegSandbox(void* ptr)
   JDIMENSION d_jpeg_read_scanlines(j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines)
   {
     //printf("Calling func d_jpeg_read_scanlines\n");
-    START_TIMER(d_jpeg_read_scanlines);
+    START_TIMER_CORE(d_jpeg_read_scanlines);
     JDIMENSION ret = ptr_jpeg_read_scanlines(cinfo, scanlines, max_lines);
-    END_TIMER(d_jpeg_read_scanlines);
+    END_TIMER_CORE(d_jpeg_read_scanlines);
     return ret;
   }
   boolean d_jpeg_finish_decompress(j_decompress_ptr cinfo)
@@ -1009,4 +998,280 @@ void freeInJpegSandbox(void* ptr)
     return jpeg_resync_to_restart_stub;
   }
 
+#elif(USE_SANDBOXING == 0)
+
+  struct jpeg_error_mgr * d_jpeg_std_error(struct jpeg_error_mgr * err)
+  {
+    //printf("Calling func d_jpeg_std_error\n");
+    START_TIMER(d_jpeg_std_error);
+    struct jpeg_error_mgr * ret = jpeg_std_error(err);
+    END_TIMER(d_jpeg_std_error);
+    return ret;
+  }
+  void d_jpeg_CreateCompress(j_compress_ptr cinfo, int version, size_t structsize)
+  {
+    //printf("Calling func d_jpeg_CreateCompress\n");
+    START_TIMER(d_jpeg_CreateCompress);
+    jpeg_CreateCompress(cinfo, version, structsize);
+    END_TIMER(d_jpeg_CreateCompress);
+  }
+  void d_jpeg_stdio_dest(j_compress_ptr cinfo, FILE * outfile)
+  {
+    //printf("Calling func d_jpeg_stdio_dest\n");
+    START_TIMER(d_jpeg_stdio_dest);
+    jpeg_stdio_dest(cinfo, outfile);
+    END_TIMER(d_jpeg_stdio_dest);
+  }
+  void d_jpeg_set_defaults(j_compress_ptr cinfo)
+  {
+    //printf("Calling func d_jpeg_set_defaults\n");
+    START_TIMER(d_jpeg_set_defaults);
+    jpeg_set_defaults(cinfo);
+    END_TIMER(d_jpeg_set_defaults);
+  }
+  void d_jpeg_set_quality(j_compress_ptr cinfo, int quality, boolean force_baseline)
+  {
+    //printf("Calling func d_jpeg_set_quality\n");
+    START_TIMER(d_jpeg_set_quality);
+    jpeg_set_quality(cinfo, quality, force_baseline);
+    END_TIMER(d_jpeg_set_quality);
+  }
+  void d_jpeg_start_compress(j_compress_ptr cinfo, boolean write_all_tables)
+  {
+    //printf("Calling func d_jpeg_start_compress\n");
+    START_TIMER(d_jpeg_start_compress);
+    jpeg_start_compress(cinfo, write_all_tables);
+    END_TIMER(d_jpeg_start_compress);
+  }
+  JDIMENSION d_jpeg_write_scanlines(j_compress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION num_lines)
+  {
+    //printf("Calling func d_jpeg_write_scanlines\n");
+    START_TIMER(d_jpeg_write_scanlines);
+    JDIMENSION ret = jpeg_write_scanlines(cinfo, scanlines, num_lines);
+    END_TIMER(d_jpeg_write_scanlines);
+    return ret;
+  }
+  void d_jpeg_finish_compress(j_compress_ptr cinfo)
+  {
+    //printf("Calling func d_jpeg_finish_compress\n");
+    START_TIMER(d_jpeg_finish_compress);
+    jpeg_finish_compress(cinfo);
+    END_TIMER(d_jpeg_finish_compress);
+  }
+  void d_jpeg_destroy_compress(j_compress_ptr cinfo)
+  {
+    //printf("Calling func d_jpeg_destroy_compress\n");
+    START_TIMER(d_jpeg_destroy_compress);
+    jpeg_destroy_compress(cinfo);
+    END_TIMER(d_jpeg_destroy_compress);
+  }
+  void d_jpeg_CreateDecompress(j_decompress_ptr cinfo, int version, size_t structsize)
+  {
+    //printf("Calling func d_jpeg_CreateDecompress\n");
+    START_TIMER(d_jpeg_CreateDecompress);
+    jpeg_CreateDecompress(cinfo, version, structsize);
+    END_TIMER(d_jpeg_CreateDecompress);
+  }
+  void d_jpeg_stdio_src(j_decompress_ptr cinfo, FILE * infile)
+  {
+    //printf("Calling func d_jpeg_stdio_src\n");
+    START_TIMER(d_jpeg_stdio_src);
+    jpeg_stdio_src(cinfo, infile);
+    END_TIMER(d_jpeg_stdio_src);
+  }
+  int d_jpeg_read_header(j_decompress_ptr cinfo, boolean require_image)
+  {
+    //printf("Calling func d_jpeg_read_header\n");
+    START_TIMER(d_jpeg_read_header);
+    int ret = jpeg_read_header(cinfo, require_image);
+    END_TIMER(d_jpeg_read_header);
+    return ret;
+  }
+  boolean d_jpeg_start_decompress(j_decompress_ptr cinfo)
+  {
+    //printf("Calling func d_jpeg_start_decompress\n");
+    START_TIMER(d_jpeg_start_decompress);
+    boolean ret = jpeg_start_decompress(cinfo);
+    END_TIMER(d_jpeg_start_decompress);
+    return ret;
+  }
+  JDIMENSION d_jpeg_read_scanlines(j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines)
+  {
+    //printf("Calling func d_jpeg_read_scanlines\n");
+    START_TIMER_CORE(d_jpeg_read_scanlines);
+    JDIMENSION ret = jpeg_read_scanlines(cinfo, scanlines, max_lines);
+    END_TIMER_CORE(d_jpeg_read_scanlines);
+    return ret;
+  }
+  boolean d_jpeg_finish_decompress(j_decompress_ptr cinfo)
+  {
+    //printf("Calling func d_jpeg_finish_decompress\n");
+    START_TIMER(d_jpeg_finish_decompress);
+    boolean ret = jpeg_finish_decompress(cinfo);
+    END_TIMER(d_jpeg_finish_decompress);
+    return ret;
+  }
+  void d_jpeg_destroy_decompress(j_decompress_ptr cinfo)
+  {
+    //printf("Calling func d_jpeg_destroy_decompress\n");
+    START_TIMER(d_jpeg_destroy_decompress);
+    jpeg_destroy_decompress(cinfo);
+    END_TIMER(d_jpeg_destroy_decompress);
+  }
+  void d_jpeg_save_markers (j_decompress_ptr cinfo, int marker_code, unsigned int length_limit)
+  {
+    //printf("Calling func d_jpeg_save_markers\n");
+    START_TIMER(d_jpeg_save_markers);
+    jpeg_save_markers(cinfo, marker_code, length_limit);
+    END_TIMER(d_jpeg_save_markers);
+  }
+  boolean d_jpeg_has_multiple_scans (j_decompress_ptr cinfo)
+  {
+    //printf("Calling func d_jpeg_has_multiple_scans\n");
+    START_TIMER(d_jpeg_has_multiple_scans);
+    boolean ret = jpeg_has_multiple_scans(cinfo);
+    END_TIMER(d_jpeg_has_multiple_scans);
+    return ret;
+  }
+  void d_jpeg_calc_output_dimensions (j_decompress_ptr cinfo)
+  {
+    //printf("Calling func d_jpeg_calc_output_dimensions\n");
+    START_TIMER(d_jpeg_calc_output_dimensions);
+    jpeg_calc_output_dimensions(cinfo);
+    END_TIMER(d_jpeg_calc_output_dimensions);
+  }
+  boolean d_jpeg_start_output (j_decompress_ptr cinfo, int scan_number)
+  {
+    //printf("Calling func d_jpeg_start_output\n");
+    START_TIMER(d_jpeg_start_output);
+    boolean ret = jpeg_start_output(cinfo, scan_number);
+    END_TIMER(d_jpeg_start_output);
+    return ret;
+  }
+  boolean d_jpeg_finish_output (j_decompress_ptr cinfo)
+  {
+    //printf("Calling func d_jpeg_finish_output\n");
+    START_TIMER(d_jpeg_finish_output);
+    boolean ret = jpeg_finish_output(cinfo);
+    END_TIMER(d_jpeg_finish_output);
+    return ret;
+  }
+  boolean d_jpeg_input_complete (j_decompress_ptr cinfo)
+  {
+    //printf("Calling func d_jpeg_input_complete\n");
+    START_TIMER(d_jpeg_input_complete);
+    boolean ret = jpeg_input_complete(cinfo);
+    END_TIMER(d_jpeg_input_complete);
+    return ret;
+  }
+  int d_jpeg_consume_input (j_decompress_ptr cinfo)
+  {
+    //printf("Calling func d_jpeg_consume_input\n");
+    START_TIMER(d_jpeg_consume_input);
+    int ret = jpeg_consume_input(cinfo);
+    END_TIMER(d_jpeg_consume_input);
+    return ret;
+  }
+  JSAMPARRAY d_alloc_sarray(void* alloc_sarray, j_common_ptr cinfo, int pool_id, JDIMENSION samplesperrow, JDIMENSION numrows)
+  {
+    //printf("Calling func d_alloc_sarray\n");
+    START_TIMER(d_alloc_sarray);
+
+    typedef JSAMPARRAY (*t_alloc_sarray)(j_common_ptr, int, JDIMENSION, JDIMENSION);
+    t_alloc_sarray ptr_alloc_sarray = (t_alloc_sarray) alloc_sarray;
+
+    JSAMPARRAY ret = ptr_alloc_sarray(cinfo, pool_id, samplesperrow, numrows);
+    END_TIMER(d_alloc_sarray);
+    return ret;
+  }
+  void d_format_message(void* format_message, j_common_ptr cinfo, char *buffer)
+  {
+    //printf("Calling func d_format_message\n");
+    START_TIMER(d_format_message);
+
+    typedef void (*t_format_message)(j_common_ptr, char *);
+    t_format_message ptr_format_message = (t_format_message) format_message;
+
+    ptr_format_message(cinfo, buffer);
+    END_TIMER(d_format_message);
+  }
+
+  void my_error_exit_stub(j_common_ptr cinfo)
+  {
+    END_TIMER(my_error_exit_stub);
+    //printf("Callback my_error_exit_stub\n");
+    cb_my_error_exit(cinfo);
+    START_TIMER(my_error_exit_stub);
+  }
+  void init_source_stub(j_decompress_ptr jd)
+  {
+    END_TIMER(init_source_stub);
+    //printf("Callback init_source_stub\n");
+    cb_init_source(jd);
+    START_TIMER(init_source_stub);
+  }
+  void skip_input_data_stub(j_decompress_ptr jd, long num_bytes)
+  {
+    END_TIMER(skip_input_data_stub);
+    //printf("Callback skip_input_data_stub\n");
+    cb_skip_input_data(jd, num_bytes);
+    START_TIMER(skip_input_data_stub);
+  }
+  boolean fill_input_buffer_stub(j_decompress_ptr jd)
+  {
+    END_TIMER(fill_input_buffer_stub);
+    //printf("Callback fill_input_buffer_stub\n");
+    boolean ret = cb_fill_input_buffer(jd);
+    START_TIMER(fill_input_buffer_stub);
+    return ret;
+  }
+  void term_source_stub(j_decompress_ptr jd)
+  {
+    END_TIMER(term_source_stub);
+    //printf("Callback term_source_stub\n");
+    cb_term_source(jd);
+    START_TIMER(term_source_stub);
+  }
+  boolean jpeg_resync_to_restart_stub(j_decompress_ptr jd, int desired)
+  {
+    END_TIMER(jpeg_resync_to_restart_stub);
+    //printf("Callback jpeg_resync_to_restart_stub\n");
+    boolean ret = cb_jpeg_resync_to_restart(jd, desired);
+    START_TIMER(jpeg_resync_to_restart_stub);
+    return ret;
+  }
+
+  t_my_error_exit d_my_error_exit(t_my_error_exit callback)
+  {
+    cb_my_error_exit = callback;
+    return my_error_exit_stub;
+  }
+  t_init_source d_init_source(t_init_source callback)
+  {
+    cb_init_source = callback;
+    return init_source_stub;
+  }
+  t_skip_input_data d_skip_input_data(t_skip_input_data callback)
+  {
+    cb_skip_input_data = callback;
+    return skip_input_data_stub;
+  }
+  t_fill_input_buffer d_fill_input_buffer(t_fill_input_buffer callback)
+  {
+    cb_fill_input_buffer = callback;
+    return fill_input_buffer_stub;
+  }
+  t_term_source d_term_source(t_term_source callback)
+  {
+    cb_term_source = callback;
+    return term_source_stub;
+  }
+  t_jpeg_resync_to_restart d_jpeg_resync_to_restart(t_jpeg_resync_to_restart callback)
+  {
+    cb_jpeg_resync_to_restart = callback;
+    return jpeg_resync_to_restart_stub;
+  }
+
+#else
+  #error "Bad USE_SANDBOXING value"
 #endif
