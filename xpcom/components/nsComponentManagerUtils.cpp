@@ -17,6 +17,22 @@
 
 #include "nsIComponentManager.h"
 
+#include "nsComponentManager.h"
+#include <stdio.h>
+#include <inttypes.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+extern "C" {
+  unsigned long long getTimeSpentInJpeg();
+  unsigned long long getTimeSpentInJpegCore();
+  unsigned long long getInvocationsInJpeg();
+  unsigned long long getInvocationsInJpegCore();
+}
+
+__thread int threadSpecificVar = 0;
+unsigned long long prevInv = 0;
+
 #ifndef MOZILLA_INTERNAL_API
 
 nsresult
@@ -24,6 +40,14 @@ CallGetService(const nsCID& aCID, const nsIID& aIID, void** aResult)
 {
   nsCOMPtr<nsIServiceManager> servMgr;
   nsresult status = NS_GetServiceManager(getter_AddRefs(servMgr));
+
+  unsigned long long inv = getInvocationsInJpeg();
+  if(inv != prevInv)
+  {
+    prevInv = inv;
+    printf("%10" PRId64 ",JPEG_Time,%d,%10" PRId64 ",%10" PRId64 ",%10" PRId64 "\n", inv, getppid(), getTimeSpentInJpeg(), getInvocationsInJpegCore(), getTimeSpentInJpegCore());
+  }
+
   if (servMgr) {
     status = servMgr->GetService(aCID, aIID, aResult);
   }
@@ -35,6 +59,14 @@ CallGetService(const char* aContractID, const nsIID& aIID, void** aResult)
 {
   nsCOMPtr<nsIServiceManager> servMgr;
   nsresult status = NS_GetServiceManager(getter_AddRefs(servMgr));
+
+  unsigned long long inv = getInvocationsInJpeg();
+  if(inv != prevInv)
+  {
+    prevInv = inv;
+    printf("%10" PRId64 ",JPEG_Time,%d,%10" PRId64 ",%10" PRId64 ",%10" PRId64 "\n", inv, getppid(), getTimeSpentInJpeg(), getInvocationsInJpegCore(), getTimeSpentInJpegCore());
+  }
+
   if (servMgr) {
     status = servMgr->GetServiceByContractID(aContractID, aIID, aResult);
   }
@@ -49,6 +81,14 @@ nsresult
 CallGetService(const nsCID& aCID, const nsIID& aIID, void** aResult)
 {
   nsComponentManagerImpl* compMgr = nsComponentManagerImpl::gComponentManager;
+
+  unsigned long long inv = getInvocationsInJpeg();
+  if(inv != prevInv)
+  {
+    prevInv = inv;
+    printf("%10" PRId64 ",JPEG_Time,%d,%10" PRId64 ",%10" PRId64 ",%10" PRId64 "\n", inv, getppid(), getTimeSpentInJpeg(), getInvocationsInJpegCore(), getTimeSpentInJpegCore());
+  }
+
   if (!compMgr) {
     return NS_ERROR_NOT_INITIALIZED;
   }
@@ -60,6 +100,14 @@ nsresult
 CallGetService(const char* aContractID, const nsIID& aIID, void** aResult)
 {
   nsComponentManagerImpl* compMgr = nsComponentManagerImpl::gComponentManager;
+
+  unsigned long long inv = getInvocationsInJpeg();
+  if(inv != prevInv)
+  {
+    prevInv = inv;
+    printf("%10" PRId64 ",JPEG_Time,%d,%10" PRId64 ",%10" PRId64 ",%10" PRId64 "\n", inv, getppid(), getTimeSpentInJpeg(), getInvocationsInJpegCore(), getTimeSpentInJpegCore());
+  }
+
   if (!compMgr) {
     return NS_ERROR_NOT_INITIALIZED;
   }

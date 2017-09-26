@@ -5,6 +5,11 @@ if [ -z "$1" ]; then
 	exit 1; 
 fi
 
+if [[ ! -d "firefox_32bit_optdebug_nacl" ]] || [[ ! -d "firefox_32bit_optdebug_nonnacl" ]] || [[ ! -d "firefox_32bit_optdebug_static" ]] || [[ ! -d "firefox_32bit_optdebug_stock" ]] || [[ ! -d "firefox_32bit_optdebug_stocknosimd" ]]; then
+	echo "Not all firefox versions found";
+	exit 1;
+fi
+
 #Get root
 sudo echo "Starting. Make sure to disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
 
@@ -62,47 +67,140 @@ function runTest(){
 	sleep 5
 	taskset -c 3 ./mach talos-test --activeTests $2 2>&1 | tee ./talos_output.txt
 	cat /home/shr/Code/mozilla-release/testing/mozharness/build/local.json >> "$1"
+        echo -e "\n" >> "$1"
 	writeTimingLinesToOutput "$1" "./talos_output.txt"
 	rm ./talos_output.txt
 }
 
-function switchToSandboxedFirefox(){
-	sleep 2
-	mv firefox_32bit_optdebug firefox_32bit_optdebug_nonnacl
+function loadSandboxedFirefox(){
 	sleep 2
 	mv firefox_32bit_optdebug_nacl firefox_32bit_optdebug
 	sleep 2
 }
-
-function switchToUnsandboxedFirefox(){
+function unloadSandboxedFirefox(){
 	sleep 2
 	mv firefox_32bit_optdebug firefox_32bit_optdebug_nacl
+	sleep 2
+}
+
+function loadUnsandboxedFirefox(){
 	sleep 2
 	mv firefox_32bit_optdebug_nonnacl firefox_32bit_optdebug
 	sleep 2	
 }
+function unloadUnsandboxedFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug firefox_32bit_optdebug_nonnacl
+	sleep 2	
+}
 
+function loadStaticFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug_static firefox_32bit_optdebug
+	sleep 2	
+}
+function unloadStaticFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug firefox_32bit_optdebug_static
+	sleep 2	
+}
+
+function loadStaticNoSimdFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug_staticnosimd firefox_32bit_optdebug
+	sleep 2	
+}
+function unloadStaticNoSimdFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug firefox_32bit_optdebug_staticnosimd
+	sleep 2	
+}
+
+function loadStockFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug_stock firefox_32bit_optdebug
+	sleep 2	
+}
+function unloadStockFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug firefox_32bit_optdebug_stock
+	sleep 2	
+}
+
+function loadStockNoSimdFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug_stocknosimd firefox_32bit_optdebug
+	sleep 2	
+}
+function unloadStockNoSimdFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug firefox_32bit_optdebug_stocknosimd
+	sleep 2	
+}
 for i in 1 2
 do
 
-	echo -e "NACL\n" >> "$1"
+	loadSandboxedFirefox
+
+	echo -e "FFBuild-NACL\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
 	# runTest "$1" "jpeg_page_render_25"
 	# runTest "$1" "jpeg_page_render_50"
 	echo -e "\n---------------------\n" >> "$1"
 
-	switchToUnsandboxedFirefox
+	unloadSandboxedFirefox
 
+	loadUnsandboxedFirefox
 
-	echo -e "Non-NACL\n" >> "$1"
+	echo -e "FFBuild-Non-NACL\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
 	# runTest "$1" "jpeg_page_render_25"
 	# runTest "$1" "jpeg_page_render_50"
 	echo -e "\n---------------------\n" >> "$1"
 
-	switchToSandboxedFirefox
+	unloadUnsandboxedFirefox
+
+	loadStaticFirefox
+
+	echo -e "FFBuild-Static\n" >> "$1"
+	runTest "$1" "jpeg_page_render"
+	# runTest "$1" "jpeg_page_render_25"
+	# runTest "$1" "jpeg_page_render_50"
+	echo -e "\n---------------------\n" >> "$1"
+
+	unloadStaticFirefox
+
+	loadStaticNoSimdFirefox
+
+	echo -e "FFBuild-Static-NoSimd\n" >> "$1"
+	runTest "$1" "jpeg_page_render"
+	# runTest "$1" "jpeg_page_render_25"
+	# runTest "$1" "jpeg_page_render_50"
+	echo -e "\n---------------------\n" >> "$1"
+
+	unloadStaticNoSimdFirefox
+
+	loadStockFirefox
+
+	echo -e "FFBuild-Stock\n" >> "$1"
+	runTest "$1" "jpeg_page_render"
+	# runTest "$1" "jpeg_page_render_25"
+	# runTest "$1" "jpeg_page_render_50"
+	echo -e "\n---------------------\n" >> "$1"
+
+	unloadStockFirefox
+
+	loadStockNoSimdFirefox
+
+	echo -e "FFBuild-Stock-NoSimd\n" >> "$1"
+	runTest "$1" "jpeg_page_render"
+	# runTest "$1" "jpeg_page_render_25"
+	# runTest "$1" "jpeg_page_render_50"
+	echo -e "\n---------------------\n" >> "$1"
+
+	unloadStockNoSimdFirefox
 
 done
 
 echo "Output results to $1"
-cat "$1" | grep -E "NACL|name|value|JPEG_Time"
+cat "$1" | grep -E "FFBuild|name|value|JPEG_Time"
