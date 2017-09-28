@@ -5,8 +5,23 @@ if [ -z "$1" ]; then
 	exit 1; 
 fi
 
-if [[ ! -d "firefox_32bit_optdebug_nacl" ]] || [[ ! -d "firefox_32bit_optdebug_nonnacl" ]] || [[ ! -d "firefox_32bit_optdebug_static" ]] || [[ ! -d "firefox_32bit_optdebug_stock" ]] || [[ ! -d "firefox_32bit_optdebug_stocknosimd" ]]; then
-	echo "Not all firefox versions found";
+if [[ ! -d "firefox_32bit_optdebug_nacl_simd" ]] || [[ ! -d "firefox_32bit_optdebug_nacl" ]]; then
+	echo "Not all firefox versions found1";
+	exit 1;
+fi
+
+if [[ ! -d "firefox_32bit_optdebug_nonnacl" ]]; then
+	echo "Not all firefox versions found2";
+	exit 1;
+fi
+
+if [[ ! -d "firefox_32bit_optdebug_static" ]] || [[ ! -d  "firefox_32bit_optdebug_staticnosimd" ]]; then
+	echo "Not all firefox versions found3";
+	exit 1;
+fi
+
+if [[ ! -d "firefox_32bit_optdebug_stock" ]] || [[ ! -d "firefox_32bit_optdebug_stocknosimd" ]]; then
+	echo "Not all firefox versions found4";
 	exit 1;
 fi
 
@@ -72,6 +87,16 @@ function runTest(){
 	rm ./talos_output.txt
 }
 
+function loadSandboxedSimdFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug_nacl_simd firefox_32bit_optdebug
+	sleep 2
+}
+function unloadSandboxedSimdFirefox(){
+	sleep 2
+	mv firefox_32bit_optdebug firefox_32bit_optdebug_nacl_simd
+	sleep 2
+}
 function loadSandboxedFirefox(){
 	sleep 2
 	mv firefox_32bit_optdebug_nacl firefox_32bit_optdebug
@@ -139,6 +164,16 @@ function unloadStockNoSimdFirefox(){
 }
 for i in 1 2
 do
+
+	loadSandboxedSimdFirefox
+
+	echo -e "FFBuild-NACL-SIMD\n" >> "$1"
+	runTest "$1" "jpeg_page_render"
+	# runTest "$1" "jpeg_page_render_25"
+	# runTest "$1" "jpeg_page_render_50"
+	echo -e "\n---------------------\n" >> "$1"
+
+	unloadSandboxedSimdFirefox
 
 	loadSandboxedFirefox
 
