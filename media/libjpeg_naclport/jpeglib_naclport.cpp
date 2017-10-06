@@ -1,8 +1,15 @@
+#include "mozilla/Logging.h"
+
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <inttypes.h>
 
 #include "jpeglib_naclport.h"
+
+#ifdef PRINT_FUNCTION_LOGS
+  using mozilla::LogLevel;
+  static mozilla::LazyLogModule sJPEGLog("JPEGNaclPort");
+#endif
 
 //Note USE_SANDBOXING MAY be defined as a macro in the moz.build of this folder
 
@@ -313,6 +320,9 @@ void freeInJpegSandbox(void* ptr)
 
   struct jpeg_error_mgr * d_jpeg_std_error(struct jpeg_error_mgr * err)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_std_error"));
+    #endif
     //printf("Calling func d_jpeg_std_error\n");
     START_TIMER(d_jpeg_std_error);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(err), 0 /* size of any arrays being pushed on the stack */);
@@ -324,6 +334,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_CreateCompress(j_compress_ptr cinfo, int version, size_t structsize)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_CreateCompress"));
+    #endif
     //printf("Calling func d_jpeg_CreateCompress\n");
     START_TIMER(d_jpeg_CreateCompress);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(version) + sizeof(structsize), 0 /* size of any arrays being pushed on the stack */);
@@ -335,6 +348,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_stdio_dest(j_compress_ptr cinfo, FILE * outfile)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_stdio_dest"));
+    #endif
     //printf("Calling func d_jpeg_stdio_dest\n");
     START_TIMER(d_jpeg_stdio_dest);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(outfile), 0 /* size of any arrays being pushed on the stack */);
@@ -345,6 +361,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_set_defaults(j_compress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_set_defaults"));
+    #endif
     //printf("Calling func d_jpeg_set_defaults\n");
     START_TIMER(d_jpeg_set_defaults);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
@@ -354,6 +373,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_set_quality(j_compress_ptr cinfo, int quality, boolean force_baseline)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_set_quality"));
+    #endif
     //printf("Calling func d_jpeg_set_quality\n");
     START_TIMER(d_jpeg_set_quality);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(quality) + sizeof(force_baseline), 0 /* size of any arrays being pushed on the stack */);
@@ -365,6 +387,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_start_compress(j_compress_ptr cinfo, boolean write_all_tables)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_start_compress"));
+    #endif
     //printf("Calling func d_jpeg_start_compress\n");
     START_TIMER(d_jpeg_start_compress);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(write_all_tables), 0 /* size of any arrays being pushed on the stack */);
@@ -375,6 +400,9 @@ void freeInJpegSandbox(void* ptr)
   }
   JDIMENSION d_jpeg_write_scanlines(j_compress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION num_lines)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_write_scanlines"));
+    #endif
     //printf("Calling func d_jpeg_write_scanlines\n");
     START_TIMER(d_jpeg_write_scanlines);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(scanlines) + sizeof(num_lines), 0 /* size of any arrays being pushed on the stack */);
@@ -388,6 +416,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_finish_compress(j_compress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_finish_compress"));
+    #endif
     //printf("Calling func d_jpeg_finish_compress\n");
     START_TIMER(d_jpeg_finish_compress);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
@@ -397,6 +428,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_destroy_compress(j_compress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_destroy_compress"));
+    #endif
     //printf("Calling func d_jpeg_destroy_compress\n");
     START_TIMER(d_jpeg_destroy_compress);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
@@ -406,6 +440,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_CreateDecompress(j_decompress_ptr cinfo, int version, size_t structsize)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_CreateDecompress"));
+    #endif
     //printf("Calling func d_jpeg_CreateDecompress\n");
     START_TIMER(d_jpeg_CreateDecompress);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(version) + sizeof(structsize), 0 /* size of any arrays being pushed on the stack */);
@@ -417,6 +454,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_stdio_src(j_decompress_ptr cinfo, FILE * infile)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_stdio_src"));
+    #endif
     //printf("Calling func d_jpeg_stdio_src\n");
     START_TIMER(d_jpeg_stdio_src);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(infile), 0 /* size of any arrays being pushed on the stack */);
@@ -427,6 +467,9 @@ void freeInJpegSandbox(void* ptr)
   }
   int d_jpeg_read_header(j_decompress_ptr cinfo, boolean require_image)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_read_header"));
+    #endif
     //printf("Calling func d_jpeg_read_header\n");
     START_TIMER(d_jpeg_read_header);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(require_image), 0 /* size of any arrays being pushed on the stack */);
@@ -439,6 +482,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_start_decompress(j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_start_decompress"));
+    #endif
     //printf("Calling func d_jpeg_start_decompress\n");
     START_TIMER(d_jpeg_start_decompress);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
@@ -450,6 +496,9 @@ void freeInJpegSandbox(void* ptr)
   }
   JDIMENSION d_jpeg_read_scanlines(j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_read_scanlines"));
+    #endif
     //printf("Calling func d_jpeg_read_scanlines\n");
     START_TIMER_CORE(d_jpeg_read_scanlines);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(scanlines) + sizeof(max_lines), 0 /* size of any arrays being pushed on the stack */);
@@ -463,6 +512,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_finish_decompress(j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_finish_decompress"));
+    #endif
     //printf("Calling func d_jpeg_finish_decompress\n");
     START_TIMER(d_jpeg_finish_decompress);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
@@ -474,6 +526,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_destroy_decompress(j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_destroy_decompress"));
+    #endif
     //printf("Calling func d_jpeg_destroy_decompress\n");
     START_TIMER(d_jpeg_destroy_decompress);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
@@ -483,6 +538,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_save_markers (j_decompress_ptr cinfo, int marker_code, unsigned int length_limit)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_save_markers"));
+    #endif
     //printf("Calling func d_jpeg_save_markers\n");
     START_TIMER(d_jpeg_save_markers);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(marker_code) + sizeof(length_limit), 0 /* size of any arrays being pushed on the stack */);
@@ -494,6 +552,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_has_multiple_scans (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_has_multiple_scans"));
+    #endif
     //printf("Calling func d_jpeg_has_multiple_scans\n");
     START_TIMER(d_jpeg_has_multiple_scans);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
@@ -505,6 +566,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_calc_output_dimensions (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_calc_output_dimensions"));
+    #endif
     //printf("Calling func d_jpeg_calc_output_dimensions\n");
     START_TIMER(d_jpeg_calc_output_dimensions);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
@@ -514,6 +578,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_start_output (j_decompress_ptr cinfo, int scan_number)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_start_output"));
+    #endif
     //printf("Calling func d_jpeg_start_output\n");
     START_TIMER(d_jpeg_start_output);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
@@ -525,6 +592,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_finish_output (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_finish_output"));
+    #endif
     //printf("Calling func d_jpeg_finish_output\n");
     START_TIMER(d_jpeg_finish_output);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
@@ -536,6 +606,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_input_complete (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_input_complete"));
+    #endif
     //printf("Calling func d_jpeg_input_complete\n");
     START_TIMER(d_jpeg_input_complete);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
@@ -547,6 +620,9 @@ void freeInJpegSandbox(void* ptr)
   }
   int d_jpeg_consume_input (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_consume_input"));
+    #endif
     //printf("Calling func d_jpeg_consume_input\n");
     START_TIMER(d_jpeg_consume_input);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
@@ -560,6 +636,9 @@ void freeInJpegSandbox(void* ptr)
   //Fn pointer calls
   JSAMPARRAY d_alloc_sarray(void* alloc_sarray, j_common_ptr cinfo, int pool_id, JDIMENSION samplesperrow, JDIMENSION numrows)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_alloc_sarray"));
+    #endif
     //printf("Calling func d_alloc_sarray\n");
     START_TIMER(d_alloc_sarray);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(pool_id) + sizeof(samplesperrow) + sizeof(numrows), 0 /* size of any arrays being pushed on the stack */);
@@ -575,6 +654,9 @@ void freeInJpegSandbox(void* ptr)
 
   void d_format_message(void* format_message, j_common_ptr cinfo, char *buffer)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_format_message"));
+    #endif
     //printf("Calling func d_format_message\n");
     START_TIMER(d_format_message);
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(buffer), 0 /* size of any arrays being pushed on the stack */);
@@ -587,6 +669,9 @@ void freeInJpegSandbox(void* ptr)
 
   SANDBOX_CALLBACK void my_error_exit_stub(uintptr_t sandboxPtr)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("my_error_exit_stub"));
+    #endif
     END_TIMER(my_error_exit_stub);
     //printf("Callback my_error_exit_stub\n");
     NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
@@ -599,6 +684,9 @@ void freeInJpegSandbox(void* ptr)
   }
   SANDBOX_CALLBACK void init_source_stub(uintptr_t sandboxPtr)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("init_source_stub"));
+    #endif
     END_TIMER(init_source_stub);
     //printf("Callback init_source_stub\n");
     NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
@@ -611,6 +699,9 @@ void freeInJpegSandbox(void* ptr)
   }
   SANDBOX_CALLBACK void skip_input_data_stub(uintptr_t sandboxPtr)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("skip_input_data_stub"));
+    #endif
     END_TIMER(skip_input_data_stub);
     //printf("Callback skip_input_data_stub\n");
     NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
@@ -625,6 +716,9 @@ void freeInJpegSandbox(void* ptr)
 
   SANDBOX_CALLBACK boolean fill_input_buffer_stub(uintptr_t sandboxPtr)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("fill_input_buffer_stub"));
+    #endif
     END_TIMER(fill_input_buffer_stub);
     //printf("Callback fill_input_buffer_stub\n");
     NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
@@ -638,6 +732,9 @@ void freeInJpegSandbox(void* ptr)
   }
   SANDBOX_CALLBACK void term_source_stub(uintptr_t sandboxPtr)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("term_source_stub"));
+    #endif
     END_TIMER(term_source_stub);
     //printf("Callback term_source_stub\n");
     NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
@@ -651,6 +748,9 @@ void freeInJpegSandbox(void* ptr)
 
   SANDBOX_CALLBACK boolean jpeg_resync_to_restart_stub(uintptr_t sandboxPtr)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("jpeg_resync_to_restart_stub"));
+    #endif
     END_TIMER(jpeg_resync_to_restart_stub);
     //printf("Callback jpeg_resync_to_restart_stub\n");
     NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
@@ -666,6 +766,9 @@ void freeInJpegSandbox(void* ptr)
 
   t_my_error_exit d_my_error_exit(t_my_error_exit callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_my_error_exit"));
+    #endif
     cb_my_error_exit = callback;
     uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, MY_ERROR_EXIT_CALLBACK_SLOT, (uintptr_t) my_error_exit_stub);
     if(registeredCallback == 0)
@@ -676,6 +779,9 @@ void freeInJpegSandbox(void* ptr)
   }
   t_init_source d_init_source(t_init_source callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_init_source"));
+    #endif
     cb_init_source = callback;
     uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, INIT_SOURCE_SLOT, (uintptr_t) init_source_stub);
     if(registeredCallback == 0)
@@ -686,6 +792,9 @@ void freeInJpegSandbox(void* ptr)
   }
   t_skip_input_data d_skip_input_data(t_skip_input_data callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_skip_input_data"));
+    #endif
     cb_skip_input_data = callback;
     uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, FILL_INPUT_BUFFER_SLOT, (uintptr_t) skip_input_data_stub);
     if(registeredCallback == 0)
@@ -696,6 +805,9 @@ void freeInJpegSandbox(void* ptr)
   }
   t_fill_input_buffer d_fill_input_buffer(t_fill_input_buffer callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_fill_input_buffer"));
+    #endif
     cb_fill_input_buffer = callback;
     uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, SKIP_INPUT_DATA_SLOT, (uintptr_t) fill_input_buffer_stub);
     if(registeredCallback == 0)
@@ -706,6 +818,9 @@ void freeInJpegSandbox(void* ptr)
   }
   t_term_source d_term_source(t_term_source callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_term_source"));
+    #endif
     cb_term_source = callback;
     uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, JPEG_RESYNC_TO_RESTART_SLOT, (uintptr_t) term_source_stub);
     if(registeredCallback == 0)
@@ -716,6 +831,9 @@ void freeInJpegSandbox(void* ptr)
   }
   t_jpeg_resync_to_restart d_jpeg_resync_to_restart(t_jpeg_resync_to_restart callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_resync_to_restart"));
+    #endif
     cb_jpeg_resync_to_restart = callback;
     uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, TERM_SOURCE_SLOT, (uintptr_t) jpeg_resync_to_restart_stub);
     if(registeredCallback == 0)
@@ -728,6 +846,9 @@ void freeInJpegSandbox(void* ptr)
 
   struct jpeg_error_mgr * d_jpeg_std_error(struct jpeg_error_mgr * err)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_std_error"));
+    #endif
     //printf("Calling func d_jpeg_std_error\n");
     START_TIMER(d_jpeg_std_error);
     struct jpeg_error_mgr * ret = ptr_jpeg_std_error(err);
@@ -736,6 +857,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_CreateCompress(j_compress_ptr cinfo, int version, size_t structsize)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_CreateCompress"));
+    #endif
     //printf("Calling func d_jpeg_CreateCompress\n");
     START_TIMER(d_jpeg_CreateCompress);
     ptr_jpeg_CreateCompress(cinfo, version, structsize);
@@ -743,6 +867,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_stdio_dest(j_compress_ptr cinfo, FILE * outfile)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_stdio_dest"));
+    #endif
     //printf("Calling func d_jpeg_stdio_dest\n");
     START_TIMER(d_jpeg_stdio_dest);
     ptr_jpeg_stdio_dest(cinfo, outfile);
@@ -750,6 +877,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_set_defaults(j_compress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_set_defaults"));
+    #endif
     //printf("Calling func d_jpeg_set_defaults\n");
     START_TIMER(d_jpeg_set_defaults);
     ptr_jpeg_set_defaults(cinfo);
@@ -757,6 +887,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_set_quality(j_compress_ptr cinfo, int quality, boolean force_baseline)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_set_quality"));
+    #endif
     //printf("Calling func d_jpeg_set_quality\n");
     START_TIMER(d_jpeg_set_quality);
     ptr_jpeg_set_quality(cinfo, quality, force_baseline);
@@ -764,6 +897,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_start_compress(j_compress_ptr cinfo, boolean write_all_tables)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_start_compress"));
+    #endif
     //printf("Calling func d_jpeg_start_compress\n");
     START_TIMER(d_jpeg_start_compress);
     ptr_jpeg_start_compress(cinfo, write_all_tables);
@@ -771,6 +907,9 @@ void freeInJpegSandbox(void* ptr)
   }
   JDIMENSION d_jpeg_write_scanlines(j_compress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION num_lines)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_write_scanlines"));
+    #endif
     //printf("Calling func d_jpeg_write_scanlines\n");
     START_TIMER(d_jpeg_write_scanlines);
     JDIMENSION ret = ptr_jpeg_write_scanlines(cinfo, scanlines, num_lines);
@@ -779,6 +918,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_finish_compress(j_compress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_finish_compress"));
+    #endif
     //printf("Calling func d_jpeg_finish_compress\n");
     START_TIMER(d_jpeg_finish_compress);
     ptr_jpeg_finish_compress(cinfo);
@@ -786,6 +928,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_destroy_compress(j_compress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_destroy_compress"));
+    #endif
     //printf("Calling func d_jpeg_destroy_compress\n");
     START_TIMER(d_jpeg_destroy_compress);
     ptr_jpeg_destroy_compress(cinfo);
@@ -793,6 +938,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_CreateDecompress(j_decompress_ptr cinfo, int version, size_t structsize)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_CreateDecompress"));
+    #endif
     //printf("Calling func d_jpeg_CreateDecompress\n");
     START_TIMER(d_jpeg_CreateDecompress);
     ptr_jpeg_CreateDecompress(cinfo, version, structsize);
@@ -800,6 +948,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_stdio_src(j_decompress_ptr cinfo, FILE * infile)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_stdio_src"));
+    #endif
     //printf("Calling func d_jpeg_stdio_src\n");
     START_TIMER(d_jpeg_stdio_src);
     ptr_jpeg_stdio_src(cinfo, infile);
@@ -807,6 +958,9 @@ void freeInJpegSandbox(void* ptr)
   }
   int d_jpeg_read_header(j_decompress_ptr cinfo, boolean require_image)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_read_header"));
+    #endif
     //printf("Calling func d_jpeg_read_header\n");
     START_TIMER(d_jpeg_read_header);
     int ret = ptr_jpeg_read_header(cinfo, require_image);
@@ -815,6 +969,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_start_decompress(j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_start_decompress"));
+    #endif
     //printf("Calling func d_jpeg_start_decompress\n");
     START_TIMER(d_jpeg_start_decompress);
     boolean ret = ptr_jpeg_start_decompress(cinfo);
@@ -823,6 +980,9 @@ void freeInJpegSandbox(void* ptr)
   }
   JDIMENSION d_jpeg_read_scanlines(j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_read_scanlines"));
+    #endif
     //printf("Calling func d_jpeg_read_scanlines\n");
     START_TIMER_CORE(d_jpeg_read_scanlines);
     JDIMENSION ret = ptr_jpeg_read_scanlines(cinfo, scanlines, max_lines);
@@ -831,6 +991,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_finish_decompress(j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_finish_decompress"));
+    #endif
     //printf("Calling func d_jpeg_finish_decompress\n");
     START_TIMER(d_jpeg_finish_decompress);
     boolean ret = ptr_jpeg_finish_decompress(cinfo);
@@ -839,6 +1002,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_destroy_decompress(j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_destroy_decompress"));
+    #endif
     //printf("Calling func d_jpeg_destroy_decompress\n");
     START_TIMER(d_jpeg_destroy_decompress);
     ptr_jpeg_destroy_decompress(cinfo);
@@ -846,6 +1012,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_save_markers (j_decompress_ptr cinfo, int marker_code, unsigned int length_limit)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_save_markers"));
+    #endif
     //printf("Calling func d_jpeg_save_markers\n");
     START_TIMER(d_jpeg_save_markers);
     ptr_jpeg_save_markers(cinfo, marker_code, length_limit);
@@ -853,6 +1022,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_has_multiple_scans (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_has_multiple_scans"));
+    #endif
     //printf("Calling func d_jpeg_has_multiple_scans\n");
     START_TIMER(d_jpeg_has_multiple_scans);
     boolean ret = ptr_jpeg_has_multiple_scans(cinfo);
@@ -861,6 +1033,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_calc_output_dimensions (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_calc_output_dimensions"));
+    #endif
     //printf("Calling func d_jpeg_calc_output_dimensions\n");
     START_TIMER(d_jpeg_calc_output_dimensions);
     ptr_jpeg_calc_output_dimensions(cinfo);
@@ -868,6 +1043,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_start_output (j_decompress_ptr cinfo, int scan_number)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_start_output"));
+    #endif
     //printf("Calling func d_jpeg_start_output\n");
     START_TIMER(d_jpeg_start_output);
     boolean ret = ptr_jpeg_start_output(cinfo, scan_number);
@@ -876,6 +1054,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_finish_output (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_finish_output"));
+    #endif
     //printf("Calling func d_jpeg_finish_output\n");
     START_TIMER(d_jpeg_finish_output);
     boolean ret = ptr_jpeg_finish_output(cinfo);
@@ -884,6 +1065,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_input_complete (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_input_complete"));
+    #endif
     //printf("Calling func d_jpeg_input_complete\n");
     START_TIMER(d_jpeg_input_complete);
     boolean ret = ptr_jpeg_input_complete(cinfo);
@@ -892,6 +1076,9 @@ void freeInJpegSandbox(void* ptr)
   }
   int d_jpeg_consume_input (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_consume_input"));
+    #endif
     //printf("Calling func d_jpeg_consume_input\n");
     START_TIMER(d_jpeg_consume_input);
     int ret = ptr_jpeg_consume_input(cinfo);
@@ -900,6 +1087,9 @@ void freeInJpegSandbox(void* ptr)
   }
   JSAMPARRAY d_alloc_sarray(void* alloc_sarray, j_common_ptr cinfo, int pool_id, JDIMENSION samplesperrow, JDIMENSION numrows)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_alloc_sarray"));
+    #endif
     //printf("Calling func d_alloc_sarray\n");
     START_TIMER(d_alloc_sarray);
 
@@ -912,6 +1102,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_format_message(void* format_message, j_common_ptr cinfo, char *buffer)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_format_message"));
+    #endif
     //printf("Calling func d_format_message\n");
     START_TIMER(d_format_message);
 
@@ -924,6 +1117,9 @@ void freeInJpegSandbox(void* ptr)
 
   void my_error_exit_stub(j_common_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("my_error_exit_stub"));
+    #endif
     END_TIMER(my_error_exit_stub);
     //printf("Callback my_error_exit_stub\n");
     cb_my_error_exit(cinfo);
@@ -931,6 +1127,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void init_source_stub(j_decompress_ptr jd)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("init_source_stub"));
+    #endif
     END_TIMER(init_source_stub);
     //printf("Callback init_source_stub\n");
     cb_init_source(jd);
@@ -938,6 +1137,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void skip_input_data_stub(j_decompress_ptr jd, long num_bytes)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("skip_input_data_stub"));
+    #endif
     END_TIMER(skip_input_data_stub);
     //printf("Callback skip_input_data_stub\n");
     cb_skip_input_data(jd, num_bytes);
@@ -945,6 +1147,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean fill_input_buffer_stub(j_decompress_ptr jd)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("fill_input_buffer_stub"));
+    #endif
     END_TIMER(fill_input_buffer_stub);
     //printf("Callback fill_input_buffer_stub\n");
     boolean ret = cb_fill_input_buffer(jd);
@@ -953,6 +1158,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void term_source_stub(j_decompress_ptr jd)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("term_source_stub"));
+    #endif
     END_TIMER(term_source_stub);
     //printf("Callback term_source_stub\n");
     cb_term_source(jd);
@@ -960,6 +1168,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean jpeg_resync_to_restart_stub(j_decompress_ptr jd, int desired)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("jpeg_resync_to_restart_stub"));
+    #endif
     END_TIMER(jpeg_resync_to_restart_stub);
     //printf("Callback jpeg_resync_to_restart_stub\n");
     boolean ret = cb_jpeg_resync_to_restart(jd, desired);
@@ -969,31 +1180,49 @@ void freeInJpegSandbox(void* ptr)
 
   t_my_error_exit d_my_error_exit(t_my_error_exit callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_my_error_exit"));
+    #endif
     cb_my_error_exit = callback;
     return my_error_exit_stub;
   }
   t_init_source d_init_source(t_init_source callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_init_source"));
+    #endif
     cb_init_source = callback;
     return init_source_stub;
   }
   t_skip_input_data d_skip_input_data(t_skip_input_data callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_skip_input_data"));
+    #endif
     cb_skip_input_data = callback;
     return skip_input_data_stub;
   }
   t_fill_input_buffer d_fill_input_buffer(t_fill_input_buffer callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_fill_input_buffer"));
+    #endif
     cb_fill_input_buffer = callback;
     return fill_input_buffer_stub;
   }
   t_term_source d_term_source(t_term_source callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_term_source"));
+    #endif
     cb_term_source = callback;
     return term_source_stub;
   }
   t_jpeg_resync_to_restart d_jpeg_resync_to_restart(t_jpeg_resync_to_restart callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_resync_to_restart"));
+    #endif
     cb_jpeg_resync_to_restart = callback;
     return jpeg_resync_to_restart_stub;
   }
@@ -1002,6 +1231,9 @@ void freeInJpegSandbox(void* ptr)
 
   struct jpeg_error_mgr * d_jpeg_std_error(struct jpeg_error_mgr * err)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_std_error"));
+    #endif
     //printf("Calling func d_jpeg_std_error\n");
     START_TIMER(d_jpeg_std_error);
     struct jpeg_error_mgr * ret = jpeg_std_error(err);
@@ -1010,6 +1242,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_CreateCompress(j_compress_ptr cinfo, int version, size_t structsize)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_CreateCompress"));
+    #endif
     //printf("Calling func d_jpeg_CreateCompress\n");
     START_TIMER(d_jpeg_CreateCompress);
     jpeg_CreateCompress(cinfo, version, structsize);
@@ -1017,6 +1252,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_stdio_dest(j_compress_ptr cinfo, FILE * outfile)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_stdio_dest"));
+    #endif
     //printf("Calling func d_jpeg_stdio_dest\n");
     START_TIMER(d_jpeg_stdio_dest);
     jpeg_stdio_dest(cinfo, outfile);
@@ -1024,6 +1262,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_set_defaults(j_compress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_set_defaults"));
+    #endif
     //printf("Calling func d_jpeg_set_defaults\n");
     START_TIMER(d_jpeg_set_defaults);
     jpeg_set_defaults(cinfo);
@@ -1031,6 +1272,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_set_quality(j_compress_ptr cinfo, int quality, boolean force_baseline)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_set_quality"));
+    #endif
     //printf("Calling func d_jpeg_set_quality\n");
     START_TIMER(d_jpeg_set_quality);
     jpeg_set_quality(cinfo, quality, force_baseline);
@@ -1038,6 +1282,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_start_compress(j_compress_ptr cinfo, boolean write_all_tables)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_start_compress"));
+    #endif
     //printf("Calling func d_jpeg_start_compress\n");
     START_TIMER(d_jpeg_start_compress);
     jpeg_start_compress(cinfo, write_all_tables);
@@ -1045,6 +1292,9 @@ void freeInJpegSandbox(void* ptr)
   }
   JDIMENSION d_jpeg_write_scanlines(j_compress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION num_lines)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_write_scanlines"));
+    #endif
     //printf("Calling func d_jpeg_write_scanlines\n");
     START_TIMER(d_jpeg_write_scanlines);
     JDIMENSION ret = jpeg_write_scanlines(cinfo, scanlines, num_lines);
@@ -1053,6 +1303,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_finish_compress(j_compress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_finish_compress"));
+    #endif
     //printf("Calling func d_jpeg_finish_compress\n");
     START_TIMER(d_jpeg_finish_compress);
     jpeg_finish_compress(cinfo);
@@ -1060,6 +1313,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_destroy_compress(j_compress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_destroy_compress"));
+    #endif
     //printf("Calling func d_jpeg_destroy_compress\n");
     START_TIMER(d_jpeg_destroy_compress);
     jpeg_destroy_compress(cinfo);
@@ -1067,6 +1323,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_CreateDecompress(j_decompress_ptr cinfo, int version, size_t structsize)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_CreateDecompress"));
+    #endif
     //printf("Calling func d_jpeg_CreateDecompress\n");
     START_TIMER(d_jpeg_CreateDecompress);
     jpeg_CreateDecompress(cinfo, version, structsize);
@@ -1074,6 +1333,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_stdio_src(j_decompress_ptr cinfo, FILE * infile)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_stdio_src"));
+    #endif
     //printf("Calling func d_jpeg_stdio_src\n");
     START_TIMER(d_jpeg_stdio_src);
     jpeg_stdio_src(cinfo, infile);
@@ -1081,6 +1343,9 @@ void freeInJpegSandbox(void* ptr)
   }
   int d_jpeg_read_header(j_decompress_ptr cinfo, boolean require_image)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_read_header"));
+    #endif
     //printf("Calling func d_jpeg_read_header\n");
     START_TIMER(d_jpeg_read_header);
     int ret = jpeg_read_header(cinfo, require_image);
@@ -1089,6 +1354,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_start_decompress(j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_start_decompress"));
+    #endif
     //printf("Calling func d_jpeg_start_decompress\n");
     START_TIMER(d_jpeg_start_decompress);
     boolean ret = jpeg_start_decompress(cinfo);
@@ -1097,6 +1365,9 @@ void freeInJpegSandbox(void* ptr)
   }
   JDIMENSION d_jpeg_read_scanlines(j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_read_scanlines"));
+    #endif
     //printf("Calling func d_jpeg_read_scanlines\n");
     START_TIMER_CORE(d_jpeg_read_scanlines);
     JDIMENSION ret = jpeg_read_scanlines(cinfo, scanlines, max_lines);
@@ -1105,6 +1376,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_finish_decompress(j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_finish_decompress"));
+    #endif
     //printf("Calling func d_jpeg_finish_decompress\n");
     START_TIMER(d_jpeg_finish_decompress);
     boolean ret = jpeg_finish_decompress(cinfo);
@@ -1113,6 +1387,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_destroy_decompress(j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_destroy_decompress"));
+    #endif
     //printf("Calling func d_jpeg_destroy_decompress\n");
     START_TIMER(d_jpeg_destroy_decompress);
     jpeg_destroy_decompress(cinfo);
@@ -1120,6 +1397,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_save_markers (j_decompress_ptr cinfo, int marker_code, unsigned int length_limit)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_save_markers"));
+    #endif
     //printf("Calling func d_jpeg_save_markers\n");
     START_TIMER(d_jpeg_save_markers);
     jpeg_save_markers(cinfo, marker_code, length_limit);
@@ -1127,6 +1407,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_has_multiple_scans (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_has_multiple_scans"));
+    #endif
     //printf("Calling func d_jpeg_has_multiple_scans\n");
     START_TIMER(d_jpeg_has_multiple_scans);
     boolean ret = jpeg_has_multiple_scans(cinfo);
@@ -1135,6 +1418,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_jpeg_calc_output_dimensions (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_calc_output_dimensions"));
+    #endif
     //printf("Calling func d_jpeg_calc_output_dimensions\n");
     START_TIMER(d_jpeg_calc_output_dimensions);
     jpeg_calc_output_dimensions(cinfo);
@@ -1142,6 +1428,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_start_output (j_decompress_ptr cinfo, int scan_number)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_start_output"));
+    #endif
     //printf("Calling func d_jpeg_start_output\n");
     START_TIMER(d_jpeg_start_output);
     boolean ret = jpeg_start_output(cinfo, scan_number);
@@ -1150,6 +1439,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_finish_output (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_finish_output"));
+    #endif
     //printf("Calling func d_jpeg_finish_output\n");
     START_TIMER(d_jpeg_finish_output);
     boolean ret = jpeg_finish_output(cinfo);
@@ -1158,6 +1450,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean d_jpeg_input_complete (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_input_complete"));
+    #endif
     //printf("Calling func d_jpeg_input_complete\n");
     START_TIMER(d_jpeg_input_complete);
     boolean ret = jpeg_input_complete(cinfo);
@@ -1166,6 +1461,9 @@ void freeInJpegSandbox(void* ptr)
   }
   int d_jpeg_consume_input (j_decompress_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_consume_input"));
+    #endif
     //printf("Calling func d_jpeg_consume_input\n");
     START_TIMER(d_jpeg_consume_input);
     int ret = jpeg_consume_input(cinfo);
@@ -1174,6 +1472,9 @@ void freeInJpegSandbox(void* ptr)
   }
   JSAMPARRAY d_alloc_sarray(void* alloc_sarray, j_common_ptr cinfo, int pool_id, JDIMENSION samplesperrow, JDIMENSION numrows)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_alloc_sarray"));
+    #endif
     //printf("Calling func d_alloc_sarray\n");
     START_TIMER(d_alloc_sarray);
 
@@ -1186,6 +1487,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void d_format_message(void* format_message, j_common_ptr cinfo, char *buffer)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_format_message"));
+    #endif
     //printf("Calling func d_format_message\n");
     START_TIMER(d_format_message);
 
@@ -1198,6 +1502,9 @@ void freeInJpegSandbox(void* ptr)
 
   void my_error_exit_stub(j_common_ptr cinfo)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("my_error_exit_stub"));
+    #endif
     END_TIMER(my_error_exit_stub);
     //printf("Callback my_error_exit_stub\n");
     cb_my_error_exit(cinfo);
@@ -1205,6 +1512,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void init_source_stub(j_decompress_ptr jd)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("init_source_stub"));
+    #endif
     END_TIMER(init_source_stub);
     //printf("Callback init_source_stub\n");
     cb_init_source(jd);
@@ -1212,6 +1522,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void skip_input_data_stub(j_decompress_ptr jd, long num_bytes)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("skip_input_data_stub"));
+    #endif
     END_TIMER(skip_input_data_stub);
     //printf("Callback skip_input_data_stub\n");
     cb_skip_input_data(jd, num_bytes);
@@ -1219,6 +1532,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean fill_input_buffer_stub(j_decompress_ptr jd)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("fill_input_buffer_stub"));
+    #endif
     END_TIMER(fill_input_buffer_stub);
     //printf("Callback fill_input_buffer_stub\n");
     boolean ret = cb_fill_input_buffer(jd);
@@ -1227,6 +1543,9 @@ void freeInJpegSandbox(void* ptr)
   }
   void term_source_stub(j_decompress_ptr jd)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("term_source_stub"));
+    #endif
     END_TIMER(term_source_stub);
     //printf("Callback term_source_stub\n");
     cb_term_source(jd);
@@ -1234,6 +1553,9 @@ void freeInJpegSandbox(void* ptr)
   }
   boolean jpeg_resync_to_restart_stub(j_decompress_ptr jd, int desired)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("jpeg_resync_to_restart_stub"));
+    #endif
     END_TIMER(jpeg_resync_to_restart_stub);
     //printf("Callback jpeg_resync_to_restart_stub\n");
     boolean ret = cb_jpeg_resync_to_restart(jd, desired);
@@ -1243,31 +1565,49 @@ void freeInJpegSandbox(void* ptr)
 
   t_my_error_exit d_my_error_exit(t_my_error_exit callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_my_error_exit"));
+    #endif
     cb_my_error_exit = callback;
     return my_error_exit_stub;
   }
   t_init_source d_init_source(t_init_source callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_init_source"));
+    #endif
     cb_init_source = callback;
     return init_source_stub;
   }
   t_skip_input_data d_skip_input_data(t_skip_input_data callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_skip_input_data"));
+    #endif
     cb_skip_input_data = callback;
     return skip_input_data_stub;
   }
   t_fill_input_buffer d_fill_input_buffer(t_fill_input_buffer callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_fill_input_buffer"));
+    #endif
     cb_fill_input_buffer = callback;
     return fill_input_buffer_stub;
   }
   t_term_source d_term_source(t_term_source callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_term_source"));
+    #endif
     cb_term_source = callback;
     return term_source_stub;
   }
   t_jpeg_resync_to_restart d_jpeg_resync_to_restart(t_jpeg_resync_to_restart callback)
   {
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sJPEGLog, LogLevel::Debug, ("d_jpeg_resync_to_restart"));
+    #endif
     cb_jpeg_resync_to_restart = callback;
     return jpeg_resync_to_restart_stub;
   }
