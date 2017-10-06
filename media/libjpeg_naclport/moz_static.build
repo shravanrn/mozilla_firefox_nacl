@@ -29,6 +29,9 @@ DEFINES['USE_SANDBOXING'] = 0
 # Comment out the following if you don't want to print the time spent in jpeg rendering. The value '42' below is disregarded
 DEFINES['PRINT_FUNCTION_TIMES'] = 42
 
+# Comment out if you don't want logging. The value '42' below is disregarded
+# DEFINES['PRINT_FUNCTION_LOGS'] = 42
+
 ############ Update these paths as required
 DEFINES['JPEG_DL_PATH'] = '"/home/shr/Code/libjpeg-turbo/nacl_build/.libs/libjpeg.so"'
 DEFINES['JPEG_NON_NACL_DL_PATH'] = '"/home/shr/Code/libjpeg-turbo/non_nacl_build/.libs/libjpeg.so"'
