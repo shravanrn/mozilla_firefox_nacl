@@ -1,8 +1,17 @@
 My notes
 ========
-Version of firefox modified to use a sandboxed version of libjpeg. Update the paths in media/libjpeg_naclport/moz.build and then build with ./mach build.
+Version of firefox modified to use a sandboxed version of libjpeg. 
 
-To run use
+To Build
+=========
+First time setup
+	Update the paths in media/libjpeg_naclport/moz.build 
+	Run ./mach bootstrap
+
+Build with ./mach build.
+
+To Run
+======
 # for the purposes of testing we are turning of seccomp. Eventually, we should perform all initialization prior to seccomp init
 export MOZ_DISABLE_CONTENT_SANDBOX=1
 ./mach run
