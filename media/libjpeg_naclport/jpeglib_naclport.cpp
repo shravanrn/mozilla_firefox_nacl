@@ -66,6 +66,8 @@
 #else
   #define START_TIMER(NAME) do {} while(0)
   #define END_TIMER(NAME) do {} while(0)
+  #define START_TIMER_CORE(NAME) do {} while(0)
+  #define END_TIMER_CORE(NAME) do {} while(0)
 #endif
 
 void* dlPtr;
@@ -195,27 +197,24 @@ int initializeLibJpegSandbox()
       return 0;
     }
 
-    printf("Loading dynamic library %s\n", JPEG_DL_PATH);
-
-    dlPtr = dlopenInSandbox(jpegSandbox, JPEG_DL_PATH, RTLD_LAZY);
   #elif(USE_SANDBOXING == 1)
 
     printf("Loading dynamic library %s\n", JPEG_NON_NACL_DL_PATH);
     dlPtr = dlopen(JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
-  #endif
 
-  if(!dlPtr)
-  {
-    printf("Loading of dynamic library %s has failed\n", JPEG_DL_PATH);
-    return 0;
-  }
+    if(!dlPtr)
+    {
+      printf("Loading of dynamic library %s has failed\n", JPEG_DL_PATH);
+      return 0;
+    }
+  #endif
 
   printf("Loading symbols.\n");
   int failed = 0;
 
   #if(USE_SANDBOXING == 2)
     #define loadSymbol(symbol) do { \
-      void* dlSymRes = dlsymInSandbox(jpegSandbox, dlPtr, #symbol); \
+      void* dlSymRes = symbolTableLookupInSandbox(jpegSandbox, #symbol); \
       if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
       *((void **) &ptr_##symbol) = dlSymRes; \
     } while(0)
@@ -583,8 +582,9 @@ void freeInJpegSandbox(void* ptr)
     #endif
     //printf("Calling func d_jpeg_start_output\n");
     START_TIMER(d_jpeg_start_output);
-    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
+    NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo) + sizeof(scan_number), 0 /* size of any arrays being pushed on the stack */);
     PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
+    PUSH_VAL_TO_STACK(threadData, int, scan_number);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_start_output);
     boolean ret = (boolean) functionCallReturnRawPrimitiveInt(threadData);
     END_TIMER(d_jpeg_start_output);
