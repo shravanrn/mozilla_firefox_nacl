@@ -38,7 +38,7 @@ DEFINES['JPEG_NON_NACL_DL_PATH'] = '"/home/shr/Code/libjpeg-turbo/non_nacl_build
 # DEFINES['STARTUP_LIBRARY_PATH'] = '"/home/shr/Code/nacl2/native_client/scons-out/nacl_irt-x86-32/staging/irt_core.nexe"'
 DEFINES['STARTUP_LIBRARY_PATH'] = '"/home/shr/Code/nacl2/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe"'
 # DEFINES['SANDBOX_INIT_APP'] = '"/home/shr/Code/libjpeg-turbo/nacl_build_simd_clang/mainCombine/libjpeg.nexe"'
-DEFINES['SANDBOX_INIT_APP'] = '"/home/shr/Code/libjpeg-turbo/nacl_build_64/mainCombine/libjpeg.nexe"'
+DEFINES['SANDBOX_INIT_APP'] = '"/home/shr/Code/libjpeg-turbo/nacl_build_simd_64/mainCombine/libjpeg.nexe"'
 
 
 LOCAL_INCLUDES += [
