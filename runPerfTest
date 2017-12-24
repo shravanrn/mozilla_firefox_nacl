@@ -5,25 +5,19 @@ if [ -z "$1" ]; then
 	exit 1; 
 fi
 
-if [[ ! -d "firefox_32bit_optdebug_nacl_simd" ]] || [[ ! -d "firefox_32bit_optdebug_nacl" ]]; then
-	echo "Not all firefox versions found1";
-	exit 1;
+if [[ -f "$1" ]]; then
+	echo "$1 already exists"; 
+	exit 1; 
 fi
 
-if [[ ! -d "firefox_32bit_optdebug_nonnacl" ]]; then
-	echo "Not all firefox versions found2";
-	exit 1;
-fi
+FFVersions=("firefox_64bit_optdebug_nacl" "firefox_64bit_optdebug_nonnacl" "firefox_64bit_optdebug_static") 
 
-if [[ ! -d "firefox_32bit_optdebug_static" ]] || [[ ! -d  "firefox_32bit_optdebug_staticnosimd" ]]; then
-	echo "Not all firefox versions found3";
-	exit 1;
-fi
-
-if [[ ! -d "firefox_32bit_optdebug_stock" ]] || [[ ! -d "firefox_32bit_optdebug_stocknosimd" ]]; then
-	echo "Not all firefox versions found4";
-	exit 1;
-fi
+for i in ${FFVersions[@]}; do
+	if [[ ! -d "${i}" ]]; then
+		echo "Not all firefox versions found: ${i}";
+		exit 1;
+	fi
+done
 
 #Get root
 sudo echo "Starting. Make sure to disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
@@ -33,21 +27,23 @@ sudo echo "Starting. Make sure to disable scaling first with. sudo cpufreq-set -
 function writeTimingLinesToOutput() {
 	# Logs are in the format as given below
 	#
-	# stuff | 1,JPEG_Time,0xf7150598,10
-	# stuff | 2,JPEG_Time,0xf7150598,33
-	# stuff | 1,JPEG_Time,0xaaa,31
-	# stuff | 2,JPEG_Time,0xaaa,40
+	# stuff | 1,JPEG_Time,0xf7150598,10,0,0
+	# stuff | 2,JPEG_Time,0xf7150598,33,1,10
+	# stuff | 1,JPEG_Time,0xaaa,31,0,0
+	# stuff | 2,JPEG_Time,0xaaa,40,1,11
 	#
-	# where the 4 comma separated columns are 
+	# where the 5 comma separated columns are 
 	# - invocation count for this thread
 	# - const string "JPEG_Time"
 	# - a unique string for each thread
 	# - cumulative time spent in "timed" code
+	# - invocation count for scanlines in this thread
+	# - cumulative time spent in "timed" scanlines code
 	#
 	# We want the latest time for each thread i.e.
 	#
-	# stuff | 2,JPEG_Time,0xf7150598,33
-	# stuff | 2,JPEG_Time,0xaaa,40
+	# stuff | 2,JPEG_Time,0xf7150598,33,1,10
+	# stuff | 2,JPEG_Time,0xaaa,40,1,11
 
 
 	ORIGINALDATA=$(cat "$2")
@@ -57,6 +53,8 @@ function writeTimingLinesToOutput() {
 
 	FNINVOCATIONS=0
 	FNTIMESPENT=0
+	FNCOREINVOCATIONS=0
+	FNCORETIMESPENT=0
 	while [ -n "$DATATOFILTER" ]
 	do
 
@@ -65,11 +63,14 @@ function writeTimingLinesToOutput() {
 		read -ra PIECES <<<"$TOPLINE"
 		FNINVOCATIONS=$((FNINVOCATIONS + PIECES[0]))
 		FNTIMESPENT=$((FNTIMESPENT + PIECES[3]))
+		FNCOREINVOCATIONS=$((FNCOREINVOCATIONS + PIECES[4]))
+		FNCORETIMESPENT=$((FNCORETIMESPENT + PIECES[5]))
 		DATATOFILTER=$(echo "$DATATOFILTER" | grep -v -E "${PIECES[2]}")
 	done
 
 	COMMASEPTIME=$(printf "%'.f\n" $((FNTIMESPENT / 25)))
-	echo "Final JPEG_Time (for 1 run): inv=$((FNINVOCATIONS / 25)) time=$COMMASEPTIME" >> "$1"
+	COMMASEPCORETIME=$(printf "%'.f\n" $((FNCORETIMESPENT / 25)))
+	echo "Final JPEG_Time (for 1 run): inv=$((FNINVOCATIONS / 25)) time=$COMMASEPTIME core_inv=$((FNCOREINVOCATIONS / 25)) time=$COMMASEPCORETIME" >> "$1"
 	echo -e "\n" >> "$1"
 
 	IFS=$OIFS
@@ -78,106 +79,59 @@ function writeTimingLinesToOutput() {
 # param: outputFile
 # param: testName
 function runTest(){
+	rm -f /home/shr/Code/mozilla-release/testing/mozharness/build/local.json
+	rm -f ./talos_output.txt
 	sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 	sleep 5
 	taskset -c 3 ./mach talos-test --activeTests $2 2>&1 | tee ./talos_output.txt
 	cat /home/shr/Code/mozilla-release/testing/mozharness/build/local.json >> "$1"
-        echo -e "\n" >> "$1"
+	echo -e "\n" >> "$1"
 	writeTimingLinesToOutput "$1" "./talos_output.txt"
+	echo -e "\nTerminal Output\n" >> "$1"
+	cat "./talos_output.txt" >> "$1"
+	echo "\n=================================\n" >> "$1"
 	rm ./talos_output.txt
 }
 
-function loadSandboxedSimdFirefox(){
-	sleep 2
-	mv firefox_32bit_optdebug_nacl_simd firefox_32bit_optdebug
-	sleep 2
-}
-function unloadSandboxedSimdFirefox(){
-	sleep 2
-	mv firefox_32bit_optdebug firefox_32bit_optdebug_nacl_simd
-	sleep 2
-}
 function loadSandboxedFirefox(){
 	sleep 2
-	mv firefox_32bit_optdebug_nacl firefox_32bit_optdebug
+	mv firefox_64bit_optdebug_nacl firefox_64bit_optdebug
 	sleep 2
 }
 function unloadSandboxedFirefox(){
 	sleep 2
-	mv firefox_32bit_optdebug firefox_32bit_optdebug_nacl
+	mv firefox_64bit_optdebug firefox_64bit_optdebug_nacl
 	sleep 2
 }
 
 function loadUnsandboxedFirefox(){
 	sleep 2
-	mv firefox_32bit_optdebug_nonnacl firefox_32bit_optdebug
+	mv firefox_64bit_optdebug_nonnacl firefox_64bit_optdebug
 	sleep 2	
 }
 function unloadUnsandboxedFirefox(){
 	sleep 2
-	mv firefox_32bit_optdebug firefox_32bit_optdebug_nonnacl
+	mv firefox_64bit_optdebug firefox_64bit_optdebug_nonnacl
 	sleep 2	
 }
 
 function loadStaticFirefox(){
 	sleep 2
-	mv firefox_32bit_optdebug_static firefox_32bit_optdebug
+	mv firefox_64bit_optdebug_static firefox_64bit_optdebug
 	sleep 2	
 }
 function unloadStaticFirefox(){
 	sleep 2
-	mv firefox_32bit_optdebug firefox_32bit_optdebug_static
+	mv firefox_64bit_optdebug firefox_64bit_optdebug_static
 	sleep 2	
 }
 
-function loadStaticNoSimdFirefox(){
-	sleep 2
-	mv firefox_32bit_optdebug_staticnosimd firefox_32bit_optdebug
-	sleep 2	
-}
-function unloadStaticNoSimdFirefox(){
-	sleep 2
-	mv firefox_32bit_optdebug firefox_32bit_optdebug_staticnosimd
-	sleep 2	
-}
-
-function loadStockFirefox(){
-	sleep 2
-	mv firefox_32bit_optdebug_stock firefox_32bit_optdebug
-	sleep 2	
-}
-function unloadStockFirefox(){
-	sleep 2
-	mv firefox_32bit_optdebug firefox_32bit_optdebug_stock
-	sleep 2	
-}
-
-function loadStockNoSimdFirefox(){
-	sleep 2
-	mv firefox_32bit_optdebug_stocknosimd firefox_32bit_optdebug
-	sleep 2	
-}
-function unloadStockNoSimdFirefox(){
-	sleep 2
-	mv firefox_32bit_optdebug firefox_32bit_optdebug_stocknosimd
-	sleep 2	
-}
 for i in 1 2
 do
 
-	loadSandboxedSimdFirefox
-
-	echo -e "FFBuild-NACL-SIMD\n" >> "$1"
-	runTest "$1" "jpeg_page_render"
-	# runTest "$1" "jpeg_page_render_25"
-	# runTest "$1" "jpeg_page_render_50"
-	echo -e "\n---------------------\n" >> "$1"
-
-	unloadSandboxedSimdFirefox
-
 	loadSandboxedFirefox
 
-	echo -e "FFBuild-NACL\n" >> "$1"
+	echo -e "FFBuild-NACL-SIMD\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
 	# runTest "$1" "jpeg_page_render_25"
 	# runTest "$1" "jpeg_page_render_50"
@@ -205,37 +159,7 @@ do
 
 	unloadStaticFirefox
 
-	loadStaticNoSimdFirefox
-
-	echo -e "FFBuild-Static-NoSimd\n" >> "$1"
-	runTest "$1" "jpeg_page_render"
-	# runTest "$1" "jpeg_page_render_25"
-	# runTest "$1" "jpeg_page_render_50"
-	echo -e "\n---------------------\n" >> "$1"
-
-	unloadStaticNoSimdFirefox
-
-	loadStockFirefox
-
-	echo -e "FFBuild-Stock\n" >> "$1"
-	runTest "$1" "jpeg_page_render"
-	# runTest "$1" "jpeg_page_render_25"
-	# runTest "$1" "jpeg_page_render_50"
-	echo -e "\n---------------------\n" >> "$1"
-
-	unloadStockFirefox
-
-	loadStockNoSimdFirefox
-
-	echo -e "FFBuild-Stock-NoSimd\n" >> "$1"
-	runTest "$1" "jpeg_page_render"
-	# runTest "$1" "jpeg_page_render_25"
-	# runTest "$1" "jpeg_page_render_50"
-	echo -e "\n---------------------\n" >> "$1"
-
-	unloadStockNoSimdFirefox
-
 done
 
 echo "Output results to $1"
-cat "$1" | grep -E "FFBuild|name|value|JPEG_Time"
+cat "$1" | grep -E '(^FFBuild)|("name")|("value")|(Final JPEG_Time)' | grep --invert-match "INFO -"
