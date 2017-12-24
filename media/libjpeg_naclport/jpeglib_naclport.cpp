@@ -178,7 +178,7 @@ int initializeLibJpegSandbox()
     return 1;
   #endif
 
-  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_DL_PATH, JPEG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
+  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
 
   #if(USE_SANDBOXING == 2)
     printf("Creating NaCl SandboxL %s, %s\n", STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
@@ -204,7 +204,7 @@ int initializeLibJpegSandbox()
 
     if(!dlPtr)
     {
-      printf("Loading of dynamic library %s has failed\n", JPEG_DL_PATH);
+      printf("Loading of dynamic library %s has failed\n", JPEG_NON_NACL_DL_PATH);
       return 0;
     }
   #endif

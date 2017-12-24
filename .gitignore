@@ -137,4 +137,4 @@ lextab.py
 !.vscode/extensions.json
 !.vscode/tasks.json
 /firefox_32bit_*/
-/firefox_64bit_optdebug/
+/firefox_64bit_*/
