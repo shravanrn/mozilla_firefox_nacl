@@ -33,10 +33,13 @@ DEFINES['PRINT_FUNCTION_TIMES'] = 42
 # DEFINES['PRINT_FUNCTION_LOGS'] = 42
 
 ############ Update these paths as required
-DEFINES['JPEG_DL_PATH'] = '"/home/shr/Code/libjpeg-turbo/nacl_build/.libs/libjpeg.so"'
-DEFINES['JPEG_NON_NACL_DL_PATH'] = '"/home/shr/Code/libjpeg-turbo/non_nacl_build/.libs/libjpeg.so"'
-DEFINES['STARTUP_LIBRARY_PATH'] = '"/home/shr/Code/nacl2/native_client/toolchain/linux_x86/nacl_x86_glibc/x86_64-nacl/lib32/"'
-DEFINES['SANDBOX_INIT_APP'] = '"/home/shr/Code/nacl2/native_client/scons-out/nacl-x86-32-glibc/staging/dyn_ldr_sandbox_init.nexe"'
+#DEFINES['JPEG_NON_NACL_DL_PATH'] = '"/home/shr/Code/libjpeg-turbo/non_nacl_build_simd_clang/.libs/libjpeg.so"'
+#DEFINES['STARTUP_LIBRARY_PATH'] = '"/home/shr/Code/nacl2/native_client/scons-out/nacl_irt-x86-32/staging/irt_core.nexe"'
+#DEFINES['SANDBOX_INIT_APP'] = '"/home/shr/Code/libjpeg-turbo/nacl_build_simd_clang/mainCombine/libjpeg.nexe"'
+
+DEFINES['JPEG_NON_NACL_DL_PATH'] = '"/home/shr/Code/libjpeg-turbo/non_nacl_build_simd_clang_64/.libs/libjpeg.so"'
+DEFINES['STARTUP_LIBRARY_PATH'] = '"/home/shr/Code/nacl2/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe"'
+DEFINES['SANDBOX_INIT_APP'] = '"/home/shr/Code/libjpeg-turbo/nacl_build_simd_64/mainCombine/libjpeg.nexe"'
 
 
 LOCAL_INCLUDES += [
@@ -46,6 +49,7 @@ LOCAL_INCLUDES += [
 ]
 
 ############ Update this path as required
-OS_LIBS += ['-L/home/shr/Code/nacl2/native_client/scons-out-firefox/opt-linux-x86-32/lib', '-ldyn_ldr', '-lsel', '-lnacl_error_code', '-lenv_cleanser', '-lnrd_xfer', '-lnacl_perf_counter', '-lnacl_base', '-limc', '-lnacl_fault_inject', '-lnacl_interval', '-lplatform_qual_lib', '-lvalidators', '-ldfa_validate_caller_x86_32', '-lcpu_features', '-lvalidation_cache', '-lplatform', '-lgio', '-lnccopy_x86_32', '-lrt', '-lpthread']
+#OS_LIBS += ['-L/home/shr/Code/nacl2/native_client/scons-out-firefox/opt-linux-x86-32/lib', '-ldyn_ldr', '-lsel', '-lnacl_error_code', '-lenv_cleanser', '-lnrd_xfer', '-lnacl_perf_counter', '-lnacl_base', '-limc', '-lnacl_fault_inject', '-lnacl_interval', '-lplatform_qual_lib', '-lvalidators', '-ldfa_validate_caller_x86_32', '-lcpu_features', '-lvalidation_cache', '-lplatform', '-lgio', '-lnccopy_x86_32', '-lrt', '-lpthread']
+OS_LIBS += ['-L/home/shr/Code/nacl2/native_client/scons-out-firefox/opt-linux-x86-64/lib', '-ldyn_ldr', '-lsel', '-lnacl_error_code', '-lenv_cleanser', '-lnrd_xfer', '-lnacl_perf_counter', '-lnacl_base', '-limc', '-lnacl_fault_inject', '-lnacl_interval', '-lplatform_qual_lib', '-lvalidators', '-ldfa_validate_caller_x86_64', '-lcpu_features', '-lvalidation_cache', '-lplatform', '-lgio', '-lnccopy_x86_64', '-lrt', '-lpthread']
 
 FINAL_LIBRARY = 'gkmedias'

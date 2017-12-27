@@ -181,7 +181,7 @@ int initializeLibJpegSandbox()
   //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
 
   #if(USE_SANDBOXING == 2)
-    printf("Creating NaCl SandboxL %s, %s\n", STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
+    printf("Creating NaCl Sandbox %s, %s\n", STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
 
     if(!initializeDlSandboxCreator(0 /* Should enable detailed logging */))
     {
