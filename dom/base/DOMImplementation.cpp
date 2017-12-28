@@ -98,7 +98,7 @@ DOMImplementation::CreateDocument(const nsAString& aNamespaceURI,
 
   nsresult rv;
   if (!aQualifiedName.IsEmpty()) {
-    const nsAFlatString& qName = PromiseFlatString(aQualifiedName);
+    const nsString& qName = PromiseFlatString(aQualifiedName);
     const char16_t *colon;
     rv = nsContentUtils::CheckQName(qName, true, &colon);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -123,7 +123,8 @@ DOMImplementation::CreateDocument(const nsAString& aNamespaceURI,
                          mDocumentURI, mBaseURI,
                          mOwner->NodePrincipal(),
                          true, scriptHandlingObject,
-                         DocumentFlavorLegacyGuess);
+                         DocumentFlavorLegacyGuess,
+                         mOwner->GetStyleBackendType());
   NS_ENSURE_SUCCESS(rv, rv);
 
   // When DOMImplementation's createDocument method is invoked with
@@ -202,7 +203,8 @@ DOMImplementation::CreateHTMLDocument(const nsAString& aTitle,
                          doctype, mDocumentURI, mBaseURI,
                          mOwner->NodePrincipal(),
                          true, scriptHandlingObject,
-                         DocumentFlavorLegacyGuess);
+                         DocumentFlavorLegacyGuess,
+                         mOwner->GetStyleBackendType());
   NS_ENSURE_SUCCESS(rv, rv);
   nsCOMPtr<nsIDocument> doc = do_QueryInterface(document);
 

@@ -10,7 +10,7 @@ const { classes: Cc, interfaces: Ci } = Components;
 
 function getTestDataFile(aFilename) {
   let file = Cc["@mozilla.org/file/directory_service;1"].
-            getService(Ci.nsIProperties).get("CurWorkD", Ci.nsILocalFile);
+            getService(Ci.nsIProperties).get("CurWorkD", Ci.nsIFile);
   let pathParts = REL_PATH_DATA.split("/");
   for (let i = 0; i < pathParts.length; ++i) {
     file.append(pathParts[i]);
@@ -29,7 +29,7 @@ function loadHelperScript(aScriptFile) {
   scriptloader.loadSubScript(scriptSpec, this);
 }
 
-var scriptFile = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsILocalFile);
+var scriptFile = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsIFile);
 scriptFile.initWithPath(getState("__LOCATION__"));
 scriptFile = scriptFile.parent;
 scriptFile.append("testConstants.js");
@@ -112,36 +112,48 @@ function handleRequest(aRequest, aResponse) {
   let size;
   let patches = "";
   let url = params.badURL ? BAD_SERVICE_URL : SERVICE_URL;
-
   if (!params.partialPatchOnly) {
     size = SIZE_SIMPLE_MAR + (params.invalidCompleteSize ? "1" : "");
-    patches += getRemotePatchString("complete", url, "SHA512",
-                                    SHA512_HASH_SIMPLE_MAR, size);
+    let patchProps = {type: "complete",
+                      url: url,
+                      size: size};
+    patches += getRemotePatchString(patchProps);
   }
 
   if (!params.completePatchOnly) {
     size = SIZE_SIMPLE_MAR + (params.invalidPartialSize ? "1" : "");
-    patches += getRemotePatchString("partial", url, "SHA512",
-                                    SHA512_HASH_SIMPLE_MAR, size);
+    let patchProps = {type: "partial",
+                      url: url,
+                      size: size};
+    patches += getRemotePatchString(patchProps);
   }
 
-  let type = params.type ? params.type : "major";
-  let name = params.name ? params.name : "App Update Test";
-  let appVersion = params.appVersion ? params.appVersion : "999999.9";
-  let displayVersion = params.displayVersion ? params.displayVersion
-                                             : "version " + appVersion;
-  let buildID = params.buildID ? params.buildID : "01234567890123";
-  // XXXrstrong - not specifying a detailsURL will cause a leak due to bug 470244
-//  let detailsURL = params.showDetails ? URL_HTTP_UPDATE_SJS + "?uiURL=DETAILS" : null;
-  let detailsURL = URL_HTTP_UPDATE_SJS + "?uiURL=DETAILS";
-  let showPrompt = params.showPrompt ? "true" : null;
-  let showNever = params.showNever ? "true" : null;
-  let promptWaitTime = params.promptWaitTime ? params.promptWaitTime : null;
+  let updateProps = {};
+  if (params.type) {
+    updateProps.type = params.type;
+  }
 
-  let updates = getRemoteUpdateString(patches, type, "App Update Test",
-                                      displayVersion, appVersion, buildID,
-                                      detailsURL, showPrompt, showNever,
-                                      promptWaitTime);
+  if (params.name) {
+    updateProps.name = params.name;
+  }
+
+  if (params.appVersion) {
+    updateProps.appVersion = params.appVersion;
+  }
+
+  if (params.displayVersion) {
+    updateProps.displayVersion = params.displayVersion;
+  }
+
+  if (params.buildID) {
+    updateProps.buildID = params.buildID;
+  }
+
+  if (params.promptWaitTime) {
+    updateProps.promptWaitTime = params.promptWaitTime;
+  }
+
+  let updates = getRemoteUpdateString(updateProps, patches);
   aResponse.write(getRemoteUpdatesXMLString(updates));
 }
 

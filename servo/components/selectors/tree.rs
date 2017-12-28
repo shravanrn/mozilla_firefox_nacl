@@ -5,13 +5,29 @@
 //! Traits that nodes must implement. Breaks the otherwise-cyclic dependency
 //! between layout and style.
 
-use attr::{AttrSelectorOperation, NamespaceConstraint};
+use attr::{AttrSelectorOperation, NamespaceConstraint, CaseSensitivity};
 use matching::{ElementSelectorFlags, LocalMatchingContext, MatchingContext, RelevantLinkStatus};
 use parser::SelectorImpl;
+use servo_arc::NonZeroPtrMut;
 use std::fmt::Debug;
 
-pub trait Element: Sized + Debug {
+/// Opaque representation of an Element, for identity comparisons. We use
+/// NonZeroPtrMut to get the NonZero optimization.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct OpaqueElement(pub NonZeroPtrMut<()>);
+
+impl OpaqueElement {
+    /// Creates a new OpaqueElement from an arbitrarily-typed pointer.
+    pub fn new<T>(ptr: *const T) -> Self {
+        OpaqueElement(NonZeroPtrMut::new(ptr as *const () as *mut ()))
+    }
+}
+
+pub trait Element: Sized + Clone + Debug {
     type Impl: SelectorImpl;
+
+    /// Converts self into an opaque representation.
+    fn opaque(&self) -> OpaqueElement;
 
     fn parent_element(&self) -> Option<Self>;
 
@@ -63,9 +79,15 @@ pub trait Element: Sized + Debug {
     /// Whether this element is a `link`.
     fn is_link(&self) -> bool;
 
-    fn get_id(&self) -> Option<<Self::Impl as SelectorImpl>::Identifier>;
+    fn has_id(&self,
+              id: &<Self::Impl as SelectorImpl>::Identifier,
+              case_sensitivity: CaseSensitivity)
+              -> bool;
 
-    fn has_class(&self, name: &<Self::Impl as SelectorImpl>::ClassName) -> bool;
+    fn has_class(&self,
+                 name: &<Self::Impl as SelectorImpl>::ClassName,
+                 case_sensitivity: CaseSensitivity)
+                 -> bool;
 
     /// Returns whether this element matches `:empty`.
     ///
@@ -79,4 +101,17 @@ pub trait Element: Sized + Debug {
     /// Note: this can be false even if `.parent_element()` is `None`
     /// if the parent node is a `DocumentFragment`.
     fn is_root(&self) -> bool;
+
+    /// Returns whether this element should ignore matching nth child
+    /// selector.
+    fn ignores_nth_child_selectors(&self) -> bool {
+        false
+    }
+
+    /// Return true if we want to stop lookup ancestor of the current
+    /// element while matching complex selectors with descendant/child
+    /// combinator.
+    fn blocks_ancestor_combinators(&self) -> bool {
+        false
+    }
 }

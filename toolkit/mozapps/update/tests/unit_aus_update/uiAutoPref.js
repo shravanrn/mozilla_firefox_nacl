@@ -2,11 +2,9 @@
  * http://creativecommons.org/publicdomain/zero/1.0/
  */
 
-Components.utils.import("resource://testing-common/MockRegistrar.jsm");
-
 const WindowWatcher = {
   openWindow(aParent, aUrl, aName, aFeatures, aArgs) {
-    gCheckFunc();
+    check_showUpdateAvailable();
   },
 
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIWindowWatcher])
@@ -47,9 +45,8 @@ function run_test() {
     MockRegistrar.unregister(windowMediatorCID);
   });
 
-  gCheckFunc = check_showUpdateAvailable;
-  let patches = getRemotePatchString("complete");
-  let updates = getRemoteUpdateString(patches, "minor", null, null, "1.0");
+  let patches = getRemotePatchString({});
+  let updates = getRemoteUpdateString({}, patches);
   gResponseBody = getRemoteUpdatesXMLString(updates);
   gAUS.notify(null);
 }

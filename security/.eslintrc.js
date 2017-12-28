@@ -8,9 +8,6 @@ module.exports = {
     // Braces only needed for multi-line arrow function blocks
     "arrow-body-style": ["error", "as-needed"],
 
-    // Commas at the end of the line not the start
-    "comma-style": "error",
-
     // Verify calls of super() in constructors.
     "constructor-super": "error",
 
@@ -20,39 +17,21 @@ module.exports = {
     // Require default case in switch statements.
     "default-case": "error",
 
-    // Require `foo.bar` dot notation instead of `foo["bar"]` notation.
-    "dot-notation": "error",
-
-    // Require function* name()
-    "generator-star-spacing": ["error", {"before": false, "after": true}],
-
     // Always require parenthesis for new calls
     "new-parens": "error",
 
     // Disallow use of alert(), confirm(), and prompt().
     "no-alert": "error",
 
-    // Disallow use of arguments.caller or arguments.callee.
-    "no-caller": "error",
-
     // Disallow likely erroneous `switch` scoped lexical declarations in
     // case/default clauses.
     "no-case-declarations": "error",
 
-    // Disallow modifying variables of class declarations.
-    "no-class-assign": "error",
-
     // Disallow use of the console API.
     "no-console": "error",
 
-    // Disallow modifying variables that are declared using const.
-    "no-const-assign": "error",
-
     // Disallow constant expressions in conditions (except for loops).
     "no-constant-condition": ["error", { "checkLoops": false }],
-
-    // Disallow duplicate class members.
-    "no-dupe-class-members": "error",
 
     // Disallow extending of native objects.
     "no-extend-native": "error",
@@ -64,18 +43,11 @@ module.exports = {
     // No reassigning native JS objects or read only globals.
     "no-global-assign": "error",
 
-    // Disallow primitive wrapper instances like `new Boolean(false)`, which
-    // seem like they should act like primitives but don't.
-    "no-new-wrappers": "error",
-
     // Disallow use of assignment in return statement.
     "no-return-assign": ["error", "always"],
 
     // Disallow use of the comma operator.
     "no-sequences": "error",
-
-    // Disallow tabs.
-    "no-tabs": "error",
 
     // Disallow template literal placeholder syntax in regular strings.
     "no-template-curly-in-string": "error",
@@ -90,17 +62,11 @@ module.exports = {
     // Disallow unmodified loop conditions.
     "no-unmodified-loop-condition": "error",
 
-    // Disallow ternary operators when simpler alternatives exist.
-    "no-unneeded-ternary": "error",
-
     // No expressions where a statement is expected
     "no-unused-expressions": "error",
 
     // Disallow unnecessary escape usage in strings and regular expressions.
     "no-useless-escape": "error",
-
-    // Disallow whitespace before properties.
-    "no-whitespace-before-property": "error",
 
     // Disallow blank line padding within blocks.
     "padded-blocks": ["error", "never"],

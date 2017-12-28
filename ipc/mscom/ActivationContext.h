@@ -8,16 +8,31 @@
 #define mozilla_mscom_ActivationContext_h
 
 #include "mozilla/Attributes.h"
+#include "mozilla/Move.h"
+#include "mozilla/Result.h"
 
 #include <windows.h>
 
 namespace mozilla {
 namespace mscom {
 
-class MOZ_RAII ActivationContext
+class ActivationContext final
 {
 public:
-  explicit ActivationContext(HMODULE aLoadFromModule);
+  ActivationContext()
+    : mActCtx(INVALID_HANDLE_VALUE)
+  {
+  }
+
+  explicit ActivationContext(WORD aResourceId);
+  explicit ActivationContext(HMODULE aLoadFromModule, WORD aResourceId = 2);
+
+  ActivationContext(ActivationContext&& aOther);
+  ActivationContext& operator=(ActivationContext&& aOther);
+
+  ActivationContext(const ActivationContext& aOther);
+  ActivationContext& operator=(const ActivationContext& aOther);
+
   ~ActivationContext();
 
   explicit operator bool() const
@@ -25,14 +40,58 @@ public:
     return mActCtx != INVALID_HANDLE_VALUE;
   }
 
-  ActivationContext(const ActivationContext&) = delete;
-  ActivationContext(ActivationContext&&) = delete;
-  ActivationContext& operator=(const ActivationContext&) = delete;
-  ActivationContext& operator=(ActivationContext&&) = delete;
+  static Result<uintptr_t,HRESULT> GetCurrent();
 
 private:
-  HANDLE    mActCtx;
-  ULONG_PTR mActivationCookie;
+  void Init(ACTCTX& aActCtx);
+  void AddRef();
+  void Release();
+
+private:
+  HANDLE mActCtx;
+
+  friend class ActivationContextRegion;
+};
+
+class MOZ_NON_TEMPORARY_CLASS ActivationContextRegion final
+{
+public:
+  template <typename... Args>
+  explicit ActivationContextRegion(Args... aArgs)
+    : mActCtx(Forward<Args>(aArgs)...)
+    , mActCookie(0)
+  {
+    Activate();
+  }
+
+  ActivationContextRegion();
+
+  explicit ActivationContextRegion(const ActivationContext& aActCtx);
+  ActivationContextRegion& operator=(const ActivationContext& aActCtx);
+
+  explicit ActivationContextRegion(ActivationContext&& aActCtx);
+  ActivationContextRegion& operator=(ActivationContext&& aActCtx);
+
+  ActivationContextRegion(ActivationContextRegion&& aRgn);
+  ActivationContextRegion& operator=(ActivationContextRegion&& aRgn);
+
+  ~ActivationContextRegion();
+
+  explicit operator bool() const
+  {
+    return !!mActCookie;
+  }
+
+  ActivationContextRegion(const ActivationContextRegion&) = delete;
+  ActivationContextRegion& operator=(const ActivationContextRegion&) = delete;
+
+  bool Deactivate();
+
+private:
+  void Activate();
+
+  ActivationContext mActCtx;
+  ULONG_PTR         mActCookie;
 };
 
 } // namespace mscom

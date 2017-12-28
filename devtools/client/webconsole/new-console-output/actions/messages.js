@@ -10,10 +10,12 @@ const {
   prepareMessage
 } = require("devtools/client/webconsole/new-console-output/utils/messages");
 const { IdGenerator } = require("devtools/client/webconsole/new-console-output/utils/id-generator");
-const { batchActions } = require("devtools/client/webconsole/new-console-output/actions/enhancers");
+const { batchActions } = require("devtools/client/shared/redux/middleware/debounce");
+
 const {
   MESSAGE_ADD,
   NETWORK_MESSAGE_UPDATE,
+  NETWORK_UPDATE_REQUEST,
   MESSAGES_CLEAR,
   MESSAGE_OPEN,
   MESSAGE_CLOSE,
@@ -91,7 +93,7 @@ function messageTableDataReceive(id, data) {
   };
 }
 
-function networkMessageUpdate(packet, idGenerator = null) {
+function networkMessageUpdate(packet, idGenerator = null, response) {
   if (idGenerator == null) {
     idGenerator = defaultIdGenerator;
   }
@@ -101,6 +103,15 @@ function networkMessageUpdate(packet, idGenerator = null) {
   return {
     type: NETWORK_MESSAGE_UPDATE,
     message,
+    response,
+  };
+}
+
+function networkUpdateRequest(id, data) {
+  return {
+    type: NETWORK_UPDATE_REQUEST,
+    id,
+    data,
   };
 }
 
@@ -111,5 +122,7 @@ module.exports = {
   messageClose,
   messageTableDataGet,
   networkMessageUpdate,
+  networkUpdateRequest,
+  // for test purpose only.
+  messageTableDataReceive,
 };
-

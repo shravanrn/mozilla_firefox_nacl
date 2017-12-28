@@ -286,7 +286,7 @@ UnwrapObjectInternal(V& obj, U& value, prototypes::ID protoID,
   // something of type U might trigger GC (e.g. release the value currently
   // stored in there, with arbitrary consequences) and invalidate the
   // "unwrappedObj" pointer.
-  T* tempValue;
+  T* tempValue = nullptr;
   nsresult rv = UnwrapObjectInternal<T, false>(unwrappedObj, tempValue,
                                                protoID, protoDepth);
   if (NS_SUCCEEDED(rv)) {
@@ -1961,31 +1961,8 @@ AtomizeAndPinJSString(JSContext* cx, jsid& id, const char* chars)
   return false;
 }
 
-// Spec needs a name property
-template <typename Spec>
-static bool
-InitIds(JSContext* cx, const Prefable<Spec>* prefableSpecs, jsid* ids)
-{
-  MOZ_ASSERT(prefableSpecs);
-  MOZ_ASSERT(prefableSpecs->specs);
-  do {
-    // We ignore whether the set of ids is enabled and just intern all the IDs,
-    // because this is only done once per application runtime.
-    Spec* spec = prefableSpecs->specs;
-    do {
-      if (!JS::PropertySpecNameToPermanentId(cx, spec->name, ids)) {
-        return false;
-      }
-    } while (++ids, (++spec)->name);
-
-    // We ran out of ids for that pref.  Put a JSID_VOID in on the id
-    // corresponding to the list terminator for the pref.
-    *ids = JSID_VOID;
-    ++ids;
-  } while ((++prefableSpecs)->specs);
-
-  return true;
-}
+bool
+InitIds(JSContext* cx, const NativeProperties* properties);
 
 bool
 QueryInterface(JSContext* cx, unsigned argc, JS::Value* vp);
@@ -2720,8 +2697,8 @@ const nsAString& NonNullHelper(const binding_detail::FakeString& aArg)
 
 // Reparent the wrapper of aObj to whatever its native now thinks its
 // parent should be.
-nsresult
-ReparentWrapper(JSContext* aCx, JS::Handle<JSObject*> aObj);
+void
+ReparentWrapper(JSContext* aCx, JS::Handle<JSObject*> aObj, ErrorResult& aError);
 
 /**
  * Used to implement the Symbol.hasInstance property of an interface object.
@@ -2842,6 +2819,18 @@ ToSupportsIsOnPrimaryInheritanceChain(T* aObject, nsWrapperCache* aCache)
                                                                      aCache);
 }
 
+// Get the size of allocated memory to associate with a binding JSObject for a
+// native object. This is supplied to the JS engine to allow it to schedule GC
+// when necessary.
+//
+// This function supplies a default value and is overloaded for specific native
+// object types.
+inline size_t
+BindingJSObjectMallocBytes(void *aNativePtr)
+{
+  return 0;
+}
+
 // The BindingJSObjectCreator class is supposed to be used by a caller that
 // wants to create and initialise a binding JSObject. After initialisation has
 // been successfully completed it should call ForgetObject().
@@ -2884,6 +2873,10 @@ public:
       mNative = aNative;
       mReflector = aReflector;
     }
+
+    if (size_t mallocBytes = BindingJSObjectMallocBytes(aNative)) {
+      JS_updateMallocCounter(aCx, mallocBytes);
+    }
   }
 
   void
@@ -2896,6 +2889,10 @@ public:
       js::SetReservedSlot(aReflector, DOM_OBJECT_SLOT, JS::PrivateValue(aNative));
       mNative = aNative;
       mReflector = aReflector;
+    }
+
+    if (size_t mallocBytes = BindingJSObjectMallocBytes(aNative)) {
+      JS_updateMallocCounter(aCx, mallocBytes);
     }
   }
 
@@ -3079,7 +3076,8 @@ bool
 MayResolveGlobal(const JSAtomState& aNames, jsid aId, JSObject* aMaybeObj);
 
 bool
-EnumerateGlobal(JSContext* aCx, JS::Handle<JSObject*> aObj);
+EnumerateGlobal(JSContext* aCx, JS::HandleObject aObj,
+                JS::AutoIdVector& aProperties, bool aEnumerableOnly);
 
 template <class T>
 struct CreateGlobalOptions
@@ -3395,11 +3393,10 @@ GetCustomElementReactionsStack(JS::Handle<JSObject*> aObj);
 // that constructor function.
 already_AddRefed<nsGenericHTMLElement>
 CreateHTMLElement(const GlobalObject& aGlobal, const JS::CallArgs& aCallArgs,
-                  ErrorResult& aRv);
+                  JS::Handle<JSObject*> aGivenProto, ErrorResult& aRv);
 
 void
-SetDocumentAndPageUseCounter(JSContext* aCx, JSObject* aObject,
-                             UseCounter aUseCounter);
+SetDocumentAndPageUseCounter(JSObject* aObject, UseCounter aUseCounter);
 
 // Warnings
 void

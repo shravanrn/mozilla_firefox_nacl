@@ -16,7 +16,6 @@
 #include "mozilla/ipc/IPCStreamUtils.h"
 #include "mozilla/net/NeckoParent.h"
 #include "mozilla/net/IPCTransportProvider.h"
-#include "mozilla/AbstractThread.h"
 #include "mozilla/ErrorResult.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Unused.h"
@@ -82,7 +81,9 @@ FlyWebPublishedServer::FireFetchEvent(InternalRequest* aRequest)
 {
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetOwner());
   RefPtr<FlyWebFetchEvent> e = new FlyWebFetchEvent(this,
-                                                    new Request(global, aRequest),
+                                                    new Request(global,
+                                                                aRequest,
+                                                                nullptr),
                                                     aRequest);
   e->Init(this);
   e->InitEvent(NS_LITERAL_STRING("fetch"), false, false);
@@ -95,7 +96,9 @@ FlyWebPublishedServer::FireWebsocketEvent(InternalRequest* aConnectRequest)
 {
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetOwner());
   RefPtr<FlyWebFetchEvent> e = new FlyWebWebSocketEvent(this,
-                                                        new Request(global, aConnectRequest),
+                                                        new Request(global,
+                                                                    aConnectRequest,
+                                                                    nullptr),
                                                         aConnectRequest);
   e->Init(this);
   e->InitEvent(NS_LITERAL_STRING("websocket"), false, false);
@@ -172,8 +175,8 @@ FlyWebPublishedServerImpl::FlyWebPublishedServerImpl(nsPIDOMWindowInner* aOwner,
   : FlyWebPublishedServer(aOwner, aName, aOptions)
   , mHttpServer(
       new HttpServer(aOwner ?
-        aOwner->GetDocGroup()->AbstractMainThreadFor(TaskCategory::Other) :
-        AbstractThread::MainThread()))
+        aOwner->GetDocGroup()->EventTargetFor(TaskCategory::Other) :
+        GetMainThreadSerialEventTarget()))
 {
   LOG_I("FlyWebPublishedServerImpl::FlyWebPublishedServerImpl(%p)", this);
 }
@@ -491,8 +494,8 @@ FlyWebPublishedServerParent::FlyWebPublishedServerParent(const nsAString& aName,
   RefPtr<FlyWebPublishedServerParent> self = this;
 
   mozPromise->Then(
-    // Non DocGroup-version of AbstractThread::MainThread() for the task in parent.
-    AbstractThread::MainThread(),
+    // Non DocGroup-version for the task in parent.
+    GetMainThreadSerialEventTarget(),
     __func__,
     [this, self] (FlyWebPublishedServer* aServer) {
       mPublishedServer = static_cast<FlyWebPublishedServerImpl*>(aServer);

@@ -85,7 +85,7 @@ enum NewObjectKind {
 /* Type information about an object accessed by a script. */
 class ObjectGroup : public gc::TenuredCell
 {
-    friend void gc::MergeCompartments(JSCompartment* source, JSCompartment* target);
+    friend class gc::GCRuntime;
 
     /* Class shared by objects in this group. */
     const Class* clasp_;
@@ -97,7 +97,6 @@ class ObjectGroup : public gc::TenuredCell
     JSCompartment* compartment_;
 
   public:
-
     const Class* clasp() const {
         return clasp_;
     }
@@ -390,7 +389,8 @@ class ObjectGroup : public gc::TenuredCell
     inline HeapTypeSet* getProperty(JSContext* cx, JSObject* obj, jsid id);
 
     /* Get a property only if it already exists. */
-    inline HeapTypeSet* maybeGetProperty(jsid id);
+    MOZ_ALWAYS_INLINE HeapTypeSet* maybeGetProperty(jsid id);
+    MOZ_ALWAYS_INLINE HeapTypeSet* maybeGetPropertyDontCheckGeneration(jsid id);
 
     /*
      * Iterate through the group's properties. getPropertyCount overapproximates
@@ -472,6 +472,7 @@ class ObjectGroup : public gc::TenuredCell
     }
 
     inline uint32_t basePropertyCount();
+    inline uint32_t basePropertyCountDontCheckGeneration();
 
   private:
     inline void setBasePropertyCount(uint32_t count);
@@ -623,6 +624,14 @@ class ObjectGroupCompartment
     // Table for referencing types of objects keyed to an allocation site.
     AllocationSiteTable* allocationSiteTable;
 
+    // A single per-compartment ObjectGroup for all calls to StringSplitString.
+    // StringSplitString is always called from self-hosted code, and conceptually
+    // the return object for a string.split(string) operation should have a
+    // unified type.  Having a global group for this also allows us to remove
+    // the hash-table lookup that would be required if we allocated this group
+    // on the basis of call-site pc.
+    ReadBarrieredObjectGroup stringSplitStringGroup;
+
   public:
     struct NewEntry;
 
@@ -639,6 +648,8 @@ class ObjectGroupCompartment
     static ObjectGroup* makeGroup(JSContext* cx, const Class* clasp,
                                   Handle<TaggedProto> proto,
                                   ObjectGroupFlags initialFlags = 0);
+
+    static ObjectGroup* getStringSplitStringGroup(JSContext* cx);
 
     void addSizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf,
                                 size_t* allocationSiteTables,

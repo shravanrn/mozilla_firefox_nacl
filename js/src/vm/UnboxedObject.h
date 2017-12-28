@@ -276,8 +276,8 @@ class UnboxedPlainObject : public UnboxedObject
     static bool obj_deleteProperty(JSContext* cx, HandleObject obj, HandleId id,
                                    ObjectOpResult& result);
 
-    static bool obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties,
-                              bool enumerableOnly);
+    static bool newEnumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties,
+                             bool enumerableOnly);
     static bool obj_watch(JSContext* cx, HandleObject obj, HandleId id, HandleObject callable);
 
     inline const UnboxedLayout& layout() const;
@@ -412,8 +412,8 @@ class UnboxedArrayObject : public UnboxedObject
     static bool obj_deleteProperty(JSContext* cx, HandleObject obj, HandleId id,
                                    ObjectOpResult& result);
 
-    static bool obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties,
-                              bool enumerableOnly);
+    static bool newEnumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties,
+                             bool enumerableOnly);
     static bool obj_watch(JSContext* cx, HandleObject obj, HandleId id, HandleObject callable);
 
     inline const UnboxedLayout& layout() const;
@@ -443,11 +443,8 @@ class UnboxedArrayObject : public UnboxedObject
                           Handle<GCVector<Value>> values, size_t* valueCursor);
 
     static void trace(JSTracer* trc, JSObject* object);
-    static void objectMoved(JSObject* obj, const JSObject* old);
+    static size_t objectMoved(JSObject* obj, JSObject* old);
     static void finalize(FreeOp* fop, JSObject* obj);
-
-    static size_t objectMovedDuringMinorGC(JSTracer* trc, JSObject* dst, JSObject* src,
-                                           gc::AllocKind allocKind);
 
     uint8_t* elements() {
         return elements_;

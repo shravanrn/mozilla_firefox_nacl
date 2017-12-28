@@ -2,6 +2,7 @@
 
 #include "IPDLUnitTests.h"      // fail etc.
 
+#include "mozilla/AbstractThread.h"
 #include "mozilla/Unused.h"
 
 namespace mozilla {
@@ -26,10 +27,7 @@ TestAsyncReturnsParent::~TestAsyncReturnsParent()
 void
 TestAsyncReturnsParent::Main()
 {
-  if (!AbstractThread::MainThread()) {
-    fail("AbstractThread not initalized");
-  }
-  SendNoReturn()->Then(AbstractThread::MainThread(), __func__,
+  SendNoReturn()->Then(MessageLoop::current()->SerialEventTarget(), __func__,
                        [](bool unused) {
                          fail("resolve handler should not be called");
                        },
@@ -41,7 +39,7 @@ TestAsyncReturnsParent::Main()
                          }
                          passed("reject handler called on channel close");
                        });
-  SendPing()->Then(AbstractThread::MainThread(), __func__,
+  SendPing()->Then(MessageLoop::current()->SerialEventTarget(), __func__,
                    [this](bool one) {
                      if (one) {
                        passed("take one argument");
@@ -59,7 +57,7 @@ TestAsyncReturnsParent::Main()
 mozilla::ipc::IPCResult
 TestAsyncReturnsParent::RecvPong(PongResolver&& aResolve)
 {
-  aResolve(MakeTuple(sMagic1, sMagic2));
+  aResolve(Tuple<const uint32_t&, const uint32_t&>(sMagic1, sMagic2));
   return IPC_OK();
 }
 
@@ -87,10 +85,7 @@ TestAsyncReturnsChild::RecvNoReturn(NoReturnResolver&& aResolve)
 mozilla::ipc::IPCResult
 TestAsyncReturnsChild::RecvPing(PingResolver&& aResolve)
 {
-  if (!AbstractThread::MainThread()) {
-    fail("AbstractThread not initalized");
-  }
-  SendPong()->Then(AbstractThread::MainThread(), __func__,
+  SendPong()->Then(MessageLoop::current()->SerialEventTarget(), __func__,
                    [aResolve](const Tuple<uint32_t, uint32_t>& aParam) {
                      if (Get<0>(aParam) == sMagic1 && Get<1>(aParam) == sMagic2) {
                        passed("take two arguments");

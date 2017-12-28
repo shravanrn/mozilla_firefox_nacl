@@ -11,7 +11,6 @@
 #include "MockMediaResource.h"
 
 using namespace mozilla;
-using namespace mozilla::mp3;
 using media::TimeUnit;
 
 
@@ -309,7 +308,7 @@ protected:
     }
 
     for (auto& target: mTargets) {
-      ASSERT_EQ(NS_OK, target.mResource->Open(nullptr));
+      ASSERT_EQ(NS_OK, target.mResource->Open());
       ASSERT_TRUE(target.mDemuxer->Init());
     }
   }

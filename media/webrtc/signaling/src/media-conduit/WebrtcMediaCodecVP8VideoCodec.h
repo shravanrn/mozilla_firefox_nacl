@@ -60,7 +60,6 @@ private:
   bool ResetOutputBuffers();
 
   size_t mMaxPayloadSize;
-  uint32_t mTimestamp;
   webrtc::EncodedImage mEncodedImage;
   webrtc::EncodedImageCallback* mCallback;
   uint32_t mFrameWidth;
@@ -127,8 +126,6 @@ public:
   virtual int32_t RegisterDecodeCompleteCallback(webrtc::DecodedImageCallback* callback) override;
 
   virtual int32_t Release() override;
-
-  virtual int32_t Reset() override;
 
 private:
   void DecodeFrame(EncodedFrame* frame);

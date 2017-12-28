@@ -210,11 +210,7 @@ function sleep(milliseconds) {
   var timeup = false;
 
   hwindow.setTimeout(function () { timeup = true; }, milliseconds);
-  var thread = Services.tm.currentThread;
-
-  while (!timeup) {
-    thread.processNextEvent(true);
-  }
+  Services.tm.spinEventLoopUntil(() => timeup);
 
   broker.pass({'function':'utils.sleep()'});
 }
@@ -376,7 +372,7 @@ function saveDataURL(aDataURL, aFilename) {
 
   var file;
   file = Cc['@mozilla.org/file/local;1']
-         .createInstance(Ci.nsILocalFile);
+         .createInstance(Ci.nsIFile);
   file.initWithPath(frame.persisted['screenshots']['path']);
   file.append(aFilename + ".jpg");
   file.createUnique(Ci.nsIFile.NORMAL_FILE_TYPE, FILE_PERMISSIONS);

@@ -136,6 +136,9 @@ private:
   Mutex& operator=(const Mutex&);
 };
 
+template<typename T>
+class MOZ_RAII BaseAutoUnlock;
+
 /**
  * MutexAutoLock
  * Acquires the Mutex when it enters scope, and releases it when it leaves
@@ -168,11 +171,44 @@ public:
     mLock->Unlock();
   }
 
+  // Assert that aLock is the mutex passed to the constructor and that the
+  // current thread owns the mutex.  In coding patterns such as:
+  //
+  // void LockedMethod(const MutexAutoLock& aProofOfLock)
+  // {
+  //   aProofOfLock.AssertOwns(mMutex);
+  //   ...
+  // }
+  //
+  // Without this assertion, it could be that mMutex is not actually
+  // locked. It's possible to have code like:
+  //
+  // MutexAutoLock lock(someMutex);
+  // ...
+  // MutexAutoUnlock unlock(someMutex);
+  // ...
+  // LockedMethod(lock);
+  //
+  // and in such a case, simply asserting that the mutex pointers match is not
+  // sufficient; mutex ownership must be asserted as well.
+  //
+  // Note that if you are going to use the coding pattern presented above, you
+  // should use this method in preference to using AssertCurrentThreadOwns on
+  // the mutex you expected to be held, since this method provides stronger
+  // guarantees.
+  void AssertOwns(const T& aLock) const
+  {
+    MOZ_ASSERT(&aLock == mLock);
+    mLock->AssertCurrentThreadOwns();
+  }
+
 private:
   BaseAutoLock();
   BaseAutoLock(BaseAutoLock&);
   BaseAutoLock& operator=(BaseAutoLock&);
   static void* operator new(size_t) CPP_THROW_NEW;
+
+  friend class BaseAutoUnlock<T>;
 
   T* mLock;
   MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
@@ -194,6 +230,15 @@ class MOZ_RAII BaseAutoUnlock
 public:
   explicit BaseAutoUnlock(T& aLock MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
     : mLock(&aLock)
+  {
+    MOZ_GUARD_OBJECT_NOTIFIER_INIT;
+    NS_ASSERTION(mLock, "null lock");
+    mLock->Unlock();
+  }
+
+  explicit BaseAutoUnlock(
+    BaseAutoLock<T>& aAutoLock MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
+    : mLock(aAutoLock.mLock)
   {
     MOZ_GUARD_OBJECT_NOTIFIER_INIT;
     NS_ASSERTION(mLock, "null lock");

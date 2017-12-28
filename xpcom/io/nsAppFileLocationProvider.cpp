@@ -11,11 +11,9 @@
 #include "nsIAtom.h"
 #include "nsIFile.h"
 #include "nsString.h"
-#include "nsXPIDLString.h"
 #include "nsISimpleEnumerator.h"
 #include "prenv.h"
 #include "nsCRT.h"
-
 #if defined(MOZ_WIDGET_COCOA)
 #include <Carbon/Carbon.h>
 #include "nsILocalFileMac.h"
@@ -51,7 +49,6 @@
 #ifdef MOZ_WIDGET_COCOA
 #define NS_MACOSX_USER_PLUGIN_DIR   "OSXUserPlugins"
 #define NS_MACOSX_LOCAL_PLUGIN_DIR  "OSXLocalPlugins"
-#define NS_MACOSX_JAVA2_PLUGIN_DIR  "OSXJavaPlugins"
 #elif XP_UNIX
 #define NS_SYSTEM_PLUGINS_DIR       "SysPlugins"
 #endif
@@ -61,7 +58,6 @@
 #define RES_DIR_NAME                NS_LITERAL_CSTRING("res")
 #define CHROME_DIR_NAME             NS_LITERAL_CSTRING("chrome")
 #define PLUGINS_DIR_NAME            NS_LITERAL_CSTRING("plugins")
-#define SEARCH_DIR_NAME             NS_LITERAL_CSTRING("searchplugins")
 
 //*****************************************************************************
 // nsAppFileLocationProvider::Constructor/Destructor
@@ -159,11 +155,6 @@ nsAppFileLocationProvider::GetFile(const char* aProp, bool* aPersistent,
         localFile = macFile;
       }
     }
-  } else if (nsCRT::strcmp(aProp, NS_MACOSX_JAVA2_PLUGIN_DIR) == 0) {
-    static const char* const java2PluginDirPath =
-      "/System/Library/Java/Support/Deploy.bundle/Contents/Resources/";
-    rv = NS_NewNativeLocalFile(nsDependentCString(java2PluginDirPath), true,
-                               getter_AddRefs(localFile));
   }
 #else
   else if (nsCRT::strcmp(aProp, NS_ENV_PLUGINS_DIR) == 0) {
@@ -202,17 +193,7 @@ nsAppFileLocationProvider::GetFile(const char* aProp, bool* aPersistent,
   }
 #endif
 #endif
-  else if (nsCRT::strcmp(aProp, NS_APP_SEARCH_DIR) == 0) {
-    rv = CloneMozBinDirectory(getter_AddRefs(localFile));
-    if (NS_SUCCEEDED(rv)) {
-      rv = localFile->AppendRelativeNativePath(SEARCH_DIR_NAME);
-    }
-  } else if (nsCRT::strcmp(aProp, NS_APP_USER_SEARCH_DIR) == 0) {
-    rv = NS_GetSpecialDirectory(NS_APP_USER_PROFILE_50_DIR, aResult);
-    if (NS_SUCCEEDED(rv)) {
-      rv = (*aResult)->AppendNative(SEARCH_DIR_NAME);
-    }
-  } else if (nsCRT::strcmp(aProp, NS_APP_INSTALL_CLEANUP_DIR) == 0) {
+  else if (nsCRT::strcmp(aProp, NS_APP_INSTALL_CLEANUP_DIR) == 0) {
     // This is cloned so that embeddors will have a hook to override
     // with their own cleanup dir.  See bugzilla bug #105087
     rv = CloneMozBinDirectory(getter_AddRefs(localFile));
@@ -543,18 +524,10 @@ nsAppFileLocationProvider::GetFiles(const char* aProp,
 
   if (!nsCRT::strcmp(aProp, NS_APP_PLUGINS_DIR_LIST)) {
 #ifdef MOZ_WIDGET_COCOA
-    // As of Java for Mac OS X 10.5 Update 10, Apple has (in effect) deprecated Java Plugin2 on
-    // on OS X 10.5, and removed the soft link to it from /Library/Internet Plug-Ins/.  Java
-    // Plugin2 is still present and usable, but there are no longer any links to it in the
-    // "normal" locations.  So we won't be able to find it unless we look in the "non-normal"
-    // location where it actually is.  Safari can use the WebKit-specific JavaPluginCocoa.bundle,
-    // which (of course) is still fully supported on OS X 10.5.  But we have no alternative to
-    // using Java Plugin2.  For more information see bug 668639.
     static const char* keys[] = {
       NS_APP_PLUGINS_DIR,
       NS_MACOSX_USER_PLUGIN_DIR,
       NS_MACOSX_LOCAL_PLUGIN_DIR,
-      IsOSXLeopard() ? NS_MACOSX_JAVA2_PLUGIN_DIR : nullptr,
       nullptr
     };
     *aResult = new nsAppDirectoryEnumerator(this, keys);
@@ -573,37 +546,8 @@ nsAppFileLocationProvider::GetFiles(const char* aProp,
     NS_ADDREF(*aResult);
     rv = NS_OK;
   }
-  if (!nsCRT::strcmp(aProp, NS_APP_SEARCH_DIR_LIST)) {
-    static const char* keys[] = { nullptr, NS_APP_USER_SEARCH_DIR, nullptr };
-    if (!keys[0] && !(keys[0] = PR_GetEnv("MOZ_SEARCH_ENGINE_PATH"))) {
-      static const char nullstr = 0;
-      keys[0] = &nullstr;
-    }
-    *aResult = new nsPathsDirectoryEnumerator(this, keys);
-    NS_ADDREF(*aResult);
-    rv = NS_OK;
-  }
   if (!strcmp(aProp, NS_APP_DISTRIBUTION_SEARCH_DIR_LIST)) {
     return NS_NewEmptyEnumerator(aResult);
   }
   return rv;
 }
-
-#if defined(MOZ_WIDGET_COCOA)
-bool
-nsAppFileLocationProvider::IsOSXLeopard()
-{
-  static SInt32 version = 0;
-
-  if (!version) {
-    OSErr err = ::Gestalt(gestaltSystemVersion, &version);
-    if (err != noErr) {
-      version = 0;
-    } else {
-      version &= 0xFFFF; // The system version is in the low order word
-    }
-  }
-
-  return ((version >= 0x1050) && (version < 0x1060));
-}
-#endif

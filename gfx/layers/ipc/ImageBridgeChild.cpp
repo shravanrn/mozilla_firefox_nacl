@@ -181,26 +181,19 @@ ImageBridgeChild::HoldUntilCompositableRefReleasedIfNecessary(TextureClient* aCl
 void
 ImageBridgeChild::NotifyNotUsed(uint64_t aTextureId, uint64_t aFwdTransactionId)
 {
-  RefPtr<TextureClient> client = mTexturesWaitingRecycled.Get(aTextureId);
-  if (!client) {
-    return;
+  if (auto entry = mTexturesWaitingRecycled.Lookup(aTextureId)) {
+    if (aFwdTransactionId < entry.Data()->GetLastFwdTransactionId()) {
+      // Released on host side, but client already requested newer use texture.
+      return;
+    }
+    entry.Remove();
   }
-  if (aFwdTransactionId < client->GetLastFwdTransactionId()) {
-    // Released on host side, but client already requested newer use texture.
-    return;
-  }
-  mTexturesWaitingRecycled.Remove(aTextureId);
 }
 
 void
 ImageBridgeChild::CancelWaitForRecycle(uint64_t aTextureId)
 {
   MOZ_ASSERT(InImageBridgeChildThread());
-
-  RefPtr<TextureClient> client = mTexturesWaitingRecycled.Get(aTextureId);
-  if (!client) {
-    return;
-  }
   mTexturesWaitingRecycled.Remove(aTextureId);
 }
 
@@ -247,13 +240,16 @@ ImageBridgeChild::ShutdownStep2(SynchronousTask* aTask)
 
   MOZ_ASSERT(InImageBridgeChildThread(),
              "Should be in ImageBridgeChild thread.");
-  Close();
+  if (!mDestroyed) {
+    Close();
+  }
 }
 
 void
 ImageBridgeChild::ActorDestroy(ActorDestroyReason aWhy)
 {
   mCanSend = false;
+  mDestroyed = true;
   {
     MutexAutoLock lock(mContainerMapLock);
     mImageContainers.Clear();
@@ -335,7 +331,7 @@ ImageBridgeChild::Connect(CompositableClient* aCompositable,
 
   CompositableHandle handle(id);
   aCompositable->InitIPDL(handle);
-  SendNewCompositable(handle, aCompositable->GetTextureInfo());
+  SendNewCompositable(handle, aCompositable->GetTextureInfo(), GetCompositorBackendType());
 }
 
 void
@@ -358,41 +354,9 @@ ImageBridgeChild::GetSingleton()
 }
 
 void
-ImageBridgeChild::ReleaseTextureClientNow(TextureClient* aClient)
+ImageBridgeChild::UpdateImageClient(RefPtr<ImageContainer> aContainer)
 {
-  MOZ_ASSERT(InImageBridgeChildThread());
-  RELEASE_MANUALLY(aClient);
-}
-
-/* static */ void
-ImageBridgeChild::DispatchReleaseTextureClient(TextureClient* aClient)
-{
-  if (!aClient) {
-    return;
-  }
-
-  RefPtr<ImageBridgeChild> imageBridge = ImageBridgeChild::GetSingleton();
-  if (!imageBridge) {
-    // TextureClient::Release should normally happen in the ImageBridgeChild
-    // thread because it usually generate some IPDL messages.
-    // However, if we take this branch it means that the ImageBridgeChild
-    // has already shut down, along with the TextureChild, which means no
-    // message will be sent and it is safe to run this code from any thread.
-    RELEASE_MANUALLY(aClient);
-    return;
-  }
-
-  RefPtr<Runnable> runnable = WrapRunnable(
-    imageBridge,
-    &ImageBridgeChild::ReleaseTextureClientNow,
-    aClient);
-  imageBridge->GetMessageLoop()->PostTask(runnable.forget());
-}
-
-void
-ImageBridgeChild::UpdateImageClient(RefPtr<ImageClient> aClient, RefPtr<ImageContainer> aContainer)
-{
-  if (!aClient || !aContainer) {
+  if (!aContainer) {
     return;
   }
 
@@ -400,7 +364,6 @@ ImageBridgeChild::UpdateImageClient(RefPtr<ImageClient> aClient, RefPtr<ImageCon
     RefPtr<Runnable> runnable = WrapRunnable(
       RefPtr<ImageBridgeChild>(this),
       &ImageBridgeChild::UpdateImageClient,
-      aClient,
       aContainer);
     GetMessageLoop()->PostTask(runnable.forget());
     return;
@@ -410,14 +373,19 @@ ImageBridgeChild::UpdateImageClient(RefPtr<ImageClient> aClient, RefPtr<ImageCon
     return;
   }
 
+  RefPtr<ImageClient> client = aContainer->GetImageClient();
+  if (NS_WARN_IF(!client)) {
+    return;
+  }
+
   // If the client has become disconnected before this event was dispatched,
   // early return now.
-  if (!aClient->IsConnected()) {
+  if (!client->IsConnected()) {
     return;
   }
 
   BeginTransaction();
-  aClient->UpdateImage(aContainer, Layer::CONTENT_OPAQUE);
+  client->UpdateImage(aContainer, Layer::CONTENT_OPAQUE);
   EndTransaction();
 }
 
@@ -578,6 +546,7 @@ ImageBridgeChild::InitForContent(Endpoint<PImageBridgeChild>&& aEndpoint, uint32
   RefPtr<ImageBridgeChild> child = new ImageBridgeChild(aNamespace);
 
   RefPtr<Runnable> runnable = NewRunnableMethod<Endpoint<PImageBridgeChild>&&>(
+    "layers::ImageBridgeChild::Bind",
     child,
     &ImageBridgeChild::Bind,
     Move(aEndpoint));
@@ -684,8 +653,6 @@ ImageBridgeChild::WillShutdown()
 
     task.Wait();
   }
-
-  mDestroyed = true;
 }
 
 void
@@ -733,7 +700,10 @@ ImageBridgeChild::InitWithGPUProcess(Endpoint<PImageBridgeChild>&& aEndpoint, ui
 
   MessageLoop* loop = child->GetMessageLoop();
   loop->PostTask(NewRunnableMethod<Endpoint<PImageBridgeChild>&&>(
-    child, &ImageBridgeChild::Bind, Move(aEndpoint)));
+    "layers::ImageBridgeChild::Bind",
+    child,
+    &ImageBridgeChild::Bind,
+    Move(aEndpoint)));
 
   // Assign this after so other threads can't post messages before we connect to IPDL.
   {

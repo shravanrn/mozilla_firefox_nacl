@@ -37,12 +37,12 @@ public:
   // nsIHTMLReflow overrides
 
   virtual void MarkIntrinsicISizesDirty() override;
-  virtual nscoord GetMinISize(nsRenderingContext *aRenderingContext) override;
-  virtual nscoord GetPrefISize(nsRenderingContext *aRenderingContext) override;
+  virtual nscoord GetMinISize(gfxContext *aRenderingContext) override;
+  virtual nscoord GetPrefISize(gfxContext *aRenderingContext) override;
 
   // Our auto size is that provided by nsFrame, not nsLeafFrame
   virtual mozilla::LogicalSize
-  ComputeAutoSize(nsRenderingContext*         aRenderingContext,
+  ComputeAutoSize(gfxContext*                 aRenderingContext,
                   mozilla::WritingMode        aWM,
                   const mozilla::LogicalSize& aCBSize,
                   nscoord                     aAvailableISize,
@@ -63,7 +63,6 @@ public:
                     nsIFrame*         asPrevInFlow) override;
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 
   virtual nsresult AttributeChanged(int32_t aNameSpaceID,

@@ -13,6 +13,7 @@
 #include "mozilla/layers/ScrollingLayersHelper.h"
 #include "mozilla/layers/StackingContextHelper.h"
 #include "mozilla/layers/WebRenderBridgeChild.h"
+#include "mozilla/layers/IpcResourceUpdateQueue.h"
 #include "mozilla/layers/UpdateImageHelper.h"
 #include "mozilla/webrender/WebRenderTypes.h"
 
@@ -23,6 +24,7 @@ using namespace mozilla::gfx;
 
 void
 WebRenderPaintedLayerBlob::RenderLayer(wr::DisplayListBuilder& aBuilder,
+                                       wr::IpcResourceUpdateQueue& aResources,
                                        const StackingContextHelper& aSc)
 {
   LayerIntRegion visibleRegion = GetVisibleRegion();
@@ -37,7 +39,7 @@ WebRenderPaintedLayerBlob::RenderLayer(wr::DisplayListBuilder& aBuilder,
   }
 
   nsIntRegion regionToPaint;
-  regionToPaint.Sub(mVisibleRegion.ToUnknownRegion(), mValidRegion);
+  regionToPaint.Sub(mVisibleRegion.ToUnknownRegion(), GetValidRegion());
 
   // We have something to paint but can't. This usually happens only in
   // empty transactions
@@ -49,8 +51,8 @@ WebRenderPaintedLayerBlob::RenderLayer(wr::DisplayListBuilder& aBuilder,
   IntSize imageSize(size.ToUnknownSize());
   if (!regionToPaint.IsEmpty() && WrManager()->GetPaintedLayerCallback()) {
     RefPtr<gfx::DrawEventRecorderMemory> recorder = MakeAndAddRef<gfx::DrawEventRecorderMemory>();
-    RefPtr<gfx::DrawTarget> dummyDt = gfx::Factory::CreateDrawTarget(gfx::BackendType::SKIA, imageSize, gfx::SurfaceFormat::B8G8R8X8);
-    RefPtr<gfx::DrawTarget> dt = gfx::Factory::CreateRecordingDrawTarget(recorder, dummyDt);
+    RefPtr<gfx::DrawTarget> dummyDt = gfx::Factory::CreateDrawTarget(gfx::BackendType::SKIA, IntSize(1, 1), gfx::SurfaceFormat::B8G8R8X8);
+    RefPtr<gfx::DrawTarget> dt = gfx::Factory::CreateRecordingDrawTarget(recorder, dummyDt, imageSize);
 
     dt->ClearRect(Rect(0, 0, imageSize.width, imageSize.height));
     dt->SetTransform(Matrix().PreTranslate(-bounds.x, -bounds.y));
@@ -69,34 +71,30 @@ WebRenderPaintedLayerBlob::RenderLayer(wr::DisplayListBuilder& aBuilder,
 
     recorder->Finish();
 
-    wr::ByteBuffer bytes;
-    bytes.Allocate(recorder->RecordingSize());
-    DebugOnly<bool> ok = recorder->CopyRecording((char*)bytes.AsSlice().begin().get(), bytes.AsSlice().length());
-    MOZ_ASSERT(ok);
+    AddToValidRegion(regionToPaint);
 
-    //XXX: We should switch to updating the blob image instead of adding a new one
-    //     That will get rid of this discard bit
+    wr::ByteBuffer bytes(recorder->mOutputStream.mLength, (uint8_t*)recorder->mOutputStream.mData);
+
     if (mImageKey.isSome()) {
-      WrManager()->AddImageKeyForDiscard(mImageKey.value());
+      //XXX: We should switch to updating the blob image instead of adding a new one
+      aResources.DeleteImage(mImageKey.value());
     }
-    mImageKey = Some(GetImageKey());
-    WrBridge()->SendAddBlobImage(mImageKey.value(), imageSize, size.width * 4, dt->GetFormat(), bytes);
-  } else {
-    MOZ_ASSERT(GetInvalidRegion().IsEmpty());
+    mImageKey = Some(GenerateImageKey());
+
+    wr::ImageDescriptor descriptor(imageSize, 0, dt->GetFormat());
+    aResources.AddBlobImage(mImageKey.value(), descriptor, bytes.AsSlice());
+    mImageBounds = visibleRegion.GetBounds();
   }
 
-  ScrollingLayersHelper scroller(this, aBuilder, aSc);
+  ScrollingLayersHelper scroller(this, aBuilder, aResources, aSc);
   StackingContextHelper sc(aSc, aBuilder, this);
   LayerRect rect = Bounds();
   DumpLayerInfo("PaintedLayer", rect);
 
-  LayerRect clipRect = ClipRect().valueOr(rect);
-  Maybe<WrImageMask> mask = BuildWrMaskLayer(&sc);
-  WrClipRegionToken clip = aBuilder.PushClipRegion(
-      sc.ToRelativeWrRect(clipRect),
-      mask.ptrOr(nullptr));
-
-  aBuilder.PushImage(sc.ToRelativeWrRect(rect), clip, wr::ImageRendering::Auto, mImageKey.value());
+  aBuilder.PushImage(sc.ToRelativeLayoutRect(LayerRect(mImageBounds)),
+                     sc.ToRelativeLayoutRect(rect),
+                     true,
+                     wr::ImageRendering::Auto, mImageKey.value());
 }
 
 } // namespace layers

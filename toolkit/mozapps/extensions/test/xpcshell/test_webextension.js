@@ -46,7 +46,7 @@ add_task(async function() {
   do_check_false(addon.isSystem);
   do_check_eq(addon.type, "extension");
   do_check_true(addon.isWebExtension);
-  do_check_eq(addon.signedState, mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_SIGNED : AddonManager.SIGNEDSTATE_NOT_REQUIRED);
+  do_check_eq(addon.signedState, mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_PRIVILEGED : AddonManager.SIGNEDSTATE_NOT_REQUIRED);
 
   let uri = do_get_addon_root_uri(profileDir, ID);
 
@@ -73,7 +73,7 @@ add_task(async function() {
   do_check_true(addon.isActive);
   do_check_false(addon.isSystem);
   do_check_eq(addon.type, "extension");
-  do_check_eq(addon.signedState, mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_SIGNED : AddonManager.SIGNEDSTATE_NOT_REQUIRED);
+  do_check_eq(addon.signedState, mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_PRIVILEGED : AddonManager.SIGNEDSTATE_NOT_REQUIRED);
 
   let file = getFileForAddon(profileDir, ID);
   do_check_true(file.exists());
@@ -126,7 +126,7 @@ add_task(async function() {
   do_check_true(addon.isActive);
   do_check_false(addon.isSystem);
   do_check_eq(addon.type, "extension");
-  do_check_eq(addon.signedState, mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_SIGNED : AddonManager.SIGNEDSTATE_NOT_REQUIRED);
+  do_check_eq(addon.signedState, mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_PRIVILEGED : AddonManager.SIGNEDSTATE_NOT_REQUIRED);
 
   let file = getFileForAddon(profileDir, ID);
   do_check_true(file.exists());
@@ -414,7 +414,7 @@ add_task(async function testThemeExtension() {
   do_check_false(addon.isSystem);
   do_check_eq(addon.type, "theme");
   do_check_true(addon.isWebExtension);
-  do_check_eq(addon.signedState, mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_SIGNED : AddonManager.SIGNEDSTATE_NOT_REQUIRED);
+  do_check_eq(addon.signedState, mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_PRIVILEGED : AddonManager.SIGNEDSTATE_NOT_REQUIRED);
 
   addon.uninstall();
 
@@ -434,4 +434,71 @@ add_task(async function testThemeExtension() {
   do_check_true(addon.isWebExtension);
 
   addon.uninstall();
+});
+
+// Test that we can update from a webextension to a webextension-theme
+add_task(async function test_theme_upgrade() {
+  // First install a regular webextension
+  let webext = createTempWebExtensionFile({
+    manifest: {
+      version: "1.0",
+      name: "Test WebExtension 1 (temporary)",
+      applications: {
+        gecko: {
+          id: ID
+        }
+      }
+    }
+  });
+
+  await Promise.all([
+    AddonManager.installTemporaryAddon(webext),
+    promiseWebExtensionStartup(),
+  ]);
+  let addon = await promiseAddonByID(ID);
+
+  // temporary add-on is installed and started
+  do_check_neq(addon, null);
+  do_check_eq(addon.version, "1.0");
+  do_check_eq(addon.name, "Test WebExtension 1 (temporary)");
+  do_check_true(addon.isCompatible);
+  do_check_false(addon.appDisabled);
+  do_check_true(addon.isActive);
+  do_check_eq(addon.type, "extension");
+  do_check_eq(addon.signedState, mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_PRIVILEGED : AddonManager.SIGNEDSTATE_NOT_REQUIRED);
+
+  // Create a webextension theme with the same ID
+  let webext2 = createTempWebExtensionFile({
+    manifest: {
+      version: "2.0",
+      name: "Test WebExtension 1 (temporary)",
+      applications: {
+        gecko: {
+          id: ID
+        }
+      },
+      theme: { images: { headerURL: "example.png" } }
+    }
+  });
+
+  await Promise.all([
+    AddonManager.installTemporaryAddon(webext2),
+    promiseWebExtensionStartup(),
+  ]);
+  addon = await promiseAddonByID(ID);
+
+  do_check_neq(addon, null);
+  do_check_eq(addon.version, "2.0");
+  do_check_eq(addon.name, "Test WebExtension 1 (temporary)");
+  do_check_true(addon.isCompatible);
+  do_check_false(addon.appDisabled);
+  do_check_true(addon.isActive);
+  // This is what we're really interested in:
+  do_check_eq(addon.type, "theme");
+  do_check_true(addon.isWebExtension);
+
+  addon.uninstall();
+
+  addon = await promiseAddonByID(ID);
+  do_check_eq(addon, null);
 });

@@ -3,6 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+// This file is loaded into the browser window scope.
+/* eslint-env mozilla/browser-window */
+
 var PointerlockFsWarning = {
 
   _element: null,
@@ -253,6 +256,8 @@ var FullScreen = {
   init() {
     // called when we go into full screen, even if initiated by a web page script
     window.addEventListener("fullscreen", this, true);
+    window.addEventListener("willenterfullscreen", this, true);
+    window.addEventListener("willexitfullscreen", this, true);
     window.addEventListener("MozDOMFullscreen:Entered", this,
                             /* useCapture */ true,
                             /* wantsUntrusted */ false);
@@ -272,6 +277,14 @@ var FullScreen = {
       window.messageManager.removeMessageListener(type, this);
     }
     this.cleanup();
+  },
+
+  willToggle(aWillEnterFullscreen) {
+    if (aWillEnterFullscreen) {
+      document.documentElement.setAttribute("inFullscreen", true);
+    } else {
+      document.documentElement.removeAttribute("inFullscreen");
+    }
   },
 
   toggle() {
@@ -345,6 +358,12 @@ var FullScreen = {
 
   handleEvent(event) {
     switch (event.type) {
+      case "willenterfullscreen":
+        this.willToggle(true);
+        break;
+      case "willexitfullscreen":
+        this.willToggle(false);
+        break;
       case "fullscreen":
         this.toggle();
         break;

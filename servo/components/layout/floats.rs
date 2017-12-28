@@ -13,7 +13,7 @@ use style::logical_geometry::{LogicalRect, LogicalSize, WritingMode};
 use style::values::computed::LengthOrPercentageOrAuto;
 
 /// The kind of float: left or right.
-#[derive(Clone, Serialize, Debug, Copy)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub enum FloatKind {
     Left,
     Right
@@ -30,7 +30,7 @@ impl FloatKind {
 }
 
 /// The kind of clearance: left, right, or both.
-#[derive(Copy, Clone)]
+#[derive(Clone, Copy)]
 pub enum ClearType {
     Left,
     Right,
@@ -78,9 +78,9 @@ impl FloatList {
 
 impl fmt::Debug for FloatList {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f, "max_block_start={:?} floats={}", self.max_block_start, self.floats.len()));
+        write!(f, "max_block_start={:?} floats={}", self.max_block_start, self.floats.len())?;
         for float in self.floats.iter() {
-            try!(write!(f, " {:?}", float));
+            write!(f, " {:?}", float)?;
         }
         Ok(())
     }
@@ -431,7 +431,7 @@ impl Floats {
 /// This is used for two purposes: (a) determining whether we can lay out blocks in parallel; (b)
 /// guessing the inline-sizes of block formatting contexts in an effort to lay them out in
 /// parallel.
-#[derive(Copy, Clone)]
+#[derive(Clone, Copy)]
 pub struct SpeculatedFloatPlacement {
     /// The estimated inline size (an upper bound) of the left floats flowing through this flow.
     pub left: Au,
@@ -505,7 +505,7 @@ impl SpeculatedFloatPlacement {
                 // might flow around this float.
                 if let LengthOrPercentageOrAuto::Percentage(percentage) =
                         flow.as_block().fragment.style.content_inline_size() {
-                    if percentage > 0.0 {
+                    if percentage.0 > 0.0 {
                         float_inline_size = Au::from_px(1)
                     }
                 }

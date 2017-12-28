@@ -290,7 +290,7 @@ BaseWebSocketChannel::GetProtocolFlags(uint32_t *aProtocolFlags)
 {
   LOG(("BaseWebSocketChannel::GetProtocolFlags() %p\n", this));
 
-  *aProtocolFlags = URI_NORELATIVE | URI_NON_PERSISTABLE | ALLOWS_PROXY | 
+  *aProtocolFlags = URI_NORELATIVE | URI_NON_PERSISTABLE | ALLOWS_PROXY |
       ALLOWS_PROXY_HTTP | URI_DOES_NOT_RETURN_DATA | URI_DANGEROUS_TO_LOAD;
   return NS_OK;
 }
@@ -359,6 +359,19 @@ BaseWebSocketChannel::RetargetDeliveryTo(nsIEventTarget* aTargetThread)
   return NS_OK;
 }
 
+NS_IMETHODIMP
+BaseWebSocketChannel::GetDeliveryTarget(nsIEventTarget** aTargetThread)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  nsCOMPtr<nsIEventTarget> target = mTargetThread;
+  if (!target) {
+    target = GetCurrentThreadEventTarget();
+  }
+  target.forget(aTargetThread);
+  return NS_OK;
+}
+
 BaseWebSocketChannel::ListenerAndContextContainer::ListenerAndContextContainer(
                                                nsIWebSocketListener* aListener,
                                                nsISupports* aContext)
@@ -373,8 +386,12 @@ BaseWebSocketChannel::ListenerAndContextContainer::~ListenerAndContextContainer(
 {
   MOZ_ASSERT(mListener);
 
-  NS_ReleaseOnMainThread(mListener.forget());
-  NS_ReleaseOnMainThread(mContext.forget());
+  NS_ReleaseOnMainThreadSystemGroup(
+    "BaseWebSocketChannel::ListenerAndContextContainer::mListener",
+    mListener.forget());
+  NS_ReleaseOnMainThreadSystemGroup(
+    "BaseWebSocketChannel::ListenerAndContextContainer::mContext",
+    mContext.forget());
 }
 
 } // namespace net

@@ -12,7 +12,7 @@ const { getStack, callFunctionWithAsyncStack } = require("devtools/shared/platfo
 
 const promise = Cu.import("resource://devtools/shared/deprecated-sync-thenables.js", {}).Promise;
 
-loader.lazyRequireGetter(this, "events", "sdk/event/core");
+loader.lazyRequireGetter(this, "EventEmitter", "devtools/shared/event-emitter");
 loader.lazyRequireGetter(this, "WebConsoleClient", "devtools/shared/webconsole/client", true);
 loader.lazyRequireGetter(this, "DebuggerSocket", "devtools/shared/security/socket", true);
 loader.lazyRequireGetter(this, "Authentication", "devtools/shared/security/auth");
@@ -283,6 +283,7 @@ DebuggerClient.requester = function (packetSkeleton, config = {}) {
       if (thisCallback) {
         thisCallback(response);
       }
+      return response;
     }, "DebuggerClient.requester request callback"));
   }, "DebuggerClient.requester");
 };
@@ -334,7 +335,7 @@ DebuggerClient.prototype = {
 
     // Also emit the event on the |DebuggerClient| object (not on the instance),
     // so it's possible to track all instances.
-    events.emit(DebuggerClient, "connect", this);
+    EventEmitter.emit(DebuggerClient, "connect", this);
 
     this.addOneTimeListener("connected", (name, applicationType, traits) => {
       this.traits = traits;
@@ -702,45 +703,53 @@ DebuggerClient.prototype = {
     if (!packet.to) {
       throw Error("'" + type + "' request packet has no destination.");
     }
+
+    // The onResponse callback might modify the response, so we need to call
+    // it and resolve the promise with its result if it's truthy.
+    const safeOnResponse = response => {
+      if (!onResponse) {
+        return response;
+      }
+      return onResponse(response) || response;
+    };
+
     if (this._closed) {
       let msg = "'" + type + "' request packet to " +
                 "'" + packet.to + "' " +
                "can't be sent as the connection is closed.";
       let resp = { error: "connectionClosed", message: msg };
-      if (onResponse) {
-        onResponse(resp);
-      }
-      return promise.reject(resp);
+      return promise.reject(safeOnResponse(resp));
     }
 
     let request = new Request(packet);
     request.format = "json";
     request.stack = getStack();
-    if (onResponse) {
-      request.on("json-reply", onResponse);
-    }
-
-    this._sendOrQueueRequest(request);
 
     // Implement a Promise like API on the returned object
     // that resolves/rejects on request response
     let deferred = promise.defer();
     function listenerJson(resp) {
-      request.off("json-reply", listenerJson);
-      request.off("bulk-reply", listenerBulk);
+      removeRequestListeners();
       if (resp.error) {
-        deferred.reject(resp);
+        deferred.reject(safeOnResponse(resp));
       } else {
-        deferred.resolve(resp);
+        deferred.resolve(safeOnResponse(resp));
       }
     }
     function listenerBulk(resp) {
+      removeRequestListeners();
+      deferred.resolve(safeOnResponse(resp));
+    }
+
+    const removeRequestListeners = () => {
       request.off("json-reply", listenerJson);
       request.off("bulk-reply", listenerBulk);
-      deferred.resolve(resp);
-    }
+    };
+
     request.on("json-reply", listenerJson);
     request.on("bulk-reply", listenerBulk);
+
+    this._sendOrQueueRequest(request);
     request.then = deferred.promise.then.bind(deferred.promise);
 
     return request;
@@ -1301,33 +1310,16 @@ DebuggerClient.prototype = {
 
 eventSource(DebuggerClient.prototype);
 
-function Request(request) {
-  this.request = request;
-}
-
-Request.prototype = {
-
-  on: function (type, listener) {
-    events.on(this, type, listener);
-  },
-
-  off: function (type, listener) {
-    events.off(this, type, listener);
-  },
-
-  once: function (type, listener) {
-    events.once(this, type, listener);
-  },
-
-  emit: function (type, ...args) {
-    events.emit(this, type, ...args);
-  },
+class Request extends EventEmitter {
+  constructor(request) {
+    super();
+    this.request = request;
+  }
 
   get actor() {
     return this.request.to || this.request.actor;
   }
-
-};
+}
 
 /**
  * Creates a tab client for the remote debugging protocol server. This client
@@ -2301,6 +2293,37 @@ ThreadClient.prototype = {
   },
 
   /**
+   * Get or create an ArrayBuffer client, checking the grip client cache if it
+   * already exists.
+   *
+   * @param grip Object
+   *        The ArrayBuffer grip returned by the protocol.
+   * @param gripCacheName String
+   *        The property name of the grip client cache to check for existing
+   *        clients in.
+   */
+  _arrayBuffer: function (grip, gripCacheName) {
+    if (grip.actor in this[gripCacheName]) {
+      return this[gripCacheName][grip.actor];
+    }
+
+    let client = new ArrayBufferClient(this.client, grip);
+    this[gripCacheName][grip.actor] = client;
+    return client;
+  },
+
+  /**
+   * Return an instance of ArrayBufferClient for the given ArrayBuffer grip that
+   * is scoped to the thread lifetime.
+   *
+   * @param grip Object
+   *        The ArrayBuffer grip returned by the protocol.
+   */
+  threadArrayBuffer: function (grip) {
+    return this._arrayBuffer(grip, "_threadGrips");
+  },
+
+  /**
    * Clear and invalidate all the grip clients from the given cache.
    *
    * @param gripCacheName
@@ -2629,6 +2652,30 @@ ObjectClient.prototype = {
   }),
 
   /**
+   * Request a SymbolIteratorClient instance to enumerate symbols in an object.
+   *
+   * @param onResponse function Called with the request's response.
+   */
+  enumSymbols: DebuggerClient.requester({
+    type: "enumSymbols"
+  }, {
+    before: function (packet) {
+      if (this._grip.type !== "object") {
+        throw new Error("enumSymbols is only valid for objects grips.");
+      }
+      return packet;
+    },
+    after: function (response) {
+      if (response.iterator) {
+        return {
+          iterator: new SymbolIteratorClient(this._client, response.iterator)
+        };
+      }
+      return response;
+    }
+  }),
+
+  /**
    * Request the property descriptor of the object's specified property.
    *
    * @param name string The name of the requested property.
@@ -2803,6 +2850,95 @@ PropertyIteratorClient.prototype = {
   all: DebuggerClient.requester({
     type: "all"
   }, {}),
+};
+
+/**
+ * A SymbolIteratorClient provides a way to access to symbols
+ * of an object efficiently, slice by slice.
+ *
+ * @param client DebuggerClient
+ *        The debugger client parent.
+ * @param grip Object
+ *        A SymbolIteratorActor grip returned by the protocol via
+ *        TabActor.enumSymbols request.
+ */
+function SymbolIteratorClient(client, grip) {
+  this._grip = grip;
+  this._client = client;
+  this.request = this._client.request;
+}
+
+SymbolIteratorClient.prototype = {
+  get actor() {
+    return this._grip.actor;
+  },
+
+  /**
+   * Get the total number of symbols available in the iterator.
+   */
+  get count() {
+    return this._grip.count;
+  },
+
+  /**
+   * Get a set of following symbols.
+   *
+   * @param start Number
+   *        The index of the first symbol to fetch.
+   * @param count Number
+   *        The number of symbols to fetch.
+   * @param callback Function
+   *        The function called when we receive the symbols.
+   */
+  slice: DebuggerClient.requester({
+    type: "slice",
+    start: arg(0),
+    count: arg(1)
+  }, {}),
+
+  /**
+   * Get all the symbols.
+   *
+   * @param callback Function
+   *        The function called when we receive the symbols.
+   */
+  all: DebuggerClient.requester({
+    type: "all"
+  }, {}),
+};
+
+/**
+ * A ArrayBufferClient provides a way to access ArrayBuffer from the
+ * debugger server.
+ *
+ * @param client DebuggerClient
+ *        The debugger client parent.
+ * @param grip Object
+ *        A pause-lifetime ArrayBuffer grip returned by the protocol.
+ */
+function ArrayBufferClient(client, grip) {
+  this._grip = grip;
+  this._client = client;
+  this.request = this._client.request;
+}
+ArrayBufferClient.prototype = {
+  get actor() {
+    return this._grip.actor;
+  },
+  get length() {
+    return this._grip.length;
+  },
+  get _transport() {
+    return this._client._transport;
+  },
+
+  valid: true,
+
+  slice: DebuggerClient.requester({
+    type: "slice",
+    start: arg(0),
+    count: arg(1)
+  }),
 };
 
 /**
@@ -3010,6 +3146,28 @@ SourceClient.prototype = {
     }
 
     let { contentType, source } = response;
+    if (source.type === "arrayBuffer") {
+      let arrayBuffer = this._activeThread.threadArrayBuffer(source);
+      return arrayBuffer.slice(0, arrayBuffer.length).then(function (resp) {
+        if (resp.error) {
+          callback(resp);
+          return resp;
+        }
+        // Keeping str as a string, ArrayBuffer/Uint8Array will not survive
+        // setIn/mergeIn operations.
+        const str = atob(resp.encoded);
+        let newResponse = {
+          source: {
+            binary: str,
+            toString: () => "[wasm]",
+          },
+          contentType,
+        };
+        callback(newResponse);
+        return newResponse;
+      });
+    }
+
     let longString = this._activeThread.threadLongString(source);
     return longString.substring(0, longString.length).then(function (resp) {
       if (resp.error) {

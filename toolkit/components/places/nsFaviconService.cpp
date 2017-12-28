@@ -130,6 +130,7 @@ NS_IMPL_ISUPPORTS_CI(
 , nsIFaviconService
 , mozIAsyncFavicons
 , nsITimerCallback
+, nsINamed
 )
 
 nsFaviconService::nsFaviconService()
@@ -202,11 +203,15 @@ nsFaviconService::ExpireAllFavicons()
   , removeIconsStmt.get()
   , unlinkIconsStmt.get()
   };
+  nsCOMPtr<mozIStorageConnection> conn = mDB->MainConn();
+  if (!conn) {
+    return NS_ERROR_UNEXPECTED;
+  }
   nsCOMPtr<mozIStoragePendingStatement> ps;
   RefPtr<ExpireFaviconsStatementCallbackNotifier> callback =
     new ExpireFaviconsStatementCallbackNotifier();
-  return mDB->MainConn()->ExecuteAsync(stmts, ArrayLength(stmts),
-                                       callback, getter_AddRefs(ps));
+  return conn->ExecuteAsync(stmts, ArrayLength(stmts),
+                                        callback, getter_AddRefs(ps));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -233,6 +238,16 @@ nsFaviconService::Notify(nsITimer* timer)
       this, UNASSOCIATED_ICON_EXPIRY_INTERVAL, nsITimer::TYPE_ONE_SHOT);
   }
 
+  return NS_OK;
+}
+
+////////////////////////////////////////////////////////////////////////
+//// nsINamed
+
+NS_IMETHODIMP
+nsFaviconService::GetName(nsACString& aName)
+{
+  aName.AssignLiteral("nsFaviconService");
   return NS_OK;
 }
 
@@ -375,7 +390,7 @@ nsFaviconService::SetAndFetchFaviconForPage(nsIURI* aPageURI,
       icon.host.Cut(0, 4);
     }
     nsAutoCString path;
-    rv = aFaviconURI->GetPath(path);
+    rv = aFaviconURI->GetPathQueryRef(path);
     if (NS_SUCCEEDED(rv) && path.EqualsLiteral("/favicon.ico")) {
       icon.rootIcon = 1;
     }
@@ -448,7 +463,7 @@ nsFaviconService::ReplaceFaviconData(nsIURI* aFaviconURI,
   nsresult rv = aFaviconURI->GetSpec(iconData->spec);
   NS_ENSURE_SUCCESS(rv, rv);
   nsAutoCString path;
-  rv = aFaviconURI->GetPath(path);
+  rv = aFaviconURI->GetPathQueryRef(path);
   if (NS_SUCCEEDED(rv) && path.EqualsLiteral("/favicon.ico")) {
     iconData->rootIcon = 1;
   }
@@ -810,8 +825,8 @@ nsFaviconService::OptimizeIconSizes(IconData& aIcon)
 
   // decode image
   nsCOMPtr<imgIContainer> container;
-  rv = GetImgTools()->DecodeImageData(stream, payload.mimeType,
-                                      getter_AddRefs(container));
+  rv = GetImgTools()->DecodeImage(stream, payload.mimeType,
+                                  getter_AddRefs(container));
   NS_ENSURE_SUCCESS(rv, rv);
 
   // For ICO files, we must evaluate each of the frames we care about.

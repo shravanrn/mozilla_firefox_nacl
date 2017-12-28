@@ -23,6 +23,7 @@
 #include "nsString.h"
 #include "nsTArray.h"
 #include "mozilla/nsRedirectHistoryEntry.h"
+#include "URIUtils.h"
 
 namespace mozilla {
 namespace net {
@@ -346,6 +347,13 @@ LoadInfoToLoadInfoArgs(nsILoadInfo *aLoadInfo,
     sandboxedLoadingPrincipalInfo = sandboxedLoadingPrincipalInfoTemp;
   }
 
+  OptionalURIParams optionalResultPrincipalURI = mozilla::void_t();
+  nsCOMPtr<nsIURI> resultPrincipalURI;
+  Unused << aLoadInfo->GetResultPrincipalURI(getter_AddRefs(resultPrincipalURI));
+  if (resultPrincipalURI) {
+    SerializeURI(resultPrincipalURI, optionalResultPrincipalURI);
+  }
+
   nsTArray<RedirectHistoryEntryInfo> redirectChainIncludingInternalRedirects;
   for (const nsCOMPtr<nsIRedirectHistoryEntry>& redirectEntry :
        aLoadInfo->RedirectChainIncludingInternalRedirects()) {
@@ -368,6 +376,7 @@ LoadInfoToLoadInfoArgs(nsILoadInfo *aLoadInfo,
       triggeringPrincipalInfo,
       principalToInheritInfo,
       sandboxedLoadingPrincipalInfo,
+      optionalResultPrincipalURI,
       aLoadInfo->GetSecurityFlags(),
       aLoadInfo->InternalContentPolicyType(),
       static_cast<uint32_t>(aLoadInfo->GetTainting()),
@@ -378,6 +387,7 @@ LoadInfoToLoadInfoArgs(nsILoadInfo *aLoadInfo,
       aLoadInfo->GetInnerWindowID(),
       aLoadInfo->GetOuterWindowID(),
       aLoadInfo->GetParentOuterWindowID(),
+      aLoadInfo->GetTopOuterWindowID(),
       aLoadInfo->GetFrameOuterWindowID(),
       aLoadInfo->GetEnforceSecurity(),
       aLoadInfo->GetInitialSecurityCheckDone(),
@@ -389,7 +399,10 @@ LoadInfoToLoadInfoArgs(nsILoadInfo *aLoadInfo,
       aLoadInfo->GetForcePreflight(),
       aLoadInfo->GetIsPreflight(),
       aLoadInfo->GetForceHSTSPriming(),
-      aLoadInfo->GetMixedContentWouldBlock());
+      aLoadInfo->GetMixedContentWouldBlock(),
+      aLoadInfo->GetIsHSTSPriming(),
+      aLoadInfo->GetIsHSTSPrimingUpgrade()
+      );
 
   return NS_OK;
 }
@@ -431,6 +444,12 @@ LoadInfoArgsToLoadInfo(const OptionalLoadInfoArgs& aOptionalLoadInfoArgs,
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
+  nsCOMPtr<nsIURI> resultPrincipalURI;
+  if (loadInfoArgs.resultPrincipalURI().type() != OptionalURIParams::Tvoid_t) {
+    resultPrincipalURI = DeserializeURI(loadInfoArgs.resultPrincipalURI());
+    NS_ENSURE_TRUE(resultPrincipalURI, NS_ERROR_UNEXPECTED);
+  }
+
   RedirectHistoryArray redirectChainIncludingInternalRedirects;
   for (const RedirectHistoryEntryInfo& entryInfo :
       loadInfoArgs.redirectChainIncludingInternalRedirects()) {
@@ -453,6 +472,7 @@ LoadInfoArgsToLoadInfo(const OptionalLoadInfoArgs& aOptionalLoadInfoArgs,
                           triggeringPrincipal,
                           principalToInherit,
                           sandboxedLoadingPrincipal,
+                          resultPrincipalURI,
                           loadInfoArgs.securityFlags(),
                           loadInfoArgs.contentPolicyType(),
                           static_cast<LoadTainting>(loadInfoArgs.tainting()),
@@ -463,6 +483,7 @@ LoadInfoArgsToLoadInfo(const OptionalLoadInfoArgs& aOptionalLoadInfoArgs,
                           loadInfoArgs.innerWindowID(),
                           loadInfoArgs.outerWindowID(),
                           loadInfoArgs.parentOuterWindowID(),
+                          loadInfoArgs.topOuterWindowID(),
                           loadInfoArgs.frameOuterWindowID(),
                           loadInfoArgs.enforceSecurity(),
                           loadInfoArgs.initialSecurityCheckDone(),
@@ -474,7 +495,9 @@ LoadInfoArgsToLoadInfo(const OptionalLoadInfoArgs& aOptionalLoadInfoArgs,
                           loadInfoArgs.forcePreflight(),
                           loadInfoArgs.isPreflight(),
                           loadInfoArgs.forceHSTSPriming(),
-                          loadInfoArgs.mixedContentWouldBlock()
+                          loadInfoArgs.mixedContentWouldBlock(),
+                          loadInfoArgs.isHSTSPriming(),
+                          loadInfoArgs.isHSTSPrimingUpgrade()
                           );
 
    loadInfo.forget(outLoadInfo);

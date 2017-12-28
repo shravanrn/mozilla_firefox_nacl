@@ -6,7 +6,6 @@
 #![feature(plugin, test)]
 
 extern crate app_units;
-extern crate byteorder;
 extern crate cssparser;
 extern crate euclid;
 #[macro_use] extern crate html5ever;
@@ -14,11 +13,12 @@ extern crate parking_lot;
 extern crate rayon;
 extern crate rustc_serialize;
 extern crate selectors;
+extern crate servo_arc;
 extern crate servo_atoms;
 extern crate servo_config;
 extern crate servo_url;
 #[macro_use] extern crate size_of_test;
-extern crate style;
+#[macro_use] extern crate style;
 extern crate style_traits;
 extern crate test;
 
@@ -29,9 +29,10 @@ mod logical_geometry;
 mod media_queries;
 mod parsing;
 mod properties;
-mod restyle_hints;
 mod rule_tree;
 mod size_of;
+#[path = "../stylo/specified_values.rs"]
+mod specified_values;
 mod str;
 mod stylesheets;
 mod stylist;

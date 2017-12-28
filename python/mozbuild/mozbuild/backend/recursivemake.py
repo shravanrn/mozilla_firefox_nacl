@@ -36,6 +36,7 @@ from ..frontend.data import (
     BaseLibrary,
     BaseProgram,
     ChromeManifestEntry,
+    ComputedFlags,
     ConfigFileSubstitution,
     ContextDerived,
     ContextWrapped,
@@ -110,7 +111,6 @@ MOZBUILD_VARIABLES = [
     b'HOST_LIBRARY_NAME',
     b'HOST_PROGRAM',
     b'HOST_SIMPLE_PROGRAMS',
-    b'IS_COMPONENT',
     b'JAR_MANIFEST',
     b'JAVA_JAR_TARGETS',
     b'LD_VERSION_SCRIPT',
@@ -572,7 +572,7 @@ class RecursiveMakeBackend(CommonBackend):
             self._compile_graph[build_target]
 
         elif isinstance(obj, Program):
-            self._process_program(obj.program, backend_file)
+            self._process_program(obj, backend_file)
             self._process_linked_libraries(obj, backend_file)
             self._no_skip['syms'].add(backend_file.relobjdir)
 
@@ -595,6 +595,9 @@ class RecursiveMakeBackend(CommonBackend):
         elif isinstance(obj, PerSourceFlag):
             self._process_per_source_flag(obj, backend_file)
 
+        elif isinstance(obj, ComputedFlags):
+            self._process_computed_flags(obj, backend_file)
+
         elif isinstance(obj, InstallationTarget):
             self._process_installation_target(obj, backend_file)
 
@@ -614,6 +617,10 @@ class RecursiveMakeBackend(CommonBackend):
             self._process_rust_library(obj, backend_file)
             # No need to call _process_linked_libraries, because Rust
             # libraries are self-contained objects at this point.
+
+            # Hook the library into the compile graph.
+            build_target = self._build_target_for_obj(obj)
+            self._compile_graph[build_target]
 
         elif isinstance(obj, SharedLibrary):
             self._process_shared_library(obj, backend_file)
@@ -738,7 +745,20 @@ class RecursiveMakeBackend(CommonBackend):
 
         all_compile_deps = reduce(lambda x,y: x|y,
             self._compile_graph.values()) if self._compile_graph else set()
-        compile_roots = set(self._compile_graph.keys()) - all_compile_deps
+        # Include the following as dependencies of the top recursion target for
+        # compilation:
+        # - nodes that are not dependended upon by anything. Typically, this
+        #   would include programs, that need to be recursed, but that nothing
+        #   depends on.
+        # - nodes that have no dependencies of their own. Technically, this is
+        #   not necessary, because other things have dependencies on them, and
+        #   they all end up rooting to nodes from the above category. But the
+        #   way make works[1] is such that there can be benefits listing them
+        #   as direct dependencies of the top recursion target, to somehow
+        #   prioritize them.
+        #   1. See bug 1262241 comment 5.
+        compile_roots = [t for t, deps in self._compile_graph.iteritems()
+                         if not deps or t not in all_compile_deps]
 
         rule = root_deps_mk.create_rule(['recurse_compile'])
         rule.add_dependencies(compile_roots)
@@ -994,7 +1014,7 @@ class RecursiveMakeBackend(CommonBackend):
             build_files.add_optional_exists(p)
 
         for idl in manager.idls.values():
-            self._install_manifests['dist_idl'].add_symlink(idl['source'],
+            self._install_manifests['dist_idl'].add_link(idl['source'],
                 idl['basename'])
             self._install_manifests['dist_include'].add_optional_exists('%s.h'
                 % idl['root'])
@@ -1077,8 +1097,10 @@ class RecursiveMakeBackend(CommonBackend):
             registered_xpt_files=' '.join(sorted(registered_xpt_files)),
         ))
 
-    def _process_program(self, program, backend_file):
-        backend_file.write('PROGRAM = %s\n' % program)
+    def _process_program(self, obj, backend_file):
+        backend_file.write('PROGRAM = %s\n' % obj.program)
+        if not obj.cxx_link and not self.environment.bin_suffix:
+            backend_file.write('PROG_IS_C_ONLY_%s := 1\n' % obj.program)
 
     def _process_host_program(self, program, backend_file):
         backend_file.write('HOST_PROGRAM = %s\n' % program)
@@ -1104,8 +1126,11 @@ class RecursiveMakeBackend(CommonBackend):
     def _process_simple_program(self, obj, backend_file):
         if obj.is_unit_test:
             backend_file.write('CPP_UNIT_TESTS += %s\n' % obj.program)
+            assert obj.cxx_link
         else:
             backend_file.write('SIMPLE_PROGRAMS += %s\n' % obj.program)
+            if not obj.cxx_link and not self.environment.bin_suffix:
+                backend_file.write('PROG_IS_C_ONLY_%s := 1\n' % obj.program)
 
     def _process_host_simple_program(self, program, backend_file):
         backend_file.write('HOST_SIMPLE_PROGRAMS += %s\n' % program)
@@ -1139,14 +1164,14 @@ class RecursiveMakeBackend(CommonBackend):
         # the manifest is listed as a duplicate.
         for source, (dest, is_test) in obj.installs.items():
             try:
-                self._install_manifests['_test_files'].add_symlink(source, dest)
+                self._install_manifests['_test_files'].add_link(source, dest)
             except ValueError:
                 if not obj.dupe_manifest and is_test:
                     raise
 
         for base, pattern, dest in obj.pattern_installs:
             try:
-                self._install_manifests['_test_files'].add_pattern_symlink(base,
+                self._install_manifests['_test_files'].add_pattern_link(base,
                     pattern, dest)
             except ValueError:
                 if not obj.dupe_manifest:
@@ -1193,6 +1218,11 @@ class RecursiveMakeBackend(CommonBackend):
         for flag in per_source_flag.flags:
             backend_file.write('%s_FLAGS += %s\n' % (mozpath.basename(per_source_flag.file_name), flag))
 
+    def _process_computed_flags(self, computed_flags, backend_file):
+        for var, flags in computed_flags.get_flags():
+            backend_file.write('COMPUTED_%s += %s\n' % (var,
+                                                        ' '.join(make_quote(shell_quote(f)) for f in flags)))
+
     def _process_java_jar_data(self, jar, backend_file):
         target = jar.name
         backend_file.write('JAVA_JAR_TARGETS += %s\n' % target)
@@ -1215,8 +1245,6 @@ class RecursiveMakeBackend(CommonBackend):
         backend_file.write('FORCE_SHARED_LIB := 1\n')
         backend_file.write('IMPORT_LIBRARY := %s\n' % libdef.import_name)
         backend_file.write('SHARED_LIBRARY := %s\n' % libdef.lib_name)
-        if libdef.variant == libdef.COMPONENT:
-            backend_file.write('IS_COMPONENT := 1\n')
         if libdef.soname:
             backend_file.write('DSO_SONAME := %s\n' % libdef.soname)
         if libdef.symbols_file:
@@ -1286,7 +1314,6 @@ class RecursiveMakeBackend(CommonBackend):
                     if isinstance(obj, SharedLibrary):
                         write_shared_and_system_libs(lib)
                 elif isinstance(obj, SharedLibrary):
-                    assert lib.variant != lib.COMPONENT
                     backend_file.write_once('SHARED_LIBS += %s/%s\n'
                                         % (relpath, lib.import_name))
             elif isinstance(obj, (Program, SimpleProgram)):
@@ -1295,7 +1322,6 @@ class RecursiveMakeBackend(CommonBackend):
                                         % (relpath, lib.import_name))
                     write_shared_and_system_libs(lib)
                 else:
-                    assert lib.variant != lib.COMPONENT
                     backend_file.write_once('SHARED_LIBS += %s/%s\n'
                                         % (relpath, lib.import_name))
             elif isinstance(obj, (HostLibrary, HostProgram, HostSimpleProgram)):
@@ -1378,11 +1404,11 @@ class RecursiveMakeBackend(CommonBackend):
                                 raise Exception("Wildcards are only supported in the filename part of "
                                                 "srcdir-relative or absolute paths.")
 
-                            install_manifest.add_pattern_symlink(basepath, wild, path)
+                            install_manifest.add_pattern_link(basepath, wild, path)
                         else:
-                            install_manifest.add_pattern_symlink(f.srcdir, f, path)
+                            install_manifest.add_pattern_link(f.srcdir, f, path)
                     else:
-                        install_manifest.add_symlink(f.full_path, dest)
+                        install_manifest.add_link(f.full_path, dest)
                 else:
                     install_manifest.add_optional_exists(dest)
                     backend_file.write('%s_FILES += %s\n' % (

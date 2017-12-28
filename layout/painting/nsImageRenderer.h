@@ -17,10 +17,12 @@ namespace layers {
 class StackingContextHelper;
 class WebRenderParentCommand;
 class WebRenderDisplayItemLayer;
+class WebRenderLayerManager;
 } // namespace layers
 
 namespace wr {
 class DisplayListBuilder;
+class IpcResourceUpdateQueue;
 } // namespace wr
 
 // A CSSSizeOrRatio represents a (possibly partially specified) size for use
@@ -194,7 +196,7 @@ public:
    * @see nsLayoutUtils::DrawImage() for parameters.
    */
   DrawResult DrawLayer(nsPresContext*       aPresContext,
-                       nsRenderingContext&  aRenderingContext,
+                       gfxContext&          aRenderingContext,
                        const nsRect&        aDest,
                        const nsRect&        aFill,
                        const nsPoint&       aAnchor,
@@ -209,9 +211,11 @@ public:
    */
   DrawResult BuildWebRenderDisplayItemsForLayer(nsPresContext*       aPresContext,
                                                 mozilla::wr::DisplayListBuilder& aBuilder,
+                                                mozilla::wr::IpcResourceUpdateQueue& aResource,
                                                 const mozilla::layers::StackingContextHelper& aSc,
-                                                nsTArray<layers::WebRenderParentCommand>& aParentCommands,
                                                 mozilla::layers::WebRenderDisplayItemLayer* aLayer,
+                                                mozilla::layers::WebRenderLayerManager* aManager,
+                                                nsDisplayItem*       aItem,
                                                 const nsRect&        aDest,
                                                 const nsRect&        aFill,
                                                 const nsPoint&       aAnchor,
@@ -240,7 +244,7 @@ public:
    */
   DrawResult
   DrawBorderImageComponent(nsPresContext*       aPresContext,
-                           nsRenderingContext&  aRenderingContext,
+                           gfxContext&          aRenderingContext,
                            const nsRect&        aDirtyRect,
                            const nsRect&        aFill,
                            const mozilla::CSSIntRect& aSrc,
@@ -276,7 +280,7 @@ private:
    * @see nsLayoutUtils::DrawImage() for other parameters.
    */
   DrawResult Draw(nsPresContext*       aPresContext,
-                  nsRenderingContext&  aRenderingContext,
+                  gfxContext&          aRenderingContext,
                   const nsRect&        aDirtyRect,
                   const nsRect&        aDest,
                   const nsRect&        aFill,
@@ -294,9 +298,11 @@ private:
    */
   DrawResult BuildWebRenderDisplayItems(nsPresContext*       aPresContext,
                                         mozilla::wr::DisplayListBuilder& aBuilder,
+                                        mozilla::wr::IpcResourceUpdateQueue& aResources,
                                         const mozilla::layers::StackingContextHelper& aSc,
-                                        nsTArray<layers::WebRenderParentCommand>& aParentCommands,
                                         mozilla::layers::WebRenderDisplayItemLayer* aLayer,
+                                        mozilla::layers::WebRenderLayerManager* aManager,
+                                        nsDisplayItem*       aItem,
                                         const nsRect&        aDirtyRect,
                                         const nsRect&        aDest,
                                         const nsRect&        aFill,

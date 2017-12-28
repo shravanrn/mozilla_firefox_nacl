@@ -25,7 +25,8 @@ class ShutdownRunnable final : public CancelableRunnable
 {
 public:
   explicit ShutdownRunnable(IPCBlobInputStreamChild* aActor)
-    : mActor(aActor)
+    : CancelableRunnable("dom::ShutdownRunnable")
+    , mActor(aActor)
   {}
 
   NS_IMETHOD
@@ -45,7 +46,8 @@ class StreamNeededRunnable final : public CancelableRunnable
 {
 public:
   explicit StreamNeededRunnable(IPCBlobInputStreamChild* aActor)
-    : mActor(aActor)
+    : CancelableRunnable("dom::StreamNeededRunnable")
+    , mActor(aActor)
   {}
 
   NS_IMETHOD
@@ -70,7 +72,8 @@ class StreamReadyRunnable final : public CancelableRunnable
 public:
   StreamReadyRunnable(IPCBlobInputStream* aDestinationStream,
                       nsIInputStream* aCreatedStream)
-    : mDestinationStream(aDestinationStream)
+    : CancelableRunnable("dom::StreamReadyRunnable")
+    , mDestinationStream(aDestinationStream)
     , mCreatedStream(aCreatedStream)
   {
     MOZ_ASSERT(mDestinationStream);
@@ -102,8 +105,10 @@ public:
 class ReleaseWorkerHolderRunnable final : public CancelableRunnable
 {
 public:
-  explicit ReleaseWorkerHolderRunnable(UniquePtr<workers::WorkerHolder>&& aWorkerHolder)
-    : mWorkerHolder(Move(aWorkerHolder))
+  explicit ReleaseWorkerHolderRunnable(
+    UniquePtr<workers::WorkerHolder>&& aWorkerHolder)
+    : CancelableRunnable("dom::ReleaseWorkerHolderRunnable")
+    , mWorkerHolder(Move(aWorkerHolder))
   {}
 
   NS_IMETHOD
@@ -131,7 +136,7 @@ IPCBlobInputStreamChild::IPCBlobInputStreamChild(const nsID& aID,
   , mID(aID)
   , mSize(aSize)
   , mState(eActive)
-  , mOwningThread(NS_GetCurrentThread())
+  , mOwningEventTarget(GetCurrentThreadSerialEventTarget())
 {
   // If we are running in a worker, we need to send a Close() to the parent side
   // before the thread is released.
@@ -198,7 +203,7 @@ IPCBlobInputStreamChild::State()
   return mState;
 }
 
-already_AddRefed<nsIInputStream>
+already_AddRefed<IPCBlobInputStream>
 IPCBlobInputStreamChild::CreateStream()
 {
   bool shouldMigrate = false;
@@ -215,7 +220,7 @@ IPCBlobInputStreamChild::CreateStream()
     // The stream is active but maybe it is not running in the DOM-File thread.
     // We should migrate it there.
     if (mState == eActive &&
-        !IPCBlobInputStreamThread::IsOnFileThread(mOwningThread)) {
+        !IPCBlobInputStreamThread::IsOnFileEventTarget(mOwningEventTarget)) {
       MOZ_ASSERT(mStreams.IsEmpty());
       shouldMigrate = true;
       mState = eActiveMigrating;
@@ -249,13 +254,13 @@ IPCBlobInputStreamChild::ForgetStream(IPCBlobInputStream* aStream)
     }
   }
 
-  if (mOwningThread == NS_GetCurrentThread()) {
+  if (mOwningEventTarget->IsOnCurrentThread()) {
     Shutdown();
     return;
   }
 
   RefPtr<ShutdownRunnable> runnable = new ShutdownRunnable(this);
-  mOwningThread->Dispatch(runnable, NS_DISPATCH_NORMAL);
+  mOwningEventTarget->Dispatch(runnable, NS_DISPATCH_NORMAL);
 }
 
 void
@@ -272,7 +277,7 @@ IPCBlobInputStreamChild::StreamNeeded(IPCBlobInputStream* aStream,
 
   PendingOperation* opt = mPendingOperations.AppendElement();
   opt->mStream = aStream;
-  opt->mEventTarget = aEventTarget ? aEventTarget : NS_GetCurrentThread();
+  opt->mEventTarget = aEventTarget;
 
   if (mState == eActiveMigrating || mState == eInactiveMigrating) {
     // This operation will be continued when the migration is completed.
@@ -281,13 +286,13 @@ IPCBlobInputStreamChild::StreamNeeded(IPCBlobInputStream* aStream,
 
   MOZ_ASSERT(mState == eActive);
 
-  if (mOwningThread == NS_GetCurrentThread()) {
+  if (mOwningEventTarget->IsOnCurrentThread()) {
     SendStreamNeeded();
     return;
   }
 
   RefPtr<StreamNeededRunnable> runnable = new StreamNeededRunnable(this);
-  mOwningThread->Dispatch(runnable, NS_DISPATCH_NORMAL);
+  mOwningEventTarget->Dispatch(runnable.forget(), NS_DISPATCH_NORMAL);
 }
 
 mozilla::ipc::IPCResult
@@ -311,7 +316,16 @@ IPCBlobInputStreamChild::RecvStreamReady(const OptionalIPCStream& aStream)
 
   RefPtr<StreamReadyRunnable> runnable =
     new StreamReadyRunnable(pendingStream, stream);
-  eventTarget->Dispatch(runnable, NS_DISPATCH_NORMAL);
+
+  // If IPCBlobInputStream::AsyncWait() has been executed without passing an
+  // event target, we run the callback synchronous because any thread could be
+  // result to be the wrong one. See more in nsIAsyncInputStream::asyncWait
+  // documentation.
+  if (eventTarget) {
+    eventTarget->Dispatch(runnable, NS_DISPATCH_NORMAL);
+  } else {
+    runnable->Run();
+  }
 
   return IPC_OK();
 }
@@ -325,11 +339,11 @@ IPCBlobInputStreamChild::Migrated()
   if (mWorkerHolder) {
     RefPtr<ReleaseWorkerHolderRunnable> runnable =
       new ReleaseWorkerHolderRunnable(Move(mWorkerHolder));
-    mOwningThread->Dispatch(runnable, NS_DISPATCH_NORMAL);
+    mOwningEventTarget->Dispatch(runnable, NS_DISPATCH_NORMAL);
   }
 
-  mOwningThread = NS_GetCurrentThread();
-  MOZ_ASSERT(IPCBlobInputStreamThread::IsOnFileThread(mOwningThread));
+  mOwningEventTarget = GetCurrentThreadSerialEventTarget();
+  MOZ_ASSERT(IPCBlobInputStreamThread::IsOnFileEventTarget(mOwningEventTarget));
 
   // Maybe we have no reasons to keep this actor alive.
   if (mStreams.IsEmpty()) {

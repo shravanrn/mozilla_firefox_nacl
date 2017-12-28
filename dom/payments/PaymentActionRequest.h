@@ -9,7 +9,6 @@
 
 #include "nsIPaymentActionRequest.h"
 #include "nsCOMPtr.h"
-#include "nsCOMArray.h"
 #include "nsIArray.h"
 #include "nsString.h"
 
@@ -22,13 +21,14 @@ public:
   NS_DECL_ISUPPORTS
   NS_DECL_NSIPAYMENTACTIONREQUEST
 
-  PaymentActionRequest() = default;
+  PaymentActionRequest();
 
 protected:
   virtual ~PaymentActionRequest() = default;
 
   nsString mRequestId;
   uint32_t mType;
+  nsCOMPtr<nsIPaymentActionCallback> mCallback;
 };
 
 class PaymentCreateActionRequest final : public nsIPaymentCreateActionRequest
@@ -39,15 +39,47 @@ public:
   NS_FORWARD_NSIPAYMENTACTIONREQUEST(PaymentActionRequest::)
   NS_DECL_NSIPAYMENTCREATEACTIONREQUEST
 
-  PaymentCreateActionRequest() = default;
+  PaymentCreateActionRequest();
 
 private:
   ~PaymentCreateActionRequest() = default;
 
   uint64_t mTabId;
+  nsCOMPtr<nsIPrincipal> mTopLevelPrincipal;
   nsCOMPtr<nsIArray> mMethodData;
   nsCOMPtr<nsIPaymentDetails> mDetails;
   nsCOMPtr<nsIPaymentOptions> mOptions;
+};
+
+class PaymentCompleteActionRequest final : public nsIPaymentCompleteActionRequest
+                                         , public PaymentActionRequest
+{
+public:
+  NS_DECL_ISUPPORTS_INHERITED
+  NS_FORWARD_NSIPAYMENTACTIONREQUEST(PaymentActionRequest::)
+  NS_DECL_NSIPAYMENTCOMPLETEACTIONREQUEST
+
+  PaymentCompleteActionRequest();
+
+private:
+  ~PaymentCompleteActionRequest() = default;
+
+  nsString mCompleteStatus;
+};
+
+class PaymentUpdateActionRequest final : public nsIPaymentUpdateActionRequest
+                                       , public PaymentActionRequest
+{
+public:
+  NS_DECL_ISUPPORTS_INHERITED
+  NS_FORWARD_NSIPAYMENTACTIONREQUEST(PaymentActionRequest::)
+  NS_DECL_NSIPAYMENTUPDATEACTIONREQUEST
+
+  PaymentUpdateActionRequest() = default;
+private:
+  ~PaymentUpdateActionRequest() = default;
+
+  nsCOMPtr<nsIPaymentDetails> mDetails;
 };
 
 } // end of namespace dom

@@ -12,14 +12,14 @@
  */
 
 var transitions = [
-  TRANSITION_LINK
-, TRANSITION_TYPED
-, TRANSITION_BOOKMARK
-, TRANSITION_EMBED
-, TRANSITION_FRAMED_LINK
-, TRANSITION_REDIRECT_PERMANENT
-, TRANSITION_REDIRECT_TEMPORARY
-, TRANSITION_DOWNLOAD
+  TRANSITION_LINK,
+  TRANSITION_TYPED,
+  TRANSITION_BOOKMARK,
+  TRANSITION_EMBED,
+  TRANSITION_FRAMED_LINK,
+  TRANSITION_REDIRECT_PERMANENT,
+  TRANSITION_REDIRECT_TEMPORARY,
+  TRANSITION_DOWNLOAD
 ];
 
 function runQuery(aResultType) {
@@ -38,10 +38,6 @@ function runQuery(aResultType) {
     do_check_neq(node.uri.substr(6, 1), TRANSITION_FRAMED_LINK);
   }
   root.containerOpen = false;
-}
-
-function run_test() {
-  run_next_test();
 }
 
 add_task(async function test_execute() {

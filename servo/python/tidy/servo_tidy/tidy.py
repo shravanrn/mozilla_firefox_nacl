@@ -79,6 +79,7 @@ WEBIDL_STANDARDS = [
     "//heycam.github.io/webidl",
     "//webbluetoothcg.github.io/web-bluetooth/",
     "//svgwg.org/svg2-draft",
+    "//wicg.github.io",
     # Not a URL
     "// This interface is entirely internal to Servo, and should not be" +
     " accessible to\n// web pages."
@@ -584,6 +585,12 @@ def check_rust(file_name, lines):
             # -> () is unnecessary
             (r"-> \(\)", "encountered function signature with -> ()", no_filter),
         ]
+        keywords = ["if", "let", "mut", "extern", "as", "impl", "fn", "struct", "enum", "pub", "mod",
+                    "use", "in", "ref", "type", "where", "trait"]
+        extra_space_after = lambda key: (r"(?<![A-Za-z0-9\-_]){key}  ".format(key=key),
+                                         "extra space after {key}".format(key=key),
+                                         lambda match, line: not is_attribute)
+        regex_rules.extend(map(extra_space_after, keywords))
 
         for pattern, message, filter_func in regex_rules:
             for match in re.finditer(pattern, line):
@@ -684,6 +691,19 @@ def check_rust(file_name, lines):
         else:
             # we now erase previous entries
             prev_mod = {}
+
+        # derivable traits should be alphabetically ordered
+        if is_attribute:
+            # match the derivable traits filtering out macro expansions
+            match = re.search(r"#\[derive\(([a-zA-Z, ]*)", line)
+            if match:
+                derives = map(lambda w: w.strip(), match.group(1).split(','))
+                # sort, compare and report
+                sorted_derives = sorted(derives)
+                if sorted_derives != derives:
+                    yield(idx + 1, decl_message.format("derivable traits list")
+                              + decl_expected.format(", ".join(sorted_derives))
+                              + decl_found.format(", ".join(derives)))
 
 
 # Avoid flagging <Item=Foo> constructs

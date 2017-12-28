@@ -8,22 +8,44 @@ this.EXPORTED_SYMBOLS = ["GeckoViewModule"];
 
 const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
-var dump = Cu.import("resource://gre/modules/AndroidLog.jsm", {})
-           .AndroidLog.d.bind(null, "ViewModule");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+
+XPCOMUtils.defineLazyGetter(this, "dump", () =>
+    Cu.import("resource://gre/modules/AndroidLog.jsm",
+              {}).AndroidLog.d.bind(null, "ViewModule"));
 
 function debug(aMsg) {
   // dump(aMsg);
 }
 
 class GeckoViewModule {
-  constructor(aWindow, aBrowser, aEventDispatcher) {
+  constructor(aModuleName, aWindow, aBrowser, aEventDispatcher) {
     this.window = aWindow;
     this.browser = aBrowser;
     this.eventDispatcher = aEventDispatcher;
+    this.moduleName = aModuleName;
 
     this.eventDispatcher.registerListener(
-      () => this.onSettingsUpdate(),
-      "GeckoView:UpdateSettings");
+      () => this.onSettingsUpdate(), "GeckoView:UpdateSettings"
+    );
+
+    this.eventDispatcher.registerListener(
+      (aEvent, aData, aCallback) => {
+        if (aData.module == this.moduleName) {
+          this.register();
+          this.messageManager.sendAsyncMessage("GeckoView:Register", aData);
+        }
+      }, "GeckoView:Register"
+    );
+
+    this.eventDispatcher.registerListener(
+      (aEvent, aData, aCallback) => {
+        if (aData.module == this.moduleName) {
+          this.messageManager.sendAsyncMessage("GeckoView:Unregister", aData);
+          this.unregister();
+        }
+      }, "GeckoView:Unregister"
+    );
 
     this.init();
     this.onSettingsUpdate();
@@ -34,6 +56,9 @@ class GeckoViewModule {
 
   // Called when settings have changed. Access settings via this.settings.
   onSettingsUpdate() {}
+
+  register() {}
+  unregister() {}
 
   get settings() {
     let view = this.window.arguments[0].QueryInterface(Ci.nsIAndroidView);

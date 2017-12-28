@@ -6,6 +6,11 @@
 
 #include "nsISupportsImpl.h"
 #include "mozilla/Assertions.h"
+#ifdef MOZ_THREAD_SAFETY_OWNERSHIP_CHECKS_SUPPORTED
+#include "nsThreadUtils.h"
+#endif // MOZ_THREAD_SAFETY_OWNERSHIP_CHECKS_SUPPORTED
+
+using namespace mozilla;
 
 nsresult NS_FASTCALL
 NS_TableDrivenQI(void* aThis, REFNSIID aIID, void** aInstancePtr,
@@ -28,12 +33,23 @@ NS_TableDrivenQI(void* aThis, REFNSIID aIID, void** aInstancePtr,
 }
 
 #ifdef MOZ_THREAD_SAFETY_OWNERSHIP_CHECKS_SUPPORTED
+nsAutoOwningThread::nsAutoOwningThread()
+  : mThread(GetCurrentVirtualThread())
+{
+}
+
 void
 nsAutoOwningThread::AssertCurrentThreadOwnsMe(const char* msg) const
 {
-  if (MOZ_UNLIKELY(mThread != PR_GetCurrentThread())) {
+  if (MOZ_UNLIKELY(!IsCurrentThread())) {
     // `msg` is a string literal by construction.
     MOZ_CRASH_UNSAFE_OOL(msg);
   }
+}
+
+bool
+nsAutoOwningThread::IsCurrentThread() const
+{
+  return mThread == GetCurrentVirtualThread();
 }
 #endif

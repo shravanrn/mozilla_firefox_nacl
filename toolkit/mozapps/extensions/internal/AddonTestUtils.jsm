@@ -28,6 +28,10 @@ const {OS} = Cu.import("resource://gre/modules/osfile.jsm", {});
 
 XPCOMUtils.defineLazyModuleGetter(this, "Extension",
                                   "resource://gre/modules/Extension.jsm");
+XPCOMUtils.defineLazyGetter(this, "Management", () => {
+  let {Management} = Cu.import("resource://gre/modules/Extension.jsm", {});
+  return Management;
+});
 
 XPCOMUtils.defineLazyServiceGetter(this, "aomStartup",
                                    "@mozilla.org/addons/addon-manager-startup;1",
@@ -215,6 +219,8 @@ var AddonTestUtils = {
   addonStartup: null,
   testUnpacked: false,
   useRealCertChecks: false,
+  usePrivilegedSignatures: true,
+  overrideEntry: null,
 
   init(testScope) {
     this.testScope = testScope;
@@ -396,8 +402,7 @@ var AddonTestUtils = {
       done = true;
     });
 
-    while (!done)
-      Services.tm.mainThread.processNextEvent(true);
+    Services.tm.spinEventLoopUntil(() => done);
 
     if (error !== undefined)
       throw error;
@@ -499,6 +504,13 @@ var AddonTestUtils = {
           let id = await this.getIDFromManifest(manifestURI);
 
           let fakeCert = {commonName: id};
+          if (this.usePrivilegedSignatures) {
+            let privileged = typeof this.usePrivilegedSignatures == "function" ?
+                             this.usePrivilegedSignatures(id) : this.usePrivilegedSignatures;
+            if (privileged) {
+              fakeCert.organizationalUnit = "Mozilla Extensions";
+            }
+          }
 
           return [callback, Cr.NS_OK, fakeCert];
         } catch (e) {
@@ -581,6 +593,10 @@ var AddonTestUtils = {
   promiseShutdownManager() {
     if (!this.addonIntegrationService)
       return Promise.resolve(false);
+
+    if (this.overrideEntry) {
+      this.overrideEntry.destruct();
+    }
 
     Services.obs.notifyObservers(null, "quit-application-granted");
     return MockAsyncShutdown.hook()
@@ -1242,6 +1258,49 @@ var AddonTestUtils = {
       Services.console.unregisterListener(listener);
     }
   },
+
+  /**
+   * Helper to wait for a webextension to completely start
+   *
+   * @param {string} [id]
+   *        An optional extension id to look for.
+   *
+   * @returns {Promise<Extension>}
+   *           A promise that resolves with the extension, once it is started.
+   */
+  promiseWebExtensionStartup(id) {
+    return new Promise(resolve => {
+      Management.on("ready", function listener(event, extension) {
+        if (!id || extension.id == id) {
+          Management.off("ready", listener);
+          resolve(extension);
+        }
+      });
+    });
+  },
+
+  /**
+   * Override chrome URL for specifying allowed built-in add-ons.
+   *
+   * @param {object} data - An object specifying which add-on IDs are permitted
+   *                        to load, for instance: { "system": ["id1", "..."] }
+   */
+  async overrideBuiltIns(data) {
+    // We need to set this in order load the URL preloader service, which
+    // is only possible when running in automation.
+    Services.prefs.setBoolPref(PREF_DISABLE_SECURITY, true);
+    aomStartup.initializeURLPreloader();
+
+    let file = FileUtils.getFile("TmpD", "override.txt");
+    let manifest = Services.io.newFileURI(file);
+    await OS.File.writeAtomic(file.path,
+      new TextEncoder().encode(JSON.stringify(data)));
+    this.overrideEntry = aomStartup.registerChrome(manifest, [
+      ["override", "chrome://browser/content/built_in_addons.json",
+       Services.io.newFileURI(file).spec],
+    ]);
+    Services.prefs.setBoolPref(PREF_DISABLE_SECURITY, false);
+  }
 };
 
 for (let [key, val] of Object.entries(AddonTestUtils)) {

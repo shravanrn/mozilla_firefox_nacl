@@ -43,7 +43,6 @@
 #include "nsXHTMLContentSerializer.h"
 #include "nsRuleNode.h"
 #include "nsContentAreaDragDrop.h"
-#include "nsContentList.h"
 #include "nsBox.h"
 #include "nsIFrameTraversal.h"
 #include "nsLayoutCID.h"
@@ -93,9 +92,6 @@
 
 #ifdef MOZ_WEBSPEECH_TEST_BACKEND
 #include "mozilla/dom/FakeSpeechRecognitionService.h"
-#endif
-#ifdef MOZ_WEBSPEECH_POCKETSPHINX
-#include "mozilla/dom/PocketSphinxSpeechRecognitionService.h"
 #endif
 #ifdef MOZ_WEBSPEECH
 #include "mozilla/dom/nsSynthVoiceRegistry.h"
@@ -156,12 +152,6 @@ class nsIDocumentLoaderFactory;
 #ifdef MOZ_XUL
 #include "nsIXULDocument.h"
 #include "nsIXULSortService.h"
-
-nsresult
-NS_NewXULContentBuilder(nsISupports* aOuter, REFNSIID aIID, void** aResult);
-
-nsresult
-NS_NewXULTreeBuilder(nsISupports* aOuter, REFNSIID aIID, void** aResult);
 #endif
 
 static void Shutdown();
@@ -182,7 +172,6 @@ static void Shutdown();
 
 #include "mozilla/dom/power/PowerManagerService.h"
 #include "mozilla/dom/time/TimeService.h"
-#include "StreamingProtocolService.h"
 
 #include "nsIPresentationService.h"
 
@@ -205,7 +194,6 @@ using mozilla::dom::workers::ServiceWorkerManager;
 using mozilla::dom::workers::WorkerDebuggerManager;
 using mozilla::dom::UDPSocketChild;
 using mozilla::dom::time::TimeService;
-using mozilla::net::StreamingProtocolControllerService;
 using mozilla::gmp::GeckoMediaPluginService;
 using mozilla::dom::NotificationTelemetryService;
 
@@ -285,8 +273,6 @@ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIPowerManagerService,
                                          PowerManagerService::GetInstance)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsITimeService,
                                          TimeService::GetInstance)
-NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIStreamingProtocolControllerService,
-                                         StreamingProtocolControllerService::GetInstance)
 
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIMediaManagerService,
                                          MediaManager::GetInstance)
@@ -466,8 +452,6 @@ MAKE_CTOR(CreatePlainTextSerializer,      nsIContentSerializer,        NS_NewPla
 MAKE_CTOR(CreateContentPolicy,            nsIContentPolicy,            NS_NewContentPolicy)
 #ifdef MOZ_XUL
 MAKE_CTOR(CreateXULSortService,           nsIXULSortService,           NS_NewXULSortService)
-// NS_NewXULContentBuilder
-// NS_NewXULTreeBuilder
 MAKE_CTOR(CreateXULDocument,              nsIXULDocument,              NS_NewXULDocument)
 // NS_NewXULControllers
 #endif
@@ -540,9 +524,6 @@ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(FlyWebService, FlyWebService::GetOrCrea
 
 #ifdef MOZ_WEBSPEECH_TEST_BACKEND
 NS_GENERIC_FACTORY_CONSTRUCTOR(FakeSpeechRecognitionService)
-#endif
-#ifdef MOZ_WEBSPEECH_POCKETSPHINX
-NS_GENERIC_FACTORY_CONSTRUCTOR(PocketSphinxSpeechRecognitionService)
 #endif
 
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsContentSecurityManager)
@@ -630,8 +611,6 @@ NS_DEFINE_NAMED_CID(NS_NODATAPROTOCOLCONTENTPOLICY_CID);
 NS_DEFINE_NAMED_CID(NS_XULCONTROLLERS_CID);
 #ifdef MOZ_XUL
 NS_DEFINE_NAMED_CID(NS_XULSORTSERVICE_CID);
-NS_DEFINE_NAMED_CID(NS_XULTEMPLATEBUILDER_CID);
-NS_DEFINE_NAMED_CID(NS_XULTREEBUILDER_CID);
 NS_DEFINE_NAMED_CID(NS_XULDOCUMENT_CID);
 #endif
 NS_DEFINE_NAMED_CID(NS_CONTENT_DOCUMENT_LOADER_FACTORY_CID);
@@ -696,13 +675,9 @@ NS_DEFINE_NAMED_CID(NS_POWERMANAGERSERVICE_CID);
 NS_DEFINE_NAMED_CID(OSFILECONSTANTSSERVICE_CID);
 NS_DEFINE_NAMED_CID(UDPSOCKETCHILD_CID);
 NS_DEFINE_NAMED_CID(NS_TIMESERVICE_CID);
-NS_DEFINE_NAMED_CID(NS_MEDIASTREAMCONTROLLERSERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_MEDIAMANAGERSERVICE_CID);
 #ifdef MOZ_WEBSPEECH_TEST_BACKEND
 NS_DEFINE_NAMED_CID(NS_FAKE_SPEECH_RECOGNITION_SERVICE_CID);
-#endif
-#ifdef MOZ_WEBSPEECH_POCKETSPHINX
-NS_DEFINE_NAMED_CID(NS_POCKETSPHINX_SPEECH_RECOGNITION_SERVICE_CID);
 #endif
 #ifdef MOZ_WEBSPEECH
 NS_DEFINE_NAMED_CID(NS_SYNTHVOICEREGISTRY_CID);
@@ -895,8 +870,6 @@ static const mozilla::Module::CIDEntry kLayoutCIDs[] = {
   { &kNS_XULCONTROLLERS_CID, false, nullptr, NS_NewXULControllers },
 #ifdef MOZ_XUL
   { &kNS_XULSORTSERVICE_CID, false, nullptr, CreateXULSortService },
-  { &kNS_XULTEMPLATEBUILDER_CID, false, nullptr, NS_NewXULContentBuilder },
-  { &kNS_XULTREEBUILDER_CID, false, nullptr, NS_NewXULTreeBuilder },
   { &kNS_XULDOCUMENT_CID, false, nullptr, CreateXULDocument },
 #endif
   { &kNS_CONTENT_DOCUMENT_LOADER_FACTORY_CID, false, nullptr, CreateContentDLF },
@@ -943,9 +916,6 @@ static const mozilla::Module::CIDEntry kLayoutCIDs[] = {
 #ifdef MOZ_WEBSPEECH_TEST_BACKEND
   { &kNS_FAKE_SPEECH_RECOGNITION_SERVICE_CID, false, nullptr, FakeSpeechRecognitionServiceConstructor },
 #endif
-#ifdef MOZ_WEBSPEECH_POCKETSPHINX
-  { &kNS_POCKETSPHINX_SPEECH_RECOGNITION_SERVICE_CID, false, nullptr, PocketSphinxSpeechRecognitionServiceConstructor },
-#endif
 #ifdef MOZ_WEBSPEECH
   { &kNS_SYNTHVOICEREGISTRY_CID, true, nullptr, nsSynthVoiceRegistryConstructor },
 #endif
@@ -972,7 +942,6 @@ static const mozilla::Module::CIDEntry kLayoutCIDs[] = {
   { &kUDPSOCKETCHILD_CID, false, nullptr, UDPSocketChildConstructor },
   { &kGECKO_MEDIA_PLUGIN_SERVICE_CID, true, nullptr, GeckoMediaPluginServiceConstructor },
   { &kNS_TIMESERVICE_CID, false, nullptr, nsITimeServiceConstructor },
-  { &kNS_MEDIASTREAMCONTROLLERSERVICE_CID, false, nullptr, nsIStreamingProtocolControllerServiceConstructor },
   { &kNS_MEDIAMANAGERSERVICE_CID, false, nullptr, nsIMediaManagerServiceConstructor },
 #ifdef ACCESSIBILITY
   { &kNS_ACCESSIBILITY_SERVICE_CID, false, nullptr, CreateA11yService },
@@ -1031,8 +1000,6 @@ static const mozilla::Module::ContractIDEntry kLayoutContracts[] = {
   { "@mozilla.org/xul/xul-controllers;1", &kNS_XULCONTROLLERS_CID },
 #ifdef MOZ_XUL
   { "@mozilla.org/xul/xul-sort-service;1", &kNS_XULSORTSERVICE_CID },
-  { "@mozilla.org/xul/xul-template-builder;1", &kNS_XULTEMPLATEBUILDER_CID },
-  { "@mozilla.org/xul/xul-tree-builder;1", &kNS_XULTREEBUILDER_CID },
   { "@mozilla.org/xul/xul-document;1", &kNS_XULDOCUMENT_CID },
 #endif
   { CONTENT_DLF_CONTRACTID, &kNS_CONTENT_DOCUMENT_LOADER_FACTORY_CID },
@@ -1075,9 +1042,6 @@ static const mozilla::Module::ContractIDEntry kLayoutContracts[] = {
 #ifdef MOZ_WEBSPEECH_TEST_BACKEND
   { NS_SPEECH_RECOGNITION_SERVICE_CONTRACTID_PREFIX "fake", &kNS_FAKE_SPEECH_RECOGNITION_SERVICE_CID },
 #endif
-#ifdef MOZ_WEBSPEECH_POCKETSPHINX
-  { NS_SPEECH_RECOGNITION_SERVICE_CONTRACTID_PREFIX "pocketsphinx-en-US", &kNS_POCKETSPHINX_SPEECH_RECOGNITION_SERVICE_CID },
-#endif
 #ifdef MOZ_WEBSPEECH
   { NS_SYNTHVOICEREGISTRY_CONTRACTID, &kNS_SYNTHVOICEREGISTRY_CID },
 #endif
@@ -1103,7 +1067,6 @@ static const mozilla::Module::ContractIDEntry kLayoutContracts[] = {
   { OSFILECONSTANTSSERVICE_CONTRACTID, &kOSFILECONSTANTSSERVICE_CID },
   { "@mozilla.org/udp-socket-child;1", &kUDPSOCKETCHILD_CID },
   { TIMESERVICE_CONTRACTID, &kNS_TIMESERVICE_CID },
-  { MEDIASTREAMCONTROLLERSERVICE_CONTRACTID, &kNS_MEDIASTREAMCONTROLLERSERVICE_CID },
   { MEDIAMANAGERSERVICE_CONTRACTID, &kNS_MEDIAMANAGERSERVICE_CID },
 #ifdef ACCESSIBILITY
   { "@mozilla.org/accessibilityService;1", &kNS_ACCESSIBILITY_SERVICE_CID },

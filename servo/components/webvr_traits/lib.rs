@@ -6,9 +6,8 @@
 
 extern crate ipc_channel;
 extern crate msg;
-#[macro_use]
-extern crate serde_derive;
-pub extern crate rust_webvr as webvr;
+#[macro_use] extern crate serde;
+pub extern crate rust_webvr_api as webvr;
 
 mod webvr_traits;
 

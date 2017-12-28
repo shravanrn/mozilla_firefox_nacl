@@ -1,18 +1,42 @@
-Components.utils.import("resource://devtools/client/framework/gDevTools.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
-
-const { devtools } =
-  Components.utils.import("resource://devtools/shared/Loader.jsm", {});
-const { getActiveTab } = devtools.require("sdk/tabs/utils");
-const { getMostRecentBrowserWindow } = devtools.require("sdk/window/utils");
-const ThreadSafeChromeUtils = devtools.require("ThreadSafeChromeUtils");
-const { EVENTS } = devtools.require("devtools/client/netmonitor/src/constants");
+const { Services } = Components.utils.import("resource://gre/modules/Services.jsm", {});
 const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
+const { XPCOMUtils } = Cu.import("resource://gre/modules/XPCOMUtils.jsm", {});
+
+XPCOMUtils.defineLazyGetter(this, "require", function() {
+  let { require } =
+    Components.utils.import("resource://devtools/shared/Loader.jsm", {});
+  return require;
+});
+XPCOMUtils.defineLazyGetter(this, "gDevTools", function() {
+  let { gDevTools } = require("devtools/client/framework/devtools");
+  return gDevTools;
+});
+XPCOMUtils.defineLazyGetter(this, "EVENTS", function() {
+  let { EVENTS } = require("devtools/client/netmonitor/src/constants");
+  return EVENTS;
+});
+XPCOMUtils.defineLazyGetter(this, "TargetFactory", function() {
+  let { TargetFactory } = require("devtools/client/framework/target");
+  return TargetFactory;
+});
+XPCOMUtils.defineLazyGetter(this, "ThreadSafeChromeUtils", function() {
+  return require("ThreadSafeChromeUtils");
+});
 
 const webserver = Services.prefs.getCharPref("addon.test.damp.webserver");
 
 const SIMPLE_URL = webserver + "/tests/devtools/addon/content/pages/simple.html";
 const COMPLICATED_URL = webserver + "/tests/tp5n/bild.de/www.bild.de/index.html";
+
+function getMostRecentBrowserWindow() {
+  return Services.wm.getMostRecentWindow("navigator:browser");
+}
+
+function getActiveTab(window) {
+  return window.gBrowser.selectedTab;
+}
+
+/* globals res:true */
 
 function Damp() {
   // Path to the temp file where the heap snapshot file is saved. Set by
@@ -21,47 +45,43 @@ function Damp() {
   // HeapSnapshot instance. Set by readHeapSnapshot, used by takeCensus.
   this._snapshot = null;
 
-  // Use the old console for now: https://bugzilla.mozilla.org/show_bug.cgi?id=1306780
-  Services.prefs.setBoolPref("devtools.webconsole.new-frontend-enabled", false);
+  Services.prefs.setBoolPref("devtools.webconsole.new-frontend-enabled", true);
 }
 
 Damp.prototype = {
 
-  addTab: function(url) {
+  addTab(url) {
     return new Promise((resolve, reject) => {
       let tab = this._win.gBrowser.selectedTab = this._win.gBrowser.addTab(url);
       let browser = tab.linkedBrowser;
       browser.addEventListener("load", function onload() {
-        browser.removeEventListener("load", onload, true);
         resolve(tab);
-      }, true);
+      }, {capture: true, once: true});
     });
   },
 
-  closeCurrentTab: function() {
+  closeCurrentTab() {
     this._win.BrowserCloseTabOrWindow();
     return this._win.gBrowser.selectedTab;
   },
 
-  reloadPage: function() {
+  reloadPage() {
     let startReloadTimestamp = performance.now();
     return new Promise((resolve, reject) => {
       let browser = gBrowser.selectedBrowser;
-      let self = this;
       browser.addEventListener("load", function onload() {
-        browser.removeEventListener("load", onload, true);
         let stopReloadTimestamp = performance.now();
         resolve({
           time: stopReloadTimestamp - startReloadTimestamp
         });
-      }, true);
+      }, {capture: true, once: true});
       browser.reload();
     });
   },
 
-  openToolbox: function (tool = "webconsole") {
+  openToolbox(tool = "webconsole") {
     let tab = getActiveTab(getMostRecentBrowserWindow());
-    let target = devtools.TargetFactory.forTab(tab);
+    let target = TargetFactory.forTab(tab);
     let startRecordTimestamp = performance.now();
     let showPromise = gDevTools.showToolbox(target, tool);
 
@@ -74,9 +94,9 @@ Damp.prototype = {
     });
   },
 
-  closeToolbox: Task.async(function*() {
+  closeToolbox: Task.async(function* () {
     let tab = getActiveTab(getMostRecentBrowserWindow());
-    let target = devtools.TargetFactory.forTab(tab);
+    let target = TargetFactory.forTab(tab);
     yield target.client.waitForRequestsToSettle();
     let startRecordTimestamp = performance.now();
     yield gDevTools.closeToolbox(target);
@@ -86,9 +106,9 @@ Damp.prototype = {
     };
   }),
 
-  saveHeapSnapshot: function(label) {
+  saveHeapSnapshot(label) {
     let tab = getActiveTab(getMostRecentBrowserWindow());
-    let target = devtools.TargetFactory.forTab(tab);
+    let target = TargetFactory.forTab(tab);
     let toolbox = gDevTools.getToolbox(target);
     let panel = toolbox.getCurrentPanel();
     let memoryFront = panel.panelWin.gFront;
@@ -104,7 +124,7 @@ Damp.prototype = {
     });
   },
 
-  readHeapSnapshot: function(label) {
+  readHeapSnapshot(label) {
     let start = performance.now();
     this._snapshot = ThreadSafeChromeUtils.readHeapSnapshot(this._heapSnapshotFilePath);
     let end = performance.now();
@@ -115,7 +135,7 @@ Damp.prototype = {
     return Promise.resolve();
   },
 
-  waitForNetworkRequests: Task.async(function*(label, toolbox) {
+  waitForNetworkRequests: Task.async(function* (label, toolbox) {
     const start = performance.now();
     yield this.waitForAllRequestsFinished();
     const end = performance.now();
@@ -125,7 +145,7 @@ Damp.prototype = {
     });
   }),
 
-  _consoleBulkLoggingTest: Task.async(function*() {
+  _consoleBulkLoggingTest: Task.async(function* () {
     let TOTAL_MESSAGES = 10;
     let tab = yield this.testSetup(SIMPLE_URL);
     let messageManager = tab.linkedBrowser.messageManager;
@@ -177,12 +197,11 @@ Damp.prototype = {
   // Log a stream of console messages, 1 per rAF.  Then record the average
   // time per rAF.  The idea is that the console being slow can slow down
   // content (i.e. Bug 1237368).
-  _consoleStreamLoggingTest: Task.async(function*() {
+  _consoleStreamLoggingTest: Task.async(function* () {
     let TOTAL_MESSAGES = 100;
     let tab = yield this.testSetup(SIMPLE_URL);
     let messageManager = tab.linkedBrowser.messageManager;
-    let {toolbox} = yield this.openToolbox("webconsole");
-    let webconsole = toolbox.getPanel("webconsole");
+    yield this.openToolbox("webconsole");
 
     // Load a frame script using a data URI so we can do logs
     // from the page.  So this is running in content.
@@ -224,7 +243,7 @@ Damp.prototype = {
     yield this.testTeardown();
   }),
 
-  takeCensus: function(label) {
+  takeCensus(label) {
     let start = performance.now();
 
     this._snapshot.takeCensus({
@@ -260,83 +279,89 @@ Damp.prototype = {
     return Promise.resolve();
   },
 
-  _getToolLoadingTests: function(url, label) {
+  async openToolboxAndLog(name, tool) {
+    let {time, toolbox} = await this.openToolbox(tool);
+    this._results.push({name: name + ".open.DAMP", value: time });
+    return toolbox;
+  },
 
-    let openToolboxAndLog = Task.async(function*(name, tool) {
-      let {time, toolbox} = yield this.openToolbox(tool);
-      this._results.push({name: name + ".open.DAMP", value: time });
-      return toolbox;
-    }.bind(this));
+  async closeToolboxAndLog(name) {
+    let {time} = await this.closeToolbox();
+    this._results.push({name: name + ".close.DAMP", value: time });
+  },
 
-    let closeToolboxAndLog = Task.async(function*(name) {
-      let {time} = yield this.closeToolbox();
-      this._results.push({name: name + ".close.DAMP", value: time });
-    }.bind(this));
+  async reloadPageAndLog(name) {
+    let {time} = await this.reloadPage();
+    this._results.push({name: name + ".reload.DAMP", value: time });
+  },
 
-    let reloadPageAndLog = Task.async(function*(name) {
-      let {time} = yield this.reloadPage();
-      this._results.push({name: name + ".reload.DAMP", value: time });
-    }.bind(this));
+  async _coldInspectorOpen(url) {
+    await this.testSetup(url);
+    await this.openToolboxAndLog("cold.inspector", "inspector");
+    await this.closeToolbox();
+    await this.testTeardown();
+  },
 
+  _getToolLoadingTests(url, label) {
     let subtests = {
-      webconsoleOpen: Task.async(function*() {
+      inspectorOpen: Task.async(function* () {
         yield this.testSetup(url);
-        yield openToolboxAndLog(label + ".webconsole", "webconsole");
-        yield reloadPageAndLog(label + ".webconsole");
-        yield closeToolboxAndLog(label + ".webconsole");
+        yield this.openToolboxAndLog(label + ".inspector", "inspector");
+        yield this.reloadPageAndLog(label + ".inspector");
+        yield this.closeToolboxAndLog(label + ".inspector");
         yield this.testTeardown();
       }),
 
-      inspectorOpen: Task.async(function*() {
+      webconsoleOpen: Task.async(function* () {
         yield this.testSetup(url);
-        yield openToolboxAndLog(label + ".inspector", "inspector");
-        yield reloadPageAndLog(label + ".inspector");
-        yield closeToolboxAndLog(label + ".inspector");
+        yield this.openToolboxAndLog(label + ".webconsole", "webconsole");
+        yield this.reloadPageAndLog(label + ".webconsole");
+        yield this.closeToolboxAndLog(label + ".webconsole");
         yield this.testTeardown();
       }),
 
-      debuggerOpen: Task.async(function*() {
+      debuggerOpen: Task.async(function* () {
         yield this.testSetup(url);
-        yield openToolboxAndLog(label + ".jsdebugger", "jsdebugger");
-        yield reloadPageAndLog(label + ".jsdebugger");
-        yield closeToolboxAndLog(label + ".jsdebugger");
+        yield this.openToolboxAndLog(label + ".jsdebugger", "jsdebugger");
+        yield this.reloadPageAndLog(label + ".jsdebugger");
+        yield this.closeToolboxAndLog(label + ".jsdebugger");
         yield this.testTeardown();
       }),
 
-      styleEditorOpen: Task.async(function*() {
+      styleEditorOpen: Task.async(function* () {
         yield this.testSetup(url);
-        yield openToolboxAndLog(label + ".styleeditor", "styleeditor");
-        yield reloadPageAndLog(label + ".styleeditor");
-        yield closeToolboxAndLog(label + ".styleeditor");
+        yield this.openToolboxAndLog(label + ".styleeditor", "styleeditor");
+        yield this.reloadPageAndLog(label + ".styleeditor");
+        yield this.closeToolboxAndLog(label + ".styleeditor");
         yield this.testTeardown();
       }),
 
-      performanceOpen: Task.async(function*() {
+      performanceOpen: Task.async(function* () {
         yield this.testSetup(url);
-        yield openToolboxAndLog(label + ".performance", "performance");
-        yield reloadPageAndLog(label + ".performance");
-        yield closeToolboxAndLog(label + ".performance");
+        yield this.openToolboxAndLog(label + ".performance", "performance");
+        yield this.reloadPageAndLog(label + ".performance");
+        yield this.closeToolboxAndLog(label + ".performance");
         yield this.testTeardown();
       }),
 
-      netmonitorOpen: Task.async(function*() {
+      netmonitorOpen: Task.async(function* () {
         yield this.testSetup(url);
-        const toolbox = yield openToolboxAndLog(label + ".netmonitor", "netmonitor");
+        const toolbox = yield this.openToolboxAndLog(label + ".netmonitor", "netmonitor");
         const requestsDone = this.waitForNetworkRequests(label + ".netmonitor", toolbox);
-        yield reloadPageAndLog(label + ".netmonitor");
+        yield this.reloadPageAndLog(label + ".netmonitor");
         yield requestsDone;
-        yield closeToolboxAndLog(label + ".netmonitor");
+        yield this.closeToolboxAndLog(label + ".netmonitor");
         yield this.testTeardown();
       }),
 
-      saveAndReadHeapSnapshot: Task.async(function*() {
+      saveAndReadHeapSnapshot: Task.async(function* () {
         yield this.testSetup(url);
-        yield openToolboxAndLog(label + ".memory", "memory");
-        yield reloadPageAndLog(label + ".memory");
+        yield this.openToolboxAndLog(label + ".memory", "memory");
+        yield this.reloadPageAndLog(label + ".memory");
         yield this.saveHeapSnapshot(label);
         yield this.readHeapSnapshot(label);
         yield this.takeCensus(label);
-        yield closeToolboxAndLog(label + ".memory");
+        yield this.closeToolboxAndLog(label + ".memory");
         yield this.testTeardown();
       }),
     };
@@ -357,7 +382,7 @@ Damp.prototype = {
     return sequenceArray;
   },
 
-  testSetup: Task.async(function*(url) {
+  testSetup: Task.async(function* (url) {
     let tab = yield this.addTab(url);
     yield new Promise(resolve => {
       setTimeout(resolve, this._config.rest);
@@ -365,7 +390,7 @@ Damp.prototype = {
     return tab;
   }),
 
-  testTeardown: Task.async(function*(url) {
+  testTeardown: Task.async(function* (url) {
     this.closeCurrentTab();
     this._nextCommand();
   }),
@@ -380,7 +405,7 @@ Damp.prototype = {
   _nextCommandIx: 0,
   _commands: [],
   _onSequenceComplete: 0,
-  _nextCommand: function() {
+  _nextCommand() {
     if (this._nextCommandIx >= this._commands.length) {
       this._onSequenceComplete();
       return;
@@ -388,7 +413,7 @@ Damp.prototype = {
     this._commands[this._nextCommandIx++].call(this);
   },
   // Each command at the array a function which must call nextCommand once it's done
-  _doSequence: function(commands, onComplete) {
+  _doSequence(commands, onComplete) {
     this._commands = commands;
     this._onSequenceComplete = onComplete;
     this._results = [];
@@ -397,25 +422,25 @@ Damp.prototype = {
     this._nextCommand();
   },
 
-  _log: function(str) {
+  _log(str) {
     if (window.MozillaFileLogger && window.MozillaFileLogger.log)
       window.MozillaFileLogger.log(str);
 
     window.dump(str);
   },
 
-  _logLine: function(str) {
+  _logLine(str) {
     return this._log(str + "\n");
   },
 
-  _reportAllResults: function() {
+  _reportAllResults() {
     var testNames = [];
     var testResults = [];
 
     var out = "";
     for (var i in this._results) {
       res = this._results[i];
-      var disp = [].concat(res.value).map(function(a){return (isNaN(a) ? -1 : a.toFixed(1));}).join(" ");
+      var disp = [].concat(res.value).map(function(a) { return (isNaN(a) ? -1 : a.toFixed(1)); }).join(" ");
       out += res.name + ": " + disp + "\n";
 
       if (!Array.isArray(res.value)) { // Waw intervals array is not reported to talos
@@ -426,15 +451,15 @@ Damp.prototype = {
     this._log("\n" + out);
 
     if (content && content.tpRecordTime) {
-      content.tpRecordTime(testResults.join(','), 0, testNames.join(','));
+      content.tpRecordTime(testResults.join(","), 0, testNames.join(","));
     } else {
-      //alert(out);
+      // alert(out);
     }
   },
 
   _onTestComplete: null,
 
-  _doneInternal: function() {
+  _doneInternal() {
     this._logLine("DAMP_RESULTS_JSON=" + JSON.stringify(this._results));
     this._reportAllResults();
     this._win.gBrowser.selectedTab = this._dampTab;
@@ -462,7 +487,7 @@ Damp.prototype = {
    */
   waitForAllRequestsFinished() {
     let tab = getActiveTab(getMostRecentBrowserWindow());
-    let target = devtools.TargetFactory.forTab(tab);
+    let target = TargetFactory.forTab(tab);
     let toolbox = gDevTools.getToolbox(target);
     let window = toolbox.getCurrentPanel().panelWin;
 
@@ -496,9 +521,9 @@ Damp.prototype = {
     });
   },
 
-  startTest: function(doneCallback, config) {
-    this._onTestComplete = function (results) {
-      Profiler.mark("DAMP - end", true);
+  startTest(doneCallback, config) {
+    this._onTestComplete = function(results) {
+      TalosParentProfiler.pause("DAMP - end");
       doneCallback(results);
     };
     this._config = config;
@@ -509,9 +534,19 @@ Damp.prototype = {
     this._dampTab = this._win.gBrowser.selectedTab;
     this._win.gBrowser.selectedBrowser.focus(); // Unfocus the URL bar to avoid caret blink
 
-    Profiler.mark("DAMP - start", true);
+    TalosParentProfiler.resume("DAMP - start");
 
     let tests = [];
+
+    if (config.subtests.indexOf("inspectorOpen") > -1) {
+      // Run cold test only once
+      let topWindow = getMostRecentBrowserWindow();
+      if (!topWindow.coldRunDAMP) {
+        topWindow.coldRunDAMP = true;
+        tests = tests.concat(this._coldInspectorOpen);
+      }
+    }
+
     tests = tests.concat(this._getToolLoadingTests(SIMPLE_URL, "simple"));
     tests = tests.concat(this._getToolLoadingTests(COMPLICATED_URL, "complicated"));
 

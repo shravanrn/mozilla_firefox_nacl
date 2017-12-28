@@ -3,12 +3,14 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+from __future__ import absolute_import, print_function
 
 import os
-import sys
-import xtalos
 import subprocess
+import sys
+
 import etlparser
+import xtalos
 
 
 def stop(xperf_path, debug=False):
@@ -69,6 +71,7 @@ def main(args=sys.argv[1:]):
                          **args.__dict__)
     except xtalos.XTalosError as e:
         parser.error(str(e))
+
 
 if __name__ == "__main__":
     main()

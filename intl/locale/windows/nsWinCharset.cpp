@@ -8,12 +8,8 @@
 #include "nsIPlatformCharset.h"
 #include "nsUConvPropertySearch.h"
 #include <windows.h>
-#include "nsWin32Locale.h"
-#include "nsCOMPtr.h"
-#include "nsReadableUtils.h"
-#include "nsServiceManagerUtils.h"
+#include "nsString.h"
 #include "nsPlatformCharset.h"
-#include "nsEncoderDecoderUtils.h"
 
 using namespace mozilla;
 
@@ -49,7 +45,7 @@ nsPlatformCharset::MapToCharset(nsAString& inANSICodePage, nsACString& outCharse
   return rv;
 }
 
-NS_IMETHODIMP 
+NS_IMETHODIMP
 nsPlatformCharset::GetCharset(nsPlatformCharsetSel selector,
                               nsACString& oResult)
 {
@@ -57,7 +53,7 @@ nsPlatformCharset::GetCharset(nsPlatformCharsetSel selector,
   return NS_OK;
 }
 
-NS_IMETHODIMP 
+NS_IMETHODIMP
 nsPlatformCharset::Init()
 {
   return NS_OK;

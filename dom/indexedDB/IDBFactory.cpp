@@ -19,6 +19,7 @@
 #include "mozilla/ipc/BackgroundUtils.h"
 #include "mozilla/ipc/PBackground.h"
 #include "mozilla/ipc/PBackgroundChild.h"
+#include "mozilla/Telemetry.h"
 #include "mozIThirdPartyUtil.h"
 #include "nsAboutProtocolUtils.h"
 #include "nsContentUtils.h"
@@ -301,7 +302,7 @@ IDBFactory::CreateForJSInternal(JSContext* aCx,
   factory->mOwningObject = aOwningObject;
   mozilla::HoldJSObjects(factory.get());
   factory->mEventTarget = NS_IsMainThread() ?
-    SystemGroup::EventTargetFor(TaskCategory::Other) : NS_GetCurrentThread();
+    SystemGroup::EventTargetFor(TaskCategory::Other) : GetCurrentThreadEventTarget();
   factory->mInnerWindowID = aInnerWindowID;
 
   factory.forget(aFactory);
@@ -417,6 +418,24 @@ IDBFactory::AllowedForPrincipal(nsIPrincipal* aPrincipal,
   return true;
 }
 
+void
+IDBFactory::UpdateActiveTransactionCount(int32_t aDelta)
+{
+  AssertIsOnOwningThread();
+  if (mWindow) {
+    mWindow->UpdateActiveIndexedDBTransactionCount(aDelta);
+  }
+}
+
+void
+IDBFactory::UpdateActiveDatabaseCount(int32_t aDelta)
+{
+  AssertIsOnOwningThread();
+  if (mWindow) {
+    mWindow->UpdateActiveIndexedDBDatabaseCount(aDelta);
+  }
+}
+
 bool
 IDBFactory::IsChrome() const
 {
@@ -459,6 +478,28 @@ IDBFactory::Open(JSContext* aCx,
                  CallerType aCallerType,
                  ErrorResult& aRv)
 {
+  if (!IsChrome() &&
+      aOptions.mStorage.WasPassed()) {
+    switch (aOptions.mStorage.Value()) {
+      case StorageType::Persistent: {
+        Telemetry::ScalarAdd(Telemetry::ScalarID::IDB_TYPE_PERSISTENT_COUNT, 1);
+        break;
+      }
+
+      case StorageType::Temporary: {
+        Telemetry::ScalarAdd(Telemetry::ScalarID::IDB_TYPE_TEMPORARY_COUNT, 1);
+        break;
+      }
+
+      case StorageType::Default:
+      case StorageType::EndGuard_:
+        break;
+
+      default:
+        MOZ_CRASH("Invalid storage type!");
+    }
+  }
+
   return OpenInternal(aCx,
                       /* aPrincipal */ nullptr,
                       aName,
@@ -597,7 +638,6 @@ IDBFactory::OpenInternal(JSContext* aCx,
   MOZ_ASSERT_IF(!mWindow, !mPrivateBrowsingMode);
 
   CommonFactoryRequestParams commonParams;
-  commonParams.privateBrowsingMode() = mPrivateBrowsingMode;
 
   PrincipalInfo& principalInfo = commonParams.principalInfo();
 

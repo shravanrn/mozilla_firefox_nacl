@@ -13,7 +13,6 @@
 #include "nsObjCExceptions.h"
 #include "nsNumberControlFrame.h"
 #include "nsRangeFrame.h"
-#include "nsRenderingContext.h"
 #include "nsRect.h"
 #include "nsSize.h"
 #include "nsThemeConstants.h"
@@ -2280,7 +2279,7 @@ IsHiDPIContext(nsDeviceContext* aContext)
 }
 
 NS_IMETHODIMP
-nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
+nsNativeThemeCocoa::DrawWidgetBackground(gfxContext* aContext,
                                          nsIFrame* aFrame,
                                          uint8_t aWidgetType,
                                          const nsRect& aRect,
@@ -2295,7 +2294,7 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
 
   gfx::Rect nativeDirtyRect = NSRectToRect(aDirtyRect, p2a);
   gfxRect nativeWidgetRect(aRect.x, aRect.y, aRect.width, aRect.height);
-  nativeWidgetRect.ScaleInverse(gfxFloat(p2a));
+  nativeWidgetRect.Scale(1.0 / gfxFloat(p2a));
   float nativeWidgetHeight = round(nativeWidgetRect.Height());
   nativeWidgetRect.Round();
   if (nativeWidgetRect.IsEmpty())
@@ -2779,7 +2778,8 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
         (isOverlay ? @"kCUIWidgetOverlayScrollBar" : @"scrollbar"), @"widget",
         (isSmall ? @"small" : @"regular"), @"size",
         (isHorizontal ? @"kCUIOrientHorizontal" : @"kCUIOrientVertical"), @"kCUIOrientationKey",
-        (isOnTopOfDarkBackground ? @"kCUIVariantWhite" : @""), @"kCUIVariantKey",
+        (isOverlay && isOnTopOfDarkBackground ? @"kCUIVariantWhite" : @""),
+          @"kCUIVariantKey",
         [NSNumber numberWithBool:YES], @"indiconly",
         [NSNumber numberWithBool:YES], @"kCUIThumbProportionKey",
         [NSNumber numberWithBool:YES], @"is.flipped",
@@ -3809,52 +3809,6 @@ nsNativeThemeCocoa::NeedToClearBackgroundBehindWidget(nsIFrame* aFrame,
       return true;
     case NS_THEME_DIALOG:
       return IsWindowSheet(aFrame);
-    default:
-      return false;
-  }
-}
-
-static nscolor ConvertNSColor(NSColor* aColor)
-{
-  NSColor* deviceColor = [aColor colorUsingColorSpaceName:NSDeviceRGBColorSpace];
-  return NS_RGBA((unsigned int)([deviceColor redComponent] * 255.0),
-                 (unsigned int)([deviceColor greenComponent] * 255.0),
-                 (unsigned int)([deviceColor blueComponent] * 255.0),
-                 (unsigned int)([deviceColor alphaComponent] * 255.0));
-}
-
-bool
-nsNativeThemeCocoa::WidgetProvidesFontSmoothingBackgroundColor(nsIFrame* aFrame,
-                                                               uint8_t aWidgetType,
-                                                               nscolor* aColor)
-{
-  switch (aWidgetType) {
-    case NS_THEME_MAC_SOURCE_LIST:
-    case NS_THEME_MAC_SOURCE_LIST_SELECTION:
-    case NS_THEME_MAC_ACTIVE_SOURCE_LIST_SELECTION:
-    case NS_THEME_MAC_VIBRANCY_LIGHT:
-    case NS_THEME_MAC_VIBRANCY_DARK:
-    case NS_THEME_TOOLTIP:
-    case NS_THEME_MENUPOPUP:
-    case NS_THEME_MENUITEM:
-    case NS_THEME_CHECKMENUITEM:
-    case NS_THEME_DIALOG:
-    {
-      if ((aWidgetType == NS_THEME_DIALOG && !IsWindowSheet(aFrame)) ||
-          ((aWidgetType == NS_THEME_MAC_SOURCE_LIST_SELECTION ||
-            aWidgetType == NS_THEME_MAC_ACTIVE_SOURCE_LIST_SELECTION) &&
-            !IsInSourceList(aFrame))) {
-        return false;
-      }
-      ChildView* childView = ChildViewForFrame(aFrame);
-      if (childView) {
-        ThemeGeometryType type = ThemeGeometryTypeForWidget(aFrame, aWidgetType);
-        NSColor* color = [childView vibrancyFontSmoothingBackgroundColorForThemeGeometryType:type];
-        *aColor = ConvertNSColor(color);
-        return true;
-      }
-      return false;
-    }
     default:
       return false;
   }

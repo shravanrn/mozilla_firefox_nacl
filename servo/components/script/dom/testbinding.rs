@@ -154,7 +154,7 @@ impl TestBindingMethods for TestBinding {
     unsafe fn ArrayAttribute(&self, cx: *mut JSContext) -> NonZero<*mut JSObject> {
         rooted!(in(cx) let array = JS_NewUint8ClampedArray(cx, 16));
         assert!(!array.is_null());
-        NonZero::new(array.get())
+        NonZero::new_unchecked(array.get())
     }
     #[allow(unsafe_code)]
     unsafe fn AnyAttribute(&self, _: *mut JSContext) -> JSVal { NullValue() }
@@ -164,7 +164,7 @@ impl TestBindingMethods for TestBinding {
     unsafe fn ObjectAttribute(&self, cx: *mut JSContext) -> NonZero<*mut JSObject> {
         rooted!(in(cx) let obj = JS_NewPlainObject(cx));
         assert!(!obj.is_null());
-        NonZero::new(obj.get())
+        NonZero::new_unchecked(obj.get())
     }
     #[allow(unsafe_code)]
     unsafe fn SetObjectAttribute(&self, _: *mut JSContext, _: *mut JSObject) {}
@@ -662,9 +662,9 @@ impl TestBindingMethods for TestBinding {
     fn PassStringMozMap(&self, _: MozMap<DOMString>) {}
     fn PassByteStringMozMap(&self, _: MozMap<ByteString>) {}
     fn PassMozMapOfMozMaps(&self, _: MozMap<MozMap<i32>>) {}
-    fn PassMozMapUnion(&self, _: UnionTypes::LongOrByteStringMozMap) {}
-    fn PassMozMapUnion2(&self, _: UnionTypes::TestBindingOrByteStringMozMap) {}
-    fn PassMozMapUnion3(&self, _: UnionTypes::TestBindingOrByteStringSequenceSequenceOrByteStringMozMap) {}
+    fn PassMozMapUnion(&self, _: UnionTypes::LongOrStringByteStringRecord) {}
+    fn PassMozMapUnion2(&self, _: UnionTypes::TestBindingOrStringByteStringRecord) {}
+    fn PassMozMapUnion3(&self, _: UnionTypes::TestBindingOrByteStringSequenceSequenceOrStringByteStringRecord) {}
     fn ReceiveMozMap(&self) -> MozMap<i32> { MozMap::new() }
     fn ReceiveNullableMozMap(&self) -> Option<MozMap<i32>> { Some(MozMap::new()) }
     fn ReceiveMozMapOfNullableInts(&self) -> MozMap<Option<i32>> { MozMap::new() }
@@ -723,7 +723,7 @@ impl TestBindingMethods for TestBinding {
         p.append_native_handler(&handler);
         return p;
 
-        #[derive(JSTraceable, HeapSizeOf)]
+        #[derive(HeapSizeOf, JSTraceable)]
         struct SimpleHandler {
             #[ignore_heap_size_of = "Rc has unclear ownership semantics"]
             handler: Rc<SimpleCallback>,
@@ -748,9 +748,6 @@ impl TestBindingMethods for TestBinding {
     }
 
     fn AcceptPromise(&self, _promise: &Promise) {
-    }
-
-    fn AcceptNullablePromise(&self, _promise: Option<&Promise>) {
     }
 
     fn PassSequenceSequence(&self, _seq: Vec<Vec<i32>>) {}
@@ -807,7 +804,7 @@ impl TestBinding {
     pub unsafe fn condition_unsatisfied(_: *mut JSContext, _: HandleObject) -> bool { false }
 }
 
-#[derive(JSTraceable, HeapSizeOf)]
+#[derive(HeapSizeOf, JSTraceable)]
 pub struct TestBindingCallback {
     #[ignore_heap_size_of = "unclear ownership semantics"]
     promise: TrustedPromise,

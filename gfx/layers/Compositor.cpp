@@ -14,6 +14,7 @@
 #include "mozilla/mozalloc.h"           // for operator delete, etc
 #include "gfx2DGlue.h"
 #include "nsAppRunner.h"
+#include "LayersHelpers.h"
 
 namespace mozilla {
 
@@ -21,8 +22,7 @@ namespace layers {
 
 Compositor::Compositor(widget::CompositorWidget* aWidget,
                       CompositorBridgeParent* aParent)
-  : mCompositorID(0)
-  , mDiagnosticTypes(DiagnosticTypes::NO_DIAGNOSTIC)
+  : mDiagnosticTypes(DiagnosticTypes::NO_DIAGNOSTIC)
   , mParent(aParent)
   , mPixelsPerFrame(0)
   , mPixelsFilled(0)
@@ -50,7 +50,6 @@ void
 Compositor::Destroy()
 {
   TextureSourceProvider::Destroy();
-  FlushPendingNotifyNotUsed();
   mIsDestroyed = true;
 }
 
@@ -187,16 +186,16 @@ UpdateTextureCoordinates(gfx::TexturedTriangle& aTriangle,
                          const gfx::Rect& aTextureCoords)
 {
   // Calculate the relative offset of the intersection within the layer.
-  float dx = (aIntersection.x - aRect.x) / aRect.width;
-  float dy = (aIntersection.y - aRect.y) / aRect.height;
+  float dx = (aIntersection.x - aRect.x) / aRect.Width();
+  float dy = (aIntersection.y - aRect.y) / aRect.Height();
 
   // Update the texture offset.
-  float x = aTextureCoords.x + dx * aTextureCoords.width;
-  float y = aTextureCoords.y + dy * aTextureCoords.height;
+  float x = aTextureCoords.x + dx * aTextureCoords.Width();
+  float y = aTextureCoords.y + dy * aTextureCoords.Height();
 
   // Scale the texture width and height.
-  float w = aTextureCoords.width * aIntersection.width / aRect.width;
-  float h = aTextureCoords.height * aIntersection.height / aRect.height;
+  float w = aTextureCoords.Width() * aIntersection.Width() / aRect.Width();
+  float h = aTextureCoords.Height() * aIntersection.Height() / aRect.Height();
 
   static const auto Clamp = [](float& f)
   {
@@ -206,8 +205,8 @@ UpdateTextureCoordinates(gfx::TexturedTriangle& aTriangle,
 
   auto UpdatePoint = [&](const gfx::Point& p, gfx::Point& t)
   {
-    t.x = x + (p.x - aIntersection.x) / aIntersection.width * w;
-    t.y = y + (p.y - aIntersection.y) / aIntersection.height * h;
+    t.x = x + (p.x - aIntersection.x) / aIntersection.Width() * w;
+    t.y = y + (p.y - aIntersection.y) / aIntersection.Height() * h;
 
     Clamp(t.x);
     Clamp(t.y);
@@ -268,7 +267,7 @@ Compositor::DrawTriangles(const nsTArray<gfx::TexturedTriangle>& aTriangles,
   }
 }
 
-static nsTArray<gfx::TexturedTriangle>
+nsTArray<gfx::TexturedTriangle>
 GenerateTexturedTriangles(const gfx::Polygon& aPolygon,
                           const gfx::Rect& aRect,
                           const gfx::Rect& aTexRect)
@@ -296,8 +295,8 @@ GenerateTexturedTriangles(const gfx::Polygon& aPolygon,
         continue;
       }
 
-      MOZ_ASSERT(rect.width > 0.0f && rect.height > 0.0f);
-      MOZ_ASSERT(intersection.width > 0.0f && intersection.height > 0.0f);
+      MOZ_ASSERT(rect.Width() > 0.0f && rect.Height() > 0.0f);
+      MOZ_ASSERT(intersection.Width() > 0.0f && intersection.Height() > 0.0f);
 
       // Since the texture was created for non-split geometry, we need to
       // update the texture coordinates to account for the split.
@@ -373,22 +372,22 @@ Compositor::SlowDrawRect(const gfx::Rect& aRect, const gfx::Color& aColor,
   effects.mPrimaryEffect = new EffectSolidColor(aColor);
   // left
   this->DrawQuad(gfx::Rect(aRect.x, aRect.y,
-                           aStrokeWidth, aRect.height),
+                           aStrokeWidth, aRect.Height()),
                  aClipRect, effects, opacity,
                  aTransform);
   // top
   this->DrawQuad(gfx::Rect(aRect.x + aStrokeWidth, aRect.y,
-                           aRect.width - 2 * aStrokeWidth, aStrokeWidth),
+                           aRect.Width() - 2 * aStrokeWidth, aStrokeWidth),
                  aClipRect, effects, opacity,
                  aTransform);
   // right
-  this->DrawQuad(gfx::Rect(aRect.x + aRect.width - aStrokeWidth, aRect.y,
-                           aStrokeWidth, aRect.height),
+  this->DrawQuad(gfx::Rect(aRect.x + aRect.Width() - aStrokeWidth, aRect.y,
+                           aStrokeWidth, aRect.Height()),
                  aClipRect, effects, opacity,
                  aTransform);
   // bottom
-  this->DrawQuad(gfx::Rect(aRect.x + aStrokeWidth, aRect.y + aRect.height - aStrokeWidth,
-                           aRect.width - 2 * aStrokeWidth, aStrokeWidth),
+  this->DrawQuad(gfx::Rect(aRect.x + aStrokeWidth, aRect.y + aRect.Height() - aStrokeWidth,
+                           aRect.Width() - 2 * aStrokeWidth, aStrokeWidth),
                  aClipRect, effects, opacity,
                  aTransform);
 }
@@ -454,23 +453,23 @@ DecomposeIntoNoRepeatRects(const gfx::Rect& aRect,
   // If the texture should be flipped, it will have negative height. Detect that
   // here and compensate for it. We will flip each rect as we emit it.
   bool flipped = false;
-  if (texCoordRect.height < 0) {
+  if (texCoordRect.Height() < 0) {
     flipped = true;
-    texCoordRect.y += texCoordRect.height;
-    texCoordRect.height = -texCoordRect.height;
+    texCoordRect.y += texCoordRect.Height();
+    texCoordRect.SetHeight(-texCoordRect.Height());
   }
 
   // Wrap the texture coordinates so they are within [0,1] and cap width/height
   // at 1. We rely on this below.
   texCoordRect = gfx::Rect(gfx::Point(WrapTexCoord(texCoordRect.x),
                                       WrapTexCoord(texCoordRect.y)),
-                           gfx::Size(std::min(texCoordRect.width, 1.0f),
-                                     std::min(texCoordRect.height, 1.0f)));
+                           gfx::Size(std::min(texCoordRect.Width(), 1.0f),
+                                     std::min(texCoordRect.Height(), 1.0f)));
 
   NS_ASSERTION(texCoordRect.x >= 0.0f && texCoordRect.x <= 1.0f &&
                texCoordRect.y >= 0.0f && texCoordRect.y <= 1.0f &&
-               texCoordRect.width >= 0.0f && texCoordRect.width <= 1.0f &&
-               texCoordRect.height >= 0.0f && texCoordRect.height <= 1.0f &&
+               texCoordRect.Width() >= 0.0f && texCoordRect.Width() <= 1.0f &&
+               texCoordRect.Height() >= 0.0f && texCoordRect.Height() <= 1.0f &&
                texCoordRect.XMost() >= 0.0f && texCoordRect.XMost() <= 2.0f &&
                texCoordRect.YMost() >= 0.0f && texCoordRect.YMost() <= 2.0f,
                "We just wrapped the texture coordinates, didn't we?");
@@ -514,8 +513,8 @@ DecomposeIntoNoRepeatRects(const gfx::Rect& aRect,
   // tl.x .. 1.0 and then from 0.0 .. br.x (which we just wrapped above).
   // The same applies for the Y axis. The midpoints we calculate here are
   // only valid if we actually wrap around.
-  GLfloat xmid = aRect.x + (1.0f - tl.x) / texCoordRect.width * aRect.width;
-  GLfloat ymid = aRect.y + (1.0f - tl.y) / texCoordRect.height * aRect.height;
+  GLfloat xmid = aRect.x + (1.0f - tl.x) / texCoordRect.Width() * aRect.Width();
+  GLfloat ymid = aRect.y + (1.0f - tl.y) / texCoordRect.Height() * aRect.Height();
 
   // Due to floating-point inaccuracy, we have to use XMost()-x and YMost()-y
   // to calculate width and height, respectively, to ensure that size will
@@ -585,37 +584,13 @@ Compositor::ComputeBackdropCopyRect(const gfx::Rect& aRect,
   gfx::IntPoint rtOffset = GetCurrentRenderTarget()->GetOrigin();
   gfx::IntSize rtSize = GetCurrentRenderTarget()->GetSize();
 
-  gfx::IntRect renderBounds(0, 0, rtSize.width, rtSize.height);
-  renderBounds.IntersectRect(renderBounds, aClipRect);
-  renderBounds.MoveBy(rtOffset);
-
-  // Apply the layer transform.
-  gfx::RectDouble dest = aTransform.TransformAndClipBounds(
-    gfx::RectDouble(aRect.x, aRect.y, aRect.width, aRect.height),
-    gfx::RectDouble(renderBounds.x, renderBounds.y, renderBounds.width, renderBounds.height));
-  dest -= rtOffset;
-
-  // Ensure we don't round out to -1, which trips up Direct3D.
-  dest.IntersectRect(dest, gfx::RectDouble(0, 0, rtSize.width, rtSize.height));
-
-  if (aOutLayerQuad) {
-    *aOutLayerQuad = gfx::Rect(dest.x, dest.y, dest.width, dest.height);
-  }
-
-  // Round out to integer.
-  gfx::IntRect result;
-  dest.RoundOut();
-  dest.ToIntRect(&result);
-
-  // Create a transform from adjusted clip space to render target space,
-  // translate it for the backdrop rect, then transform it into the backdrop's
-  // uv-space.
-  gfx::Matrix4x4 transform;
-  transform.PostScale(rtSize.width, rtSize.height, 1.0);
-  transform.PostTranslate(-result.x, -result.y, 0.0);
-  transform.PostScale(1 / float(result.width), 1 / float(result.height), 1.0);
-  *aOutTransform = transform;
-  return result;
+  return layers::ComputeBackdropCopyRect(
+    aRect,
+    aClipRect,
+    aTransform,
+    gfx::IntRect(rtOffset, rtSize),
+    aOutTransform,
+    aOutLayerQuad);
 }
 
 gfx::IntRect

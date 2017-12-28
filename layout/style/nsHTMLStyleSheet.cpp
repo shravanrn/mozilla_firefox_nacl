@@ -2,15 +2,7 @@
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
- *
- * This Original Code has been modified by IBM Corporation. Modifications made by IBM
- * described herein are Copyright (c) International Business Machines Corporation, 2000.
- * Modifications to Mozilla code or documentation identified per MPL Section 3.3
- *
- * Date             Modified by     Description of modification
- * 04/20/2000       IBM Corp.      OS/2 VisualAge build.
- */
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /*
  * style sheet and style rule processor representing data from presentational
@@ -80,7 +72,7 @@ nsHTMLStyleSheet::HTMLColorRule::List(FILE* out, int32_t aIndent) const
 }
 #endif
 
- 
+
 NS_IMPL_ISUPPORTS(nsHTMLStyleSheet::GenericTableRule, nsIStyleRule)
 
 #ifdef DEBUG
@@ -156,7 +148,8 @@ nsHTMLStyleSheet::LangRule::MapRuleInfoInto(nsRuleData* aRuleData)
   if (aRuleData->mSIDs & NS_STYLE_INHERIT_BIT(Font)) {
     nsCSSValue* lang = aRuleData->ValueForLang();
     if (lang->GetUnit() == eCSSUnit_Null) {
-      lang->SetStringValue(mLang, eCSSUnit_Ident);
+      nsCOMPtr<nsIAtom> langAtom = mLang;
+      lang->SetAtomIdentValue(langAtom.forget());
     }
   }
 }
@@ -184,7 +177,7 @@ nsHTMLStyleSheet::LangRule::List(FILE* out, int32_t aIndent) const
     str.AppendLiteral("  ");
   }
   str.AppendLiteral("[lang rule] { language: \"");
-  AppendUTF16toUTF8(mLang, str);
+  AppendUTF16toUTF8(nsDependentAtomString(mLang), str);
   str.AppendLiteral("\" }\n");
   fprintf_stderr(out, "%s", str.get());
 }
@@ -242,8 +235,8 @@ struct LangRuleTableEntry : public PLDHashEntryHdr {
 static PLDHashNumber
 LangRuleTable_HashKey(const void *key)
 {
-  const nsString *lang = static_cast<const nsString*>(key);
-  return HashString(*lang);
+  auto* lang = static_cast<const nsIAtom*>(key);
+  return lang->hash();
 }
 
 static void
@@ -258,21 +251,21 @@ LangRuleTable_ClearEntry(PLDHashTable *table, PLDHashEntryHdr *hdr)
 static bool
 LangRuleTable_MatchEntry(const PLDHashEntryHdr *hdr, const void *key)
 {
-  const nsString *lang = static_cast<const nsString*>(key);
+  auto* lang = static_cast<const nsIAtom*>(key);
   const LangRuleTableEntry *entry = static_cast<const LangRuleTableEntry*>(hdr);
 
-  return entry->mRule->mLang == *lang;
+  return entry->mRule->mLang == lang;
 }
 
 static void
 LangRuleTable_InitEntry(PLDHashEntryHdr *hdr, const void *key)
 {
-  const nsString *lang = static_cast<const nsString*>(key);
+  auto* lang = static_cast<const nsIAtom*>(key);
 
-  LangRuleTableEntry *entry = new (KnownNotNull, hdr) LangRuleTableEntry();
+  LangRuleTableEntry* entry = new (KnownNotNull, hdr) LangRuleTableEntry();
 
   // Create the unique rule for this language
-  entry->mRule = new nsHTMLStyleSheet::LangRule(*lang);
+  entry->mRule = new nsHTMLStyleSheet::LangRule(const_cast<nsIAtom*>(lang));
 }
 
 static const PLDHashTableOps LangRuleTable_Ops = {
@@ -350,16 +343,17 @@ nsHTMLStyleSheet::RulesMatching(ElementRuleProcessorData* aData)
   // http://www.whatwg.org/specs/web-apps/current-work/multipage/elements.html#language
   // says that the xml:lang attribute overrides HTML's lang attribute,
   // so we need to do this after WalkContentStyleRules.
-  nsString lang;
-  if (aData->mElement->GetAttr(kNameSpaceID_XML, nsGkAtoms::lang, lang)) {
-    ruleWalker->Forward(LangRuleFor(lang));
+  const nsAttrValue* langAttr =
+    aData->mElement->GetParsedAttr(nsGkAtoms::lang, kNameSpaceID_XML);
+  if (langAttr) {
+    MOZ_ASSERT(langAttr->Type() == nsAttrValue::eAtom);
+    ruleWalker->Forward(LangRuleFor(langAttr->GetAtomValue()));
   }
 
   // Set the language to "x-math" on the <math> element, so that appropriate
   // font settings are used for MathML.
   if (aData->mElement->IsMathMLElement(nsGkAtoms::math)) {
-    nsGkAtoms::x_math->ToString(lang);
-    ruleWalker->Forward(LangRuleFor(lang));
+    ruleWalker->Forward(LangRuleFor(nsGkAtoms::x_math));
   }
 }
 
@@ -374,7 +368,7 @@ nsHTMLStyleSheet::HasStateDependentStyle(StateRuleProcessorData* aData)
        (mVisitedRule && aData->mStateMask.HasState(NS_EVENT_STATE_VISITED)))) {
     return eRestyle_Self;
   }
-  
+
   return nsRestyleHint(0);
 }
 
@@ -589,10 +583,10 @@ nsHTMLStyleSheet::CalculateMappedServoDeclarations(nsPresContext* aPresContext)
 }
 
 nsIStyleRule*
-nsHTMLStyleSheet::LangRuleFor(const nsString& aLanguage)
+nsHTMLStyleSheet::LangRuleFor(const nsIAtom* aLanguage)
 {
   auto entry =
-    static_cast<LangRuleTableEntry*>(mLangRuleTable.Add(&aLanguage, fallible));
+    static_cast<LangRuleTableEntry*>(mLangRuleTable.Add(aLanguage, fallible));
   if (!entry) {
     NS_ASSERTION(false, "out of memory");
     return nullptr;

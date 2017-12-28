@@ -16,7 +16,7 @@ Cu.import("resource://gre/modules/NetUtil.jsm");
 
 let {UrlClassifierTestUtils} = Cu.import("resource://testing-common/UrlClassifierTestUtils.jsm", {});
 
-const RESOURCE_PATH = "extensions/mozscreenshots/browser/chrome/mozscreenshots/lib/controlCenter";
+const RESOURCE_PATH = "browser/browser/tools/mozscreenshots/mozscreenshots/extension/mozscreenshots/browser/chrome/mozscreenshots/lib/controlCenter";
 const HTTP_PAGE = "http://example.com/";
 const HTTPS_PAGE = "https://example.com/";
 const PERMISSIONS_PAGE = "https://test1.example.com/";
@@ -50,6 +50,10 @@ this.ControlCenter = {
         await BrowserTestUtils.browserLoaded(gBrowser.selectedBrowser);
         await openIdentityPopup();
       },
+
+      async verifyConfig() {
+        return Promise.reject("Bug 1373563: intermittent controlCenter_localFile on Taskcluster");
+      },
     },
 
     http: {
@@ -82,7 +86,7 @@ this.ControlCenter = {
 
     singlePermission: {
       async applyConfig() {
-        let uri = Services.io.newURI(PERMISSIONS_PAGE)
+        let uri = Services.io.newURI(PERMISSIONS_PAGE);
         SitePermissions.set(uri, "camera", SitePermissions.ALLOW);
 
         await loadPage(PERMISSIONS_PAGE);
@@ -95,7 +99,7 @@ this.ControlCenter = {
         // TODO: (Bug 1330601) Rewrite this to consider temporary (TAB) permission states.
         // There are 2 possible non-default permission states, so we alternate between them.
         let states = [SitePermissions.ALLOW, SitePermissions.BLOCK];
-        let uri = Services.io.newURI(PERMISSIONS_PAGE)
+        let uri = Services.io.newURI(PERMISSIONS_PAGE);
         SitePermissions.listPermissions().forEach(function(permission, index) {
           SitePermissions.set(uri, permission, states[index % 2]);
         });

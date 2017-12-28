@@ -26,8 +26,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "OS", "resource://gre/modules/osfile.jsm
 function getPref(func, preference, defaultValue) {
   try {
     return Services.prefs[func](preference);
-  }
-  catch (e) {}
+  } catch (e) {}
   return defaultValue;
 }
 
@@ -45,7 +44,7 @@ function AddonUpdateService() {}
 AddonUpdateService.prototype = {
   classDescription: "Add-on auto-update management",
   classID: Components.ID("{93c8824c-9b87-45ae-bc90-5b82a1e4d877}"),
-  
+
   QueryInterface: XPCOMUtils.generateQI([Ci.nsITimerCallback]),
 
   notify: function aus_notify(aTimer) {
@@ -59,7 +58,7 @@ AddonUpdateService.prototype = {
     AddonManagerPrivate.backgroundUpdateCheck();
 
     let gmp = new GMPInstallManager();
-    gmp.simpleCheckAndInstall().then(null, () => {});
+    gmp.simpleCheckAndInstall().catch(() => {});
 
     let interval = 1000 * getPref("getIntPref", PREF_ADDON_UPDATE_INTERVAL, 86400);
     EventDispatcher.instance.sendRequest({

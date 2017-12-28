@@ -10,7 +10,7 @@
 use computed_values::display;
 use heapsize::HeapSizeOf;
 use matching::{StyleChange, StyleDifference};
-use properties::ServoComputedValues;
+use properties::ComputedValues;
 use std::fmt;
 
 bitflags! {
@@ -60,11 +60,19 @@ impl HeapSizeOf for ServoRestyleDamage {
 impl ServoRestyleDamage {
     /// Compute the `StyleDifference` (including the appropriate restyle damage)
     /// for a given style change between `old` and `new`.
-    pub fn compute_style_difference(old: &ServoComputedValues,
-                                    new: &ServoComputedValues)
-                                    -> StyleDifference {
+    pub fn compute_style_difference(
+        old: &ComputedValues,
+        new: &ComputedValues,
+    ) -> StyleDifference {
         let damage = compute_damage(old, new);
-        let change = if damage.is_empty() { StyleChange::Unchanged } else { StyleChange::Changed };
+        let change = if damage.is_empty() {
+            StyleChange::Unchanged
+        } else {
+            // FIXME(emilio): Differentiate between reset and inherited
+            // properties here, and set `reset_only` appropriately so the
+            // optimization to skip the cascade in those cases applies.
+            StyleChange::Changed { reset_only: false }
+        };
         StyleDifference::new(damage, change)
     }
 
@@ -123,11 +131,6 @@ impl ServoRestyleDamage {
             }
         }
     }
-
-    /// Servo doesn't implement this optimization.
-    pub fn handled_for_descendants(self) -> Self {
-        Self::empty()
-    }
 }
 
 impl Default for ServoRestyleDamage {
@@ -153,14 +156,14 @@ impl fmt::Display for ServoRestyleDamage {
 
         for &(damage, damage_str) in &to_iter {
             if self.contains(damage) {
-                if !first_elem { try!(write!(f, " | ")); }
-                try!(write!(f, "{}", damage_str));
+                if !first_elem { write!(f, " | ")?; }
+                write!(f, "{}", damage_str)?;
                 first_elem = false;
             }
         }
 
         if first_elem {
-            try!(write!(f, "NoDamage"));
+            write!(f, "NoDamage")?;
         }
 
         Ok(())
@@ -182,20 +185,19 @@ macro_rules! add_if_not_equal(
     })
 );
 
-fn compute_damage(old: &ServoComputedValues, new: &ServoComputedValues) -> ServoRestyleDamage {
+fn compute_damage(old: &ComputedValues, new: &ComputedValues) -> ServoRestyleDamage {
     let mut damage = ServoRestyleDamage::empty();
 
     // This should check every CSS property, as enumerated in the fields of
-    // http://doc.servo.org/style/properties/struct.ServoComputedValues.html
+    // http://doc.servo.org/style/properties/struct.ComputedValues.html
 
     // FIXME: Test somehow that every property is included.
 
     add_if_not_equal!(old, new, damage,
                       [REPAINT, REPOSITION, STORE_OVERFLOW, BUBBLE_ISIZES, REFLOW_OUT_OF_FLOW,
                        REFLOW, RECONSTRUCT_FLOW], [
-        get_box.float, get_box.display, get_box.position, get_counters.content,
+        get_box.clear, get_box.float, get_box.display, get_box.position, get_counters.content,
         get_counters.counter_reset, get_counters.counter_increment,
-        get_inheritedbox._servo_under_display_none,
         get_list.quotes, get_list.list_style_type,
 
         // If these text or font properties change, we need to reconstruct the flow so that
@@ -275,6 +277,13 @@ fn compute_damage(old: &ServoComputedValues, new: &ServoComputedValues) -> Servo
         // Note: May require REFLOW et al. if `visibility: collapse` is implemented.
         get_inheritedbox.visibility
     ]);
+
+
+    // Paint worklets may depend on custom properties,
+    // so if they have changed we should repaint.
+    if old.get_custom_properties() != new.get_custom_properties() {
+        damage.insert(REPAINT);
+    }
 
     // If the layer requirements of this flow have changed due to the value
     // of the transform, then reflow is required to rebuild the layers.

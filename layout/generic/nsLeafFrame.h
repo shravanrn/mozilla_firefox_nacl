@@ -24,7 +24,6 @@ public:
 
   // nsIFrame replacements
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override {
     DO_GLOBAL_REFLOW_COUNT_DSP("nsLeafFrame");
     DisplayBorderBackgroundOutline(aBuilder, aLists);
@@ -34,14 +33,14 @@ public:
    * Both GetMinISize and GetPrefISize will return whatever GetIntrinsicISize
    * returns.
    */
-  virtual nscoord GetMinISize(nsRenderingContext *aRenderingContext) override;
-  virtual nscoord GetPrefISize(nsRenderingContext *aRenderingContext) override;
+  virtual nscoord GetMinISize(gfxContext *aRenderingContext) override;
+  virtual nscoord GetPrefISize(gfxContext *aRenderingContext) override;
 
   /**
    * Our auto size is just intrinsic width and intrinsic height.
    */
   virtual mozilla::LogicalSize
-  ComputeAutoSize(nsRenderingContext*         aRenderingContext,
+  ComputeAutoSize(gfxContext*                 aRenderingContext,
                   mozilla::WritingMode        aWM,
                   const mozilla::LogicalSize& aCBSize,
                   nscoord                     aAvailableISize,
@@ -51,23 +50,12 @@ public:
                   ComputeSizeFlags            aFlags) override;
 
   /**
-   * Reflow our frame.  This will use the computed width plus borderpadding for
-   * the desired width, and use the return value of GetIntrinsicBSize plus
-   * borderpadding for the desired height.  Ascent will be set to the height,
-   * and descent will be set to 0.
+   * Each of our subclasses should provide its own Reflow impl:
    */
   virtual void Reflow(nsPresContext*      aPresContext,
-                      ReflowOutput& aDesiredSize,
-                      const ReflowInput& aReflowInput,
-                      nsReflowStatus&      aStatus) override;
-  
-  /**
-   * This method does most of the work that Reflow() above need done.
-   */
-  virtual void DoReflow(nsPresContext*      aPresContext,
-                        ReflowOutput& aDesiredSize,
-                        const ReflowInput& aReflowInput,
-                        nsReflowStatus&      aStatus);
+                      ReflowOutput&       aDesiredSize,
+                      const ReflowInput&  aReflowInput,
+                      nsReflowStatus&     aStatus) override = 0;
 
   virtual bool IsFrameOfType(uint32_t aFlags) const override
   {

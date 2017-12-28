@@ -130,7 +130,11 @@ private:
 class GlyphMetricsUpdater : public Runnable {
 public:
   NS_DECL_NSIRUNNABLE
-  explicit GlyphMetricsUpdater(SVGTextFrame* aFrame) : mFrame(aFrame) { }
+  explicit GlyphMetricsUpdater(SVGTextFrame* aFrame)
+    : Runnable("GlyphMetricsUpdater")
+    , mFrame(aFrame)
+  {
+  }
   static void Run(SVGTextFrame* aFrame);
   void Revoke() { mFrame = nullptr; }
 private:
@@ -223,7 +227,6 @@ public:
   }
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 
 #ifdef DEBUG_FRAME_DUMP
@@ -254,9 +257,6 @@ public:
   virtual SVGBBox GetBBoxContribution(const Matrix& aToBBoxUserspace,
                                       uint32_t aFlags) override;
 
-  // nsSVGContainerFrame methods:
-  virtual gfxMatrix GetCanvasTM() override;
-  
   // SVG DOM text methods:
   uint32_t GetNumberOfChars(nsIContent* aContent);
   float GetComputedTextLength(nsIContent* aContent);
@@ -353,12 +353,8 @@ public:
   gfxRect TransformFrameRectFromTextChild(const nsRect& aRect,
                                           nsIFrame* aChildFrame);
 
-  /**
-   * Update the style of our ::-moz-svg-text anonymous box.
-   */
-  void DoUpdateStyleOfOwnedAnonBoxes(mozilla::ServoStyleSet& aStyleSet,
-                                     nsStyleChangeList& aChangeList,
-                                     nsChangeHint aHintForThisFrame) override;
+  // Return our ::-moz-svg-text anonymous box.
+  void AppendDirectlyOwnedAnonBoxes(nsTArray<OwnedAnonBox>& aResult) override;
 
 private:
   /**
@@ -392,6 +388,11 @@ private:
 
     SVGTextFrame* const mFrame;
   };
+
+  /**
+   * Resolves Bidi for the anonymous block child if it needs it.
+   */
+  void MaybeResolveBidiForAnonymousBlockChild();
 
   /**
    * Reflows the anonymous block child if it is dirty or has dirty
@@ -533,11 +534,6 @@ private:
    * The MutationObserver we have registered for the <text> element subtree.
    */
   RefPtr<MutationObserver> mMutationObserver;
-
-  /**
-   * Cached canvasTM value.
-   */
-  nsAutoPtr<gfxMatrix> mCanvasTM;
 
   /**
    * The number of characters in the DOM after the final nsTextFrame.  For

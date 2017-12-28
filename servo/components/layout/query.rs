@@ -7,9 +7,7 @@
 use app_units::Au;
 use construct::ConstructionResult;
 use context::LayoutContext;
-use euclid::point::Point2D;
-use euclid::rect::Rect;
-use euclid::size::Size2D;
+use euclid::{Point2D, Vector2D, Rect, Size2D};
 use flow::{self, Flow};
 use fragment::{Fragment, FragmentBorderBoxIterator, SpecificFragmentInfo};
 use gfx::display_list::{DisplayItemMetadata, DisplayList, OpaqueNode, ScrollOffsetMap};
@@ -38,8 +36,8 @@ use style::properties::longhands::{display, position};
 use style::selector_parser::PseudoElement;
 use style_traits::ToCss;
 use style_traits::cursor::Cursor;
-use webrender_traits::ClipId;
-use wrapper::{LayoutNodeHelpers, LayoutNodeLayoutData};
+use webrender_api::ClipId;
+use wrapper::LayoutNodeLayoutData;
 
 /// Mutable data belonging to the LayoutThread.
 ///
@@ -452,10 +450,14 @@ impl FragmentBorderBoxIterator for FragmentLocatingFragmentIterator {
             border_left_width: left_width,
             ..
         } = *fragment.style.get_border();
-        self.client_rect.origin.y = top_width.to_px();
-        self.client_rect.origin.x = left_width.to_px();
-        self.client_rect.size.width = (border_box.size.width - left_width - right_width).to_px();
-        self.client_rect.size.height = (border_box.size.height - top_width - bottom_width).to_px();
+        let (left_width, right_width) = (left_width.px(), right_width.px());
+        let (top_width, bottom_width) = (top_width.px(), bottom_width.px());
+        self.client_rect.origin.y = top_width as i32;
+        self.client_rect.origin.x = left_width as i32;
+        self.client_rect.size.width =
+            (border_box.size.width.to_f32_px() - left_width - right_width) as i32;
+        self.client_rect.size.height =
+            (border_box.size.height.to_f32_px() - top_width - bottom_width) as i32;
     }
 
     fn should_process(&mut self, fragment: &Fragment) -> bool {
@@ -478,10 +480,12 @@ impl FragmentBorderBoxIterator for UnioningFragmentScrollAreaIterator {
             border_left_width: left_border,
             ..
         } = *fragment.style.get_border();
-        let right_padding = (border_box.size.width - right_border - left_border).to_px();
-        let bottom_padding = (border_box.size.height - bottom_border - top_border).to_px();
-        let top_padding = top_border.to_px();
-        let left_padding = left_border.to_px();
+        let (left_border, right_border) = (left_border.px(), right_border.px());
+        let (top_border, bottom_border) = (top_border.px(), bottom_border.px());
+        let right_padding = (border_box.size.width.to_f32_px() - right_border - left_border) as i32;
+        let bottom_padding = (border_box.size.height.to_f32_px() - bottom_border - top_border) as i32;
+        let top_padding = top_border as i32;
+        let left_padding = left_border as i32;
 
         match self.level {
             Some(start_level) if level <= start_level => { self.is_child = false; }
@@ -600,6 +604,7 @@ impl FragmentBorderBoxIterator for ParentOffsetBorderBoxIterator {
                 (true, _, _) |
                 (false, computed_values::position::T::static_, &SpecificFragmentInfo::Table) |
                 (false, computed_values::position::T::static_, &SpecificFragmentInfo::TableCell) |
+                (false, computed_values::position::T::sticky, _) |
                 (false, computed_values::position::T::absolute, _) |
                 (false, computed_values::position::T::relative, _) |
                 (false, computed_values::position::T::fixed, _) => true,
@@ -613,7 +618,7 @@ impl FragmentBorderBoxIterator for ParentOffsetBorderBoxIterator {
 
                 Some(ParentBorderBoxInfo {
                     node_address: fragment.node,
-                    origin: border_box.origin + Point2D::new(border_width.left, border_width.top),
+                    origin: border_box.origin + Vector2D::new(border_width.left, border_width.top),
                 })
             } else {
                 None
@@ -682,7 +687,9 @@ pub fn process_resolved_style_request<'a, N>(context: &LayoutContext,
                                              layout_root: &mut Flow) -> String
     where N: LayoutNode,
 {
+    use style::stylist::RuleInclusion;
     use style::traversal::resolve_style;
+
     let element = node.as_element().unwrap();
 
     // We call process_resolved_style_request after performing a whole-document
@@ -691,30 +698,43 @@ pub fn process_resolved_style_request<'a, N>(context: &LayoutContext,
         return process_resolved_style_request_internal(node, pseudo, property, layout_root);
     }
 
-    // However, the element may be in a display:none subtree. The style system
-    // has a mechanism to give us that within a defined scope (after which point
-    // it's cleared to maintained style system invariants).
+    // In a display: none subtree. No pseudo-element exists.
+    if pseudo.is_some() {
+        return String::new();
+    }
+
     let mut tlc = ThreadLocalStyleContext::new(&context.style_context);
     let mut context = StyleContext {
         shared: &context.style_context,
         thread_local: &mut tlc,
     };
-    let mut result = None;
-    let ensure = |el: N::ConcreteElement| el.as_node().initialize_data();
-    let clear = |el: N::ConcreteElement| el.as_node().clear_data();
-    resolve_style(&mut context, element, &ensure, &clear, |_: &_| {
-        let s = process_resolved_style_request_internal(node, pseudo, property, layout_root);
-        result = Some(s);
-    });
-    result.unwrap()
+
+    let styles = resolve_style(&mut context, element, RuleInclusion::All, false, pseudo.as_ref());
+    let style = styles.primary();
+    let longhand_id = match *property {
+        PropertyId::Longhand(id) => id,
+        // Firefox returns blank strings for the computed value of shorthands,
+        // so this should be web-compatible.
+        PropertyId::Shorthand(_) => return String::new(),
+        PropertyId::Custom(ref name) => {
+            return style.computed_value_to_string(PropertyDeclarationId::Custom(name))
+        }
+    };
+
+    // No need to care about used values here, since we're on a display: none
+    // subtree, use the resolved value.
+    style.computed_value_to_string(PropertyDeclarationId::Longhand(longhand_id))
 }
 
 /// The primary resolution logic, which assumes that the element is styled.
-fn process_resolved_style_request_internal<'a, N>(requested_node: N,
-                                                  pseudo: &Option<PseudoElement>,
-                                                  property: &PropertyId,
-                                                  layout_root: &mut Flow) -> String
-    where N: LayoutNode,
+fn process_resolved_style_request_internal<'a, N>(
+    requested_node: N,
+    pseudo: &Option<PseudoElement>,
+    property: &PropertyId,
+    layout_root: &mut Flow,
+) -> String
+where
+    N: LayoutNode,
 {
     let layout_el = requested_node.to_threadsafe().as_element().unwrap();
     let layout_el = match *pseudo {
@@ -723,6 +743,8 @@ fn process_resolved_style_request_internal<'a, N>(requested_node: N,
         Some(PseudoElement::DetailsSummary) |
         Some(PseudoElement::DetailsContent) |
         Some(PseudoElement::Selection) => None,
+        // FIXME(emilio): What about the other pseudos? Probably they shouldn't
+        // just return the element's style!
         _ => Some(layout_el)
     };
 
@@ -737,7 +759,6 @@ fn process_resolved_style_request_internal<'a, N>(requested_node: N,
     };
 
     let style = &*layout_el.resolved_style();
-
     let longhand_id = match *property {
         PropertyId::Longhand(id) => id,
 
@@ -752,7 +773,7 @@ fn process_resolved_style_request_internal<'a, N>(requested_node: N,
 
     let positioned = match style.get_box().position {
         position::computed_value::T::relative |
-        /*position::computed_value::T::sticky |*/
+        position::computed_value::T::sticky |
         position::computed_value::T::fixed |
         position::computed_value::T::absolute => true,
         _ => false
@@ -774,7 +795,7 @@ fn process_resolved_style_request_internal<'a, N>(requested_node: N,
         let position = maybe_data.map_or(Point2D::zero(), |data| {
             match (*data).flow_construction_result {
                 ConstructionResult::Flow(ref flow_ref, _) =>
-                    flow::base(flow_ref.deref()).stacking_relative_position,
+                    flow::base(flow_ref.deref()).stacking_relative_position.to_point(),
                 // TODO(dzbarsky) search parents until we find node with a flow ref.
                 // https://github.com/servo/servo/issues/8307
                 _ => Point2D::zero()
@@ -852,7 +873,7 @@ pub fn process_offset_parent_query<N: LayoutNode>(requested_node: N, layout_root
     let parent_info = iterator.parent_nodes.into_iter().rev().filter_map(|info| info).next();
     match (node_offset_box, parent_info) {
         (Some(node_offset_box), Some(parent_info)) => {
-            let origin = node_offset_box.offset - parent_info.origin;
+            let origin = node_offset_box.offset - parent_info.origin.to_vector();
             let size = node_offset_box.rectangle.size;
             OffsetParentResponse {
                 node_address: Some(parent_info.node_address.to_untrusted_node_address()),

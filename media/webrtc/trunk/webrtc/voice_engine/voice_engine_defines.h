@@ -17,8 +17,8 @@
 #define WEBRTC_VOICE_ENGINE_VOICE_ENGINE_DEFINES_H
 
 #include "webrtc/common_types.h"
-#include "webrtc/engine_configurations.h"
 #include "webrtc/modules/audio_processing/include/audio_processing.h"
+#include "webrtc/typedefs.h"
 
 // ----------------------------------------------------------------------------
 //  Enumerators
@@ -60,13 +60,13 @@ enum { kVoiceEngineMaxModuleVersionSize = 960 };
 // Audio processing
 const NoiseSuppression::Level kDefaultNsMode = NoiseSuppression::kModerate;
 const GainControl::Mode kDefaultAgcMode =
-#if defined(WEBRTC_ANDROID) || defined(WEBRTC_IOS) || defined(WEBRTC_GONK)
+#if defined(WEBRTC_ANDROID) || defined(WEBRTC_IOS)
     GainControl::kAdaptiveDigital;
 #else
     GainControl::kAdaptiveAnalog;
 #endif
 const bool kDefaultAgcState =
-#if defined(WEBRTC_ANDROID) || defined(WEBRTC_IOS) || defined(WEBRTC_GONK)
+#if defined(WEBRTC_ANDROID) || defined(WEBRTC_IOS)
     false;
 #else
     true;

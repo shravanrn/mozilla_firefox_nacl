@@ -21,13 +21,21 @@ PARAMETER_NAMES = set([
     'include_nightly',
     'level',
     'message',
+    'morph_templates',
     'moz_build_date',
     'optimize_target_tasks',
     'owner',
     'project',
     'pushdate',
     'pushlog_id',
+    'release_history',
+    'target_task_labels',
     'target_tasks_method',
+])
+
+TRY_ONLY_PARAMETERS = set([
+    'morph_templates',
+    'target_task_labels',
 ])
 
 
@@ -37,7 +45,7 @@ class Parameters(ReadOnlyDict):
         names = set(self)
         msg = []
 
-        missing = PARAMETER_NAMES - names
+        missing = PARAMETER_NAMES - TRY_ONLY_PARAMETERS - names
         if missing:
             msg.append("missing parameters: " + ", ".join(missing))
 
@@ -57,14 +65,16 @@ class Parameters(ReadOnlyDict):
             raise KeyError("taskgraph parameter {!r} not found".format(k))
 
 
-def load_parameters_file(options):
+def load_parameters_file(filename):
     """
-    Load parameters from the --parameters option
+    Load parameters from a path, url, decision task-id or project.
+
+    Examples:
+        task-id=fdtgsD5DQUmAQZEaGMvQ4Q
+        project=mozilla-central
     """
     import urllib
-    from taskgraph.util.taskcluster import get_artifact_url
-
-    filename = options['parameters']
+    from taskgraph.util.taskcluster import get_artifact_url, find_task_id
 
     if not filename:
         return Parameters()
@@ -73,9 +83,15 @@ def load_parameters_file(options):
         # reading parameters from a local parameters.yml file
         f = open(filename)
     except IOError:
-        # fetching parameters.yml using task task-id or supplied url
+        # fetching parameters.yml using task task-id, project or supplied url
+        task_id = None
         if filename.startswith("task-id="):
             task_id = filename.split("=")[1]
+        elif filename.startswith("project="):
+            index = "gecko.v2.{}.latest.firefox.decision".format(filename.split("=")[1])
+            task_id = find_task_id(index)
+
+        if task_id:
             filename = get_artifact_url(task_id, 'public/parameters.yml')
         f = urllib.urlopen(filename)
 

@@ -104,7 +104,7 @@ pub fn parse_border<'i, 't>(context: &ParserContext, input: &mut Parser<'i, 't>)
 
     pub fn parse_value<'i, 't>(context: &ParserContext, input: &mut Parser<'i, 't>)
                                -> Result<Longhands, ParseError<'i>> {
-        let (color, style, width) = try!(super::parse_border(context, input));
+        let (color, style, width) = super::parse_border(context, input)?;
         Ok(expanded! {
             border_${to_rust_ident(side)}_color: color,
             border_${to_rust_ident(side)}_style: style,
@@ -146,7 +146,7 @@ pub fn parse_border<'i, 't>(context: &ParserContext, input: &mut Parser<'i, 't>)
         use properties::longhands::{border_image_outset, border_image_repeat, border_image_slice};
         use properties::longhands::{border_image_source, border_image_width};
 
-        let (color, style, width) = try!(super::parse_border(context, input));
+        let (color, style, width) = super::parse_border(context, input)?;
         Ok(expanded! {
             % for side in PHYSICAL_SIDES:
                 border_${side}_color: color.clone(),
@@ -209,12 +209,13 @@ pub fn parse_border<'i, 't>(context: &ParserContext, input: &mut Parser<'i, 't>)
      for corner in ['top-left', 'top-right', 'bottom-right', 'bottom-left']
 )}" extra_prefixes="webkit" spec="https://drafts.csswg.org/css-backgrounds/#border-radius">
     use values::generics::rect::Rect;
+    use values::generics::border::BorderCornerRadius;
     use values::specified::border::BorderRadius;
     use parser::Parse;
 
     pub fn parse_value<'i, 't>(context: &ParserContext, input: &mut Parser<'i, 't>)
                                -> Result<Longhands, ParseError<'i>> {
-        let radii = try!(BorderRadius::parse(context, input));
+        let radii = BorderRadius::parse(context, input)?;
         Ok(expanded! {
             border_top_left_radius: radii.top_left,
             border_top_right_radius: radii.top_right,
@@ -226,14 +227,15 @@ pub fn parse_border<'i, 't>(context: &ParserContext, input: &mut Parser<'i, 't>)
     impl<'a> ToCss for LonghandsToSerialize<'a>  {
         fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
             let LonghandsToSerialize {
-                border_top_left_radius: ref tl,
-                border_top_right_radius: ref tr,
-                border_bottom_right_radius: ref br,
-                border_bottom_left_radius: ref bl,
+                border_top_left_radius: &BorderCornerRadius(ref tl),
+                border_top_right_radius: &BorderCornerRadius(ref tr),
+                border_bottom_right_radius: &BorderCornerRadius(ref br),
+                border_bottom_left_radius: &BorderCornerRadius(ref bl),
             } = *self;
 
-            let widths = Rect::new(&tl.0.width, &tr.0.width, &br.0.width, &bl.0.width);
-            let heights = Rect::new(&tl.0.height, &tr.0.height, &br.0.height, &bl.0.height);
+
+            let widths = Rect::new(tl.width(), tr.width(), br.width(), bl.width());
+            let heights = Rect::new(tl.height(), tr.height(), br.height(), bl.height());
 
             BorderRadius::serialize_rects(widths, heights, dest)
         }
@@ -262,7 +264,7 @@ pub fn parse_border<'i, 't>(context: &ParserContext, input: &mut Parser<'i, 't>)
                         slice = Some(value);
                         // Parse border image width and outset, if applicable.
                         let maybe_width_outset: Result<_, ParseError> = input.try(|input| {
-                            try!(input.expect_delim('/'));
+                            input.expect_delim('/')?;
 
                             // Parse border image width, if applicable.
                             let w = input.try(|input|
@@ -270,7 +272,7 @@ pub fn parse_border<'i, 't>(context: &ParserContext, input: &mut Parser<'i, 't>)
 
                             // Parse border image outset if applicable.
                             let o = input.try(|input| {
-                                try!(input.expect_delim('/'));
+                                input.expect_delim('/')?;
                                 border_image_outset::parse(context, input)
                             }).ok();
                             if w.is_none() && o.is_none() {
@@ -313,7 +315,7 @@ pub fn parse_border<'i, 't>(context: &ParserContext, input: &mut Parser<'i, 't>)
                 Err(StyleParseError::UnspecifiedError.into())
             }
         });
-        try!(result);
+        result?;
 
         Ok(expanded! {
             % for name in "outset repeat slice source width".split():

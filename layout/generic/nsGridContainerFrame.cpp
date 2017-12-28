@@ -11,6 +11,7 @@
 #include <algorithm> // for std::stable_sort
 #include <functional>
 #include <limits>
+#include "gfxContext.h"
 #include "mozilla/CSSAlignUtils.h"
 #include "mozilla/CSSOrderAwareFrameIterator.h"
 #include "mozilla/dom/GridBinding.h"
@@ -27,7 +28,6 @@
 #include "nsIFrameInlines.h"
 #include "nsPresContext.h"
 #include "nsReadableUtils.h"
-#include "nsRenderingContext.h"
 #include "nsRuleNode.h"
 #include "nsStyleContext.h"
 #include "nsTableWrapperFrame.h"
@@ -1729,7 +1729,7 @@ struct MOZ_STACK_CLASS nsGridContainerFrame::GridReflowInput
                       aRI.GetWritingMode())
   {}
   GridReflowInput(nsGridContainerFrame* aFrame,
-                  nsRenderingContext&   aRC)
+                  gfxContext&           aRC)
     : GridReflowInput(aFrame, aRC, nullptr, aFrame->StylePosition(),
                       aFrame->GetWritingMode())
   {}
@@ -1896,7 +1896,7 @@ struct MOZ_STACK_CLASS nsGridContainerFrame::GridReflowInput
    * min/max-content contributions when sizing tracks.
    */
   const ReflowInput* const mReflowInput;
-  nsRenderingContext& mRenderingContext;
+  gfxContext& mRenderingContext;
   nsGridContainerFrame* const mFrame;
   SharedGridData* mSharedGridData; // [weak] owned by mFrame's first-in-flow.
   /** Computed border+padding with mSkipSides applied. */
@@ -1922,7 +1922,7 @@ struct MOZ_STACK_CLASS nsGridContainerFrame::GridReflowInput
 
 private:
   GridReflowInput(nsGridContainerFrame*    aFrame,
-                  nsRenderingContext&      aRenderingContext,
+                  gfxContext&              aRenderingContext,
                   const ReflowInput* aReflowInput,
                   const nsStylePosition*   aGridStyle,
                   const WritingMode&       aWM)
@@ -1930,10 +1930,10 @@ private:
     , mGridStyle(aGridStyle)
     , mCols(eLogicalAxisInline)
     , mRows(eLogicalAxisBlock)
-    , mColFunctions(mGridStyle->mGridTemplateColumns,
+    , mColFunctions(mGridStyle->GridTemplateColumns(),
                     mGridStyle->mGridAutoColumnsMin,
                     mGridStyle->mGridAutoColumnsMax)
-    , mRowFunctions(mGridStyle->mGridTemplateRows,
+    , mRowFunctions(mGridStyle->GridTemplateRows(),
                     mGridStyle->mGridAutoRowsMin,
                     mGridStyle->mGridAutoRowsMax)
     , mReflowInput(aReflowInput)
@@ -2180,7 +2180,7 @@ struct MOZ_STACK_CLASS nsGridContainerFrame::Grid
    * @return null if not found
    */
   static const css::GridNamedArea*
-  FindNamedArea(const nsSubstring& aName, const nsStylePosition* aStyle)
+  FindNamedArea(const nsAString& aName, const nsStylePosition* aStyle)
   {
     if (!aStyle->mGridTemplateAreas) {
       return nullptr;
@@ -2620,8 +2620,8 @@ nsGridContainerFrame::InitImplicitNamedAreas(const nsStylePosition* aStyle)
     // below if it isn't needed anymore.
     areas->Clear();
   }
-  AddImplicitNamedAreas(aStyle->mGridTemplateColumns.mLineNameLists);
-  AddImplicitNamedAreas(aStyle->mGridTemplateRows.mLineNameLists);
+  AddImplicitNamedAreas(aStyle->GridTemplateColumns().mLineNameLists);
+  AddImplicitNamedAreas(aStyle->GridTemplateRows().mLineNameLists);
   if (areas && areas->Count() == 0) {
     DeleteProperty(ImplicitNamedAreasProperty());
   }
@@ -3101,7 +3101,7 @@ nsGridContainerFrame::Grid::PlaceGridItems(GridReflowInput& aState,
                              aComputedMaxSize.ISize(aState.mWM));
   mGridColEnd = mExplicitGridColEnd =
     aState.mColFunctions.ComputeExplicitGridEnd(areas ? areas->mNColumns + 1 : 1);
-  LineNameMap colLineNameMap(gridStyle->mGridTemplateColumns, numRepeatCols);
+  LineNameMap colLineNameMap(gridStyle->GridTemplateColumns(), numRepeatCols);
 
   uint32_t numRepeatRows = aState.mRowFunctions.InitRepeatTracks(
                              gridStyle->mGridRowGap,
@@ -3110,7 +3110,7 @@ nsGridContainerFrame::Grid::PlaceGridItems(GridReflowInput& aState,
                              aComputedMaxSize.BSize(aState.mWM));
   mGridRowEnd = mExplicitGridRowEnd =
     aState.mRowFunctions.ComputeExplicitGridEnd(areas ? areas->NRows() + 1 : 1);
-  LineNameMap rowLineNameMap(gridStyle->mGridTemplateRows, numRepeatRows);
+  LineNameMap rowLineNameMap(gridStyle->GridTemplateRows(), numRepeatRows);
 
   // http://dev.w3.org/csswg/css-grid/#line-placement
   // Resolve definite positions per spec chap 9.2.
@@ -3303,7 +3303,7 @@ nsGridContainerFrame::Grid::PlaceGridItems(GridReflowInput& aState,
   Maybe<nsTArray<uint32_t>> colAdjust;
   uint32_t numEmptyCols = 0;
   if (aState.mColFunctions.mHasRepeatAuto &&
-      !gridStyle->mGridTemplateColumns.mIsAutoFill &&
+      !gridStyle->GridTemplateColumns().mIsAutoFill &&
       aState.mColFunctions.NumRepeatTracks() > 0) {
     for (uint32_t col = aState.mColFunctions.mRepeatAutoStart,
            endRepeat = aState.mColFunctions.mRepeatAutoEnd,
@@ -3330,7 +3330,7 @@ nsGridContainerFrame::Grid::PlaceGridItems(GridReflowInput& aState,
   Maybe<nsTArray<uint32_t>> rowAdjust;
   uint32_t numEmptyRows = 0;
   if (aState.mRowFunctions.mHasRepeatAuto &&
-      !gridStyle->mGridTemplateRows.mIsAutoFill &&
+      !gridStyle->GridTemplateRows().mIsAutoFill &&
       aState.mRowFunctions.NumRepeatTracks() > 0) {
     for (uint32_t row = aState.mRowFunctions.mRepeatAutoStart,
            endRepeat = aState.mRowFunctions.mRepeatAutoEnd,
@@ -3446,7 +3446,7 @@ nsGridContainerFrame::Tracks::Initialize(
 static nscoord
 MeasuringReflow(nsIFrame*           aChild,
                 const ReflowInput*  aReflowInput,
-                nsRenderingContext* aRC,
+                gfxContext*         aRC,
                 const LogicalSize&  aAvailableSize,
                 const LogicalSize&  aCBSize,
                 nscoord             aIMinSizeClamp = NS_MAXSIZE,
@@ -3515,7 +3515,7 @@ MeasuringReflow(nsIFrame*           aChild,
 static nscoord
 ContentContribution(const GridItemInfo&       aGridItem,
                     const GridReflowInput&    aState,
-                    nsRenderingContext*       aRC,
+                    gfxContext*               aRC,
                     WritingMode               aCBWM,
                     LogicalAxis               aAxis,
                     const Maybe<LogicalSize>& aPercentageBasis,
@@ -3612,7 +3612,7 @@ struct CachedIntrinsicSizes
 static nscoord
 MinContentContribution(const GridItemInfo&    aGridItem,
                        const GridReflowInput& aState,
-                       nsRenderingContext*    aRC,
+                       gfxContext*            aRC,
                        WritingMode            aCBWM,
                        LogicalAxis            aAxis,
                        CachedIntrinsicSizes*  aCache)
@@ -3634,7 +3634,7 @@ MinContentContribution(const GridItemInfo&    aGridItem,
 static nscoord
 MaxContentContribution(const GridItemInfo&    aGridItem,
                        const GridReflowInput& aState,
-                       nsRenderingContext*    aRC,
+                       gfxContext*            aRC,
                        WritingMode            aCBWM,
                        LogicalAxis            aAxis,
                        CachedIntrinsicSizes*  aCache)
@@ -3658,7 +3658,7 @@ MaxContentContribution(const GridItemInfo&    aGridItem,
 static nscoord
 MinSize(const GridItemInfo&    aGridItem,
         const GridReflowInput& aState,
-        nsRenderingContext*    aRC,
+        gfxContext*            aRC,
         WritingMode            aCBWM,
         LogicalAxis            aAxis,
         CachedIntrinsicSizes*  aCache)
@@ -3788,7 +3788,7 @@ nsGridContainerFrame::Tracks::ResolveIntrinsicSizeStep1(
     aGridItem.mState[mAxis] |= ItemState::eClampMarginBoxMinSize;
   }
   // min sizing
-  nsRenderingContext* rc = &aState.mRenderingContext;
+  gfxContext* rc = &aState.mRenderingContext;
   if (sz.mState & TrackSize::eAutoMinSizing) {
     nscoord s;
     if (aConstraint == SizingConstraint::eMinContent) {
@@ -4167,7 +4167,7 @@ nsGridContainerFrame::Tracks::ResolveIntrinsicSize(
   AutoTArray<TrackSize::StateBits, 16> stateBitsPerSpan;
   nsTArray<Step2ItemData> step2Items;
   CSSOrderAwareFrameIterator& iter = aState.mIter;
-  nsRenderingContext* rc = &aState.mRenderingContext;
+  gfxContext* rc = &aState.mRenderingContext;
   WritingMode wm = aState.mWM;
   uint32_t maxSpan = 0; // max span of the step2Items items
   // Setup track selector for step 2.2:
@@ -4509,7 +4509,7 @@ nsGridContainerFrame::Tracks::FindUsedFlexFraction(
     fr = std::max(fr, possiblyDividedBaseSize);
   }
   WritingMode wm = aState.mWM;
-  nsRenderingContext* rc = &aState.mRenderingContext;
+  gfxContext* rc = &aState.mRenderingContext;
   CSSOrderAwareFrameIterator& iter = aState.mIter;
   iter.Reset();
   // ... the result of 'finding the size of an fr' for each item that spans
@@ -4749,6 +4749,7 @@ nsGridContainerFrame::Tracks::AlignJustifyContent(
     default:
       MOZ_ASSERT_UNREACHABLE("unknown align-/justify-content value");
       between = 0; // just to avoid a compiler warning
+      roundingError = 0; // just to avoid a compiler warning
   }
   between += mGridGap;
   for (TrackSize& sz : mSizes) {
@@ -5665,8 +5666,8 @@ nsGridContainerFrame::ReflowChildren(GridReflowInput&     aState,
                                      nsReflowStatus&      aStatus)
 {
   MOZ_ASSERT(aState.mReflowInput);
+  MOZ_ASSERT(aStatus.IsEmpty(), "Caller should pass a fresh reflow status!");
 
-  aStatus.Reset();
   nsOverflowAreas ocBounds;
   nsReflowStatus ocStatus;
   if (GetPrevInFlow()) {
@@ -5757,6 +5758,7 @@ nsGridContainerFrame::Reflow(nsPresContext*           aPresContext,
   MarkInReflow();
   DO_GLOBAL_REFLOW_COUNT("nsGridContainerFrame");
   DISPLAY_REFLOW(aPresContext, this, aReflowInput, aDesiredSize, aStatus);
+  MOZ_ASSERT(aStatus.IsEmpty(), "Caller should pass a fresh reflow status!");
 
   if (IsFrameTreeTooDeep(aReflowInput, aDesiredSize, aStatus)) {
     return;
@@ -6205,7 +6207,7 @@ nsGridContainerFrame::Reflow(nsPresContext*           aPresContext,
     // Generate column lines first.
     uint32_t capacity = gridReflowInput.mCols.mSizes.Length();
     const nsStyleGridTemplate& gridColTemplate =
-      gridReflowInput.mGridStyle->mGridTemplateColumns;
+      gridReflowInput.mGridStyle->GridTemplateColumns();
     nsTArray<nsTArray<nsString>> columnLineNames(capacity);
     for (col = 0; col <= gridReflowInput.mCols.mSizes.Length(); col++) {
       // Offset col by the explicit grid offset, to get the original names.
@@ -6226,7 +6228,7 @@ nsGridContainerFrame::Reflow(nsPresContext*           aPresContext,
     // Generate row lines next.
     capacity = gridReflowInput.mRows.mSizes.Length();
     const nsStyleGridTemplate& gridRowTemplate =
-      gridReflowInput.mGridStyle->mGridTemplateRows;
+      gridReflowInput.mGridStyle->GridTemplateRows();
     nsTArray<nsTArray<nsString>> rowLineNames(capacity);
     for (row = 0; row <= gridReflowInput.mRows.mSizes.Length(); row++) {
       // Offset row by the explicit grid offset, to get the original names.
@@ -6304,7 +6306,7 @@ nsGridContainerFrame::Reflow(nsPresContext*           aPresContext,
 }
 
 nscoord
-nsGridContainerFrame::IntrinsicISize(nsRenderingContext* aRenderingContext,
+nsGridContainerFrame::IntrinsicISize(gfxContext* aRenderingContext,
                                      IntrinsicISizeType  aType)
 {
   RenumberList();
@@ -6373,7 +6375,7 @@ nsGridContainerFrame::IntrinsicISize(nsRenderingContext* aRenderingContext,
 }
 
 nscoord
-nsGridContainerFrame::GetMinISize(nsRenderingContext* aRC)
+nsGridContainerFrame::GetMinISize(gfxContext* aRC)
 {
   DISPLAY_MIN_WIDTH(this, mCachedMinISize);
   if (mCachedMinISize == NS_INTRINSIC_WIDTH_UNKNOWN) {
@@ -6383,7 +6385,7 @@ nsGridContainerFrame::GetMinISize(nsRenderingContext* aRC)
 }
 
 nscoord
-nsGridContainerFrame::GetPrefISize(nsRenderingContext* aRC)
+nsGridContainerFrame::GetPrefISize(gfxContext* aRC)
 {
   DISPLAY_PREF_WIDTH(this, mCachedPrefISize);
   if (mCachedPrefISize == NS_INTRINSIC_WIDTH_UNKNOWN) {
@@ -6406,12 +6408,11 @@ nsGridContainerFrame::MarkIntrinsicISizesDirty()
 
 void
 nsGridContainerFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                       const nsRect&           aDirtyRect,
                                        const nsDisplayListSet& aLists)
 {
   DisplayBorderBackgroundOutline(aBuilder, aLists);
   if (GetPrevInFlow()) {
-    DisplayOverflowContainers(aBuilder, aDirtyRect, aLists);
+    DisplayOverflowContainers(aBuilder, aLists);
   }
 
   // Our children are all grid-level boxes, which behave the same as
@@ -6425,8 +6426,7 @@ nsGridContainerFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
                                   CSSOrderAwareFrameIterator::eIncludeAll, order);
   for (; !iter.AtEnd(); iter.Next()) {
     nsIFrame* child = *iter;
-    BuildDisplayListForChild(aBuilder, child, aDirtyRect, aLists,
-                             ::GetDisplayFlagsForGridItem(child));
+    BuildDisplayListForChild(aBuilder, child, aLists, ::GetDisplayFlagsForGridItem(child));
   }
 }
 

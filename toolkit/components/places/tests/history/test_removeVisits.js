@@ -1,7 +1,6 @@
 const JS_NOW = Date.now();
 const DB_NOW = JS_NOW * 1000;
 const TEST_URI = uri("http://example.com/");
-const PLACE_URI = uri("place:queryType=0&sort=8&maxResults=10");
 
 async function cleanup() {
   await PlacesTestUtils.clearHistory();
@@ -280,8 +279,8 @@ add_task(async function remove_all_visits_bookmarked_uri() {
   do_print("asyncHistory.isURIVisited should return false.");
   do_check_false(await promiseIsURIVisited(TEST_URI));
 
-  do_print("nsINavBookmarksService.isBookmarked should return true.");
-  do_check_true(PlacesUtils.bookmarks.isBookmarked(TEST_URI));
+  do_print("URI should be bookmarked");
+  do_check_true(await PlacesUtils.bookmarks.fetch({url: TEST_URI}));
   await PlacesTestUtils.promiseAsyncUpdates();
 
   do_print("Frecency should be smaller.")

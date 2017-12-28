@@ -325,7 +325,7 @@ class JsepVideoCodecDescription : public JsepCodecDescription {
       h264Params.level_asymmetry_allowed = true;
 
       msection.SetFmtp(SdpFmtpAttributeList::Fmtp(mDefaultPt, h264Params));
-    } else if (mName == "red" && mRedundantEncodings.size()) {
+    } else if (mName == "red" && !mRedundantEncodings.empty()) {
       SdpFmtpAttributeList::RedParameters redParams(
           GetRedParameters(mDefaultPt, msection));
       redParams.encodings = mRedundantEncodings;
@@ -814,17 +814,17 @@ class JsepApplicationCodecDescription : public JsepCodecDescription {
   {
     JsepCodecDescription::Negotiate(pt, remoteMsection);
 
-    uint32_t message_size = remoteMsection.GetMaxMessageSize();
-    if (message_size) {
+    uint32_t message_size;
+    mRemoteMMSSet = remoteMsection.GetMaxMessageSize(&message_size);
+    if (mRemoteMMSSet) {
       mRemoteMaxMessageSize = message_size;
+    } else {
+      mRemoteMaxMessageSize = WEBRTC_DATACHANNEL_MAX_MESSAGE_SIZE_REMOTE_DEFAULT;
     }
 
     int sctp_port = remoteMsection.GetSctpPort();
     if (sctp_port) {
       mRemotePort = sctp_port;
-      if (!message_size) {
-        mRemoteMaxMessageSize = WEBRTC_DATACHANELL_MAX_MESSAGE_SIZE_DEFAULT;
-      }
       return true;
     }
 
@@ -843,6 +843,7 @@ class JsepApplicationCodecDescription : public JsepCodecDescription {
   uint32_t mLocalMaxMessageSize;
   uint16_t mRemotePort;
   uint32_t mRemoteMaxMessageSize;
+  bool mRemoteMMSSet;
 };
 
 } // namespace mozilla

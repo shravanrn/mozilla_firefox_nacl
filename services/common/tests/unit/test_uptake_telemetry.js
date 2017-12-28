@@ -1,11 +1,6 @@
 const { UptakeTelemetry } = Cu.import("resource://services-common/uptake-telemetry.js", {});
 
-
-function run_test() {
-  run_next_test();
-}
-
-add_task(function* test_unknown_status_is_not_reported() {
+add_task(async function test_unknown_status_is_not_reported() {
   const source = "update-source";
   const startHistogram = getUptakeTelemetrySnapshot(source);
 
@@ -16,7 +11,7 @@ add_task(function* test_unknown_status_is_not_reported() {
   checkUptakeTelemetry(startHistogram, endHistogram, expectedIncrements);
 });
 
-add_task(function* test_each_status_can_be_caught_in_snapshot() {
+add_task(async function test_each_status_can_be_caught_in_snapshot() {
   const source = "some-source";
   const startHistogram = getUptakeTelemetrySnapshot(source);
 

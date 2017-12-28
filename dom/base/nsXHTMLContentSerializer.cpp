@@ -15,19 +15,17 @@
 #include "nsIDOMElement.h"
 #include "nsIContent.h"
 #include "nsIDocument.h"
+#include "nsElementTable.h"
 #include "nsNameSpaceManager.h"
 #include "nsString.h"
 #include "nsUnicharUtils.h"
-#include "nsXPIDLString.h"
 #include "nsIServiceManager.h"
 #include "nsIDocumentEncoder.h"
 #include "nsGkAtoms.h"
 #include "nsIURI.h"
 #include "nsNetUtil.h"
 #include "nsEscape.h"
-#include "nsITextToSubURI.h"
 #include "nsCRT.h"
-#include "nsIParserService.h"
 #include "nsContentUtils.h"
 #include "nsLWBrkCIID.h"
 #include "nsIScriptElement.h"
@@ -59,9 +57,12 @@ nsXHTMLContentSerializer::~nsXHTMLContentSerializer()
 }
 
 NS_IMETHODIMP
-nsXHTMLContentSerializer::Init(uint32_t aFlags, uint32_t aWrapColumn,
-                              const char* aCharSet, bool aIsCopying,
-                              bool aRewriteEncodingDeclaration)
+nsXHTMLContentSerializer::Init(uint32_t aFlags,
+                               uint32_t aWrapColumn,
+                               const mozilla::Encoding* aEncoding,
+                               bool aIsCopying,
+                               bool aRewriteEncodingDeclaration,
+                               bool* aNeedsPreformatScanning)
 {
   // The previous version of the HTML serializer did implicit wrapping
   // when there is no flags, so we keep wrapping in order to keep
@@ -72,7 +73,8 @@ nsXHTMLContentSerializer::Init(uint32_t aFlags, uint32_t aWrapColumn,
   }
 
   nsresult rv;
-  rv = nsXMLContentSerializer::Init(aFlags, aWrapColumn, aCharSet, aIsCopying, aRewriteEncodingDeclaration);
+  rv = nsXMLContentSerializer::Init(
+    aFlags, aWrapColumn, aEncoding, aIsCopying, aRewriteEncodingDeclaration, aNeedsPreformatScanning);
   NS_ENSURE_SUCCESS(rv, rv);
 
   mRewriteEncodingDeclaration = aRewriteEncodingDeclaration;
@@ -83,10 +85,6 @@ nsXHTMLContentSerializer::Init(uint32_t aFlags, uint32_t aWrapColumn,
   mBodyOnly = (mFlags & nsIDocumentEncoder::OutputBodyOnly) ? true
                                                             : false;
 
-  // set up entity converter if we are going to need it
-  if (mFlags & nsIDocumentEncoder::OutputEncodeW3CEntities) {
-    mEntityConverter = do_CreateInstance(NS_ENTITYCONVERTER_CONTRACTID);
-  }
   return NS_OK;
 }
 
@@ -155,70 +153,6 @@ nsXHTMLContentSerializer::AppendText(nsIContent* aText,
   }
 
   return NS_OK;
-}
-
-nsresult
-nsXHTMLContentSerializer::EscapeURI(nsIContent* aContent, const nsAString& aURI, nsAString& aEscapedURI)
-{
-  // URL escape %xx cannot be used in JS.
-  // No escaping if the scheme is 'javascript'.
-  if (IsJavaScript(aContent, nsGkAtoms::href, kNameSpaceID_None, aURI)) {
-    aEscapedURI = aURI;
-    return NS_OK;
-  }
-
-  // nsITextToSubURI does charset convert plus uri escape
-  // This is needed to convert to a document charset which is needed to support existing browsers.
-  // But we eventually want to use UTF-8 instead of a document charset, then the code would be much simpler.
-  // See HTML 4.01 spec, "Appendix B.2.1 Non-ASCII characters in URI attribute values"
-  nsCOMPtr<nsITextToSubURI> textToSubURI;
-  nsAutoString uri(aURI); // in order to use FindCharInSet()
-  nsresult rv = NS_OK;
-
-  if (!mCharset.IsEmpty() && !IsASCII(uri)) {
-    textToSubURI = do_GetService(NS_ITEXTTOSUBURI_CONTRACTID, &rv);
-    NS_ENSURE_SUCCESS(rv, rv);
-  }
-
-  int32_t start = 0;
-  int32_t end;
-  nsAutoString part;
-  nsXPIDLCString escapedURI;
-  aEscapedURI.Truncate(0);
-
-  // Loop and escape parts by avoiding escaping reserved characters
-  // (and '%', '#', as well as '[' and ']' for IPv6 address literals).
-  while ((end = uri.FindCharInSet("%#;/?:@&=+$,[]", start)) != -1) {
-    part = Substring(aURI, start, (end-start));
-    if (textToSubURI && !IsASCII(part)) {
-      rv = textToSubURI->ConvertAndEscape(mCharset.get(), part.get(), getter_Copies(escapedURI));
-      NS_ENSURE_SUCCESS(rv, rv);
-    } else if (NS_WARN_IF(!NS_Escape(NS_ConvertUTF16toUTF8(part), escapedURI,
-                                     url_Path))) {
-      return NS_ERROR_OUT_OF_MEMORY;
-    }
-    AppendASCIItoUTF16(escapedURI, aEscapedURI);
-
-    // Append a reserved character without escaping.
-    part = Substring(aURI, end, 1);
-    aEscapedURI.Append(part);
-    start = end + 1;
-  }
-
-  if (start < (int32_t) aURI.Length()) {
-    // Escape the remaining part.
-    part = Substring(aURI, start, aURI.Length()-start);
-    if (textToSubURI) {
-      rv = textToSubURI->ConvertAndEscape(mCharset.get(), part.get(), getter_Copies(escapedURI));
-      NS_ENSURE_SUCCESS(rv, rv);
-    } else if (NS_WARN_IF(!NS_Escape(NS_ConvertUTF16toUTF8(part), escapedURI,
-                                     url_Path))) {
-      return NS_ERROR_OUT_OF_MEMORY;
-    }
-    AppendASCIItoUTF16(escapedURI, aEscapedURI);
-  }
-
-  return rv;
 }
 
 bool
@@ -360,7 +294,7 @@ nsXHTMLContentSerializer::SerializeAttributes(nsIContent* aContent,
           (attrName == nsGkAtoms::src))) {
         // Make all links absolute when converting only the selection:
         if (mFlags & nsIDocumentEncoder::OutputAbsoluteLinks) {
-          // Would be nice to handle OBJECT and APPLET tags,
+          // Would be nice to handle OBJECT tags,
           // but that gets more complicated since we have to
           // search the tag list for CODEBASE as well.
           // For now, just leave them relative.
@@ -373,10 +307,6 @@ nsXHTMLContentSerializer::SerializeAttributes(nsIContent* aContent,
             }
           }
         }
-        // Need to escape URI.
-        nsAutoString tempURI(valueStr);
-        if (!isJS && NS_FAILED(EscapeURI(aContent, tempURI, valueStr)))
-          valueStr = tempURI;
       }
 
       if (mRewriteEncodingDeclaration && aTagName == nsGkAtoms::meta &&
@@ -665,18 +595,8 @@ nsXHTMLContentSerializer::LineBreakBeforeOpen(int32_t aNamespaceID, nsIAtom* aNa
       aName == nsGkAtoms::html) {
     return true;
   }
-  else {
-    nsIParserService* parserService = nsContentUtils::GetParserService();
 
-    if (parserService) {
-      bool res;
-      parserService->
-        IsBlock(parserService->HTMLCaseSensitiveAtomTagToId(aName), res);
-      return res;
-    }
-  }
-
-  return mAddSpace;
+  return nsHTMLElement::IsBlock(nsHTMLTags::CaseSensitiveAtomTagToId(aName));
 }
 
 bool
@@ -759,18 +679,8 @@ nsXHTMLContentSerializer::LineBreakAfterClose(int32_t aNamespaceID, nsIAtom* aNa
       (aName == nsGkAtoms::div)) {
     return true;
   }
-  else {
-    nsIParserService* parserService = nsContentUtils::GetParserService();
 
-    if (parserService) {
-      bool res;
-      parserService->
-        IsBlock(parserService->HTMLCaseSensitiveAtomTagToId(aName), res);
-      return res;
-    }
-  }
-
-  return false;
+  return nsHTMLElement::IsBlock(nsHTMLTags::CaseSensitiveAtomTagToId(aName));
 }
 
 

@@ -67,28 +67,19 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLLinkElement,
                                                   nsGenericHTMLElement)
   tmp->nsStyleLinkElement::Traverse(cb);
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mRelList)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mImportLoader)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLLinkElement,
                                                 nsGenericHTMLElement)
   tmp->nsStyleLinkElement::Unlink();
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mRelList)
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mImportLoader)
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
-NS_IMPL_ADDREF_INHERITED(HTMLLinkElement, Element)
-NS_IMPL_RELEASE_INHERITED(HTMLLinkElement, Element)
-
-
-// QueryInterface implementation for HTMLLinkElement
-NS_INTERFACE_TABLE_HEAD_CYCLE_COLLECTION_INHERITED(HTMLLinkElement)
-  NS_INTERFACE_TABLE_INHERITED(HTMLLinkElement,
-                               nsIDOMHTMLLinkElement,
-                               nsIStyleSheetLinkingElement,
-                               Link)
-NS_INTERFACE_TABLE_TAIL_INHERITING(nsGenericHTMLElement)
-
+NS_IMPL_ISUPPORTS_CYCLE_COLLECTION_INHERITED(HTMLLinkElement,
+                                             nsGenericHTMLElement,
+                                             nsIDOMHTMLLinkElement,
+                                             nsIStyleSheetLinkingElement,
+                                             Link)
 
 NS_IMPL_ELEMENT_CLONE(HTMLLinkElement)
 
@@ -169,14 +160,12 @@ HTMLLinkElement::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
   }
 
   if (IsInComposedDoc()) {
-    TryDNSPrefetchPreconnectOrPrefetchOrPrerender();
+    TryDNSPrefetchOrPreconnectOrPrefetchOrPreloadOrPrerender();
   }
 
   void (HTMLLinkElement::*update)() = &HTMLLinkElement::UpdateStyleSheetInternal;
-  nsContentUtils::AddScriptRunner(NewRunnableMethod(this, update));
-
-  void (HTMLLinkElement::*updateImport)() = &HTMLLinkElement::UpdateImport;
-  nsContentUtils::AddScriptRunner(NewRunnableMethod(this, updateImport));
+  nsContentUtils::AddScriptRunner(
+    NewRunnableMethod("dom::HTMLLinkElement::BindToTree", this, update));
 
   CreateAndDispatchEvent(aDocument, NS_LITERAL_STRING("DOMLinkAdded"));
 
@@ -203,7 +192,7 @@ HTMLLinkElement::UnbindFromTree(bool aDeep, bool aNullParent)
   // mCachedURI based on data that is invalid - due to a call to GetHostname.
   CancelDNSPrefetch(HTML_LINK_DNS_PREFETCH_DEFERRED,
                     HTML_LINK_DNS_PREFETCH_REQUESTED);
-  CancelPrefetch();
+  CancelPrefetchOrPreload();
 
   // If this link is ever reinserted into a document, it might
   // be under a different xml:base, so forget the cached state now.
@@ -222,7 +211,6 @@ HTMLLinkElement::UnbindFromTree(bool aDeep, bool aNullParent)
   nsGenericHTMLElement::UnbindFromTree(aDeep, aNullParent);
 
   UpdateStyleSheetInternal(oldDoc, oldShadowRoot);
-  UpdateImport();
 }
 
 bool
@@ -234,6 +222,11 @@ HTMLLinkElement::ParseAttribute(int32_t aNamespaceID,
   if (aNamespaceID == kNameSpaceID_None) {
     if (aAttribute == nsGkAtoms::crossorigin) {
       ParseCORSValue(aValue, aResult);
+      return true;
+    }
+
+    if (aAttribute == nsGkAtoms::as) {
+      ParseAsValue(aValue, aResult);
       return true;
     }
 
@@ -281,54 +274,6 @@ HTMLLinkElement::CreateAndDispatchEvent(nsIDocument* aDoc,
   asyncDispatcher->PostDOMEvent();
 }
 
-void
-HTMLLinkElement::UpdateImport()
-{
-  // 1. link node should be attached to the document.
-  nsCOMPtr<nsIDocument> doc = GetUncomposedDoc();
-  if (!doc) {
-    // We might have been just removed from the document, so
-    // let's remove ourself from the list of link nodes of
-    // the import and reset mImportLoader.
-    if (mImportLoader) {
-      mImportLoader->RemoveLinkElement(this);
-      mImportLoader = nullptr;
-    }
-    return;
-  }
-
-  // 2. rel type should be import.
-  nsAutoString rel;
-  GetAttr(kNameSpaceID_None, nsGkAtoms::rel, rel);
-  uint32_t linkTypes = nsStyleLinkElement::ParseLinkTypes(rel, NodePrincipal());
-  if (!(linkTypes & eHTMLIMPORT)) {
-    mImportLoader = nullptr;
-    return;
-  }
-
-  nsCOMPtr<nsIURI> uri = GetHrefURI();
-  if (!uri) {
-    mImportLoader = nullptr;
-    return;
-  }
-
-  if (!nsStyleLinkElement::IsImportEnabled()) {
-    // For now imports are hidden behind a pref...
-    return;
-  }
-
-  RefPtr<ImportManager> manager = doc->ImportManager();
-  MOZ_ASSERT(manager, "ImportManager should be created lazily when needed");
-
-  {
-    // The load even might fire sooner than we could set mImportLoader so
-    // we must use async event and a scriptBlocker here.
-    nsAutoScriptBlocker scriptBlocker;
-    // CORS check will happen at the start of the load.
-    mImportLoader = manager->Get(uri, this, doc);
-  }
-}
-
 nsresult
 HTMLLinkElement::BeforeSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
                                const nsAttrValueOrString* aValue, bool aNotify)
@@ -337,7 +282,7 @@ HTMLLinkElement::BeforeSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
       (aName == nsGkAtoms::href || aName == nsGkAtoms::rel)) {
     CancelDNSPrefetch(HTML_LINK_DNS_PREFETCH_DEFERRED,
                       HTML_LINK_DNS_PREFETCH_REQUESTED);
-    CancelPrefetch();
+    CancelPrefetchOrPreload();
   }
 
   return nsGenericHTMLElement::BeforeSetAttr(aNameSpaceID, aName,
@@ -368,27 +313,28 @@ HTMLLinkElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
          aName == nsGkAtoms::rel ||
          aName == nsGkAtoms::title ||
          aName == nsGkAtoms::media ||
-         aName == nsGkAtoms::type)) {
+         aName == nsGkAtoms::type ||
+         aName == nsGkAtoms::as ||
+         aName == nsGkAtoms::crossorigin)) {
       bool dropSheet = false;
       if (aName == nsGkAtoms::rel) {
         nsAutoString value;
         aValue->ToString(value);
-        uint32_t linkTypes = nsStyleLinkElement::ParseLinkTypes(value,
-                                                                NodePrincipal());
+        uint32_t linkTypes = nsStyleLinkElement::ParseLinkTypes(value);
         if (GetSheet()) {
           dropSheet = !(linkTypes & nsStyleLinkElement::eSTYLESHEET);
-        } else if (linkTypes & eHTMLIMPORT) {
-          UpdateImport();
         }
-      }
-
-      if (aName == nsGkAtoms::href) {
-        UpdateImport();
       }
 
       if ((aName == nsGkAtoms::rel || aName == nsGkAtoms::href) &&
           IsInComposedDoc()) {
-        TryDNSPrefetchPreconnectOrPrefetchOrPrerender();
+        TryDNSPrefetchOrPreconnectOrPrefetchOrPreloadOrPrerender();
+      }
+
+      if ((aName == nsGkAtoms::as || aName == nsGkAtoms::type ||
+           aName == nsGkAtoms::crossorigin || aName == nsGkAtoms::media) &&
+          IsInComposedDoc()) {
+        UpdatePreload(aName, aValue, aOldValue);
       }
 
       UpdateStyleSheetInternal(nullptr, nullptr,
@@ -408,9 +354,10 @@ HTMLLinkElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
           aName == nsGkAtoms::type) {
         UpdateStyleSheetInternal(nullptr, nullptr, true);
       }
-      if (aName == nsGkAtoms::href ||
-          aName == nsGkAtoms::rel) {
-        UpdateImport();
+      if ((aName == nsGkAtoms::as || aName == nsGkAtoms::type ||
+           aName == nsGkAtoms::crossorigin || aName == nsGkAtoms::media) &&
+          IsInComposedDoc()) {
+        UpdatePreload(aName, aValue, aOldValue);
       }
     }
   }
@@ -449,7 +396,21 @@ HTMLLinkElement::GetLinkTarget(nsAString& aTarget)
 static const DOMTokenListSupportedToken sSupportedRelValues[] = {
   // Keep this in sync with ToLinkMask in nsStyleLinkElement.cpp.
   // "import" must come first because it's conditional.
-  "import",
+  "prefetch",
+  "dns-prefetch",
+  "stylesheet",
+  "next",
+  "alternate",
+  "preconnect",
+  "icon",
+  "search",
+  "preload",
+  nullptr
+};
+
+static const DOMTokenListSupportedToken sSupportedRelValuesNoPreload[] = {
+  // Keep this in sync with ToLinkMask in nsStyleLinkElement.cpp.
+  // "import" must come first because it's conditional.
   "prefetch",
   "dns-prefetch",
   "stylesheet",
@@ -460,16 +421,15 @@ static const DOMTokenListSupportedToken sSupportedRelValues[] = {
   "search",
   nullptr
 };
-
-nsDOMTokenList* 
+nsDOMTokenList*
 HTMLLinkElement::RelList()
 {
   if (!mRelList) {
-    const DOMTokenListSupportedTokenArray relValues =
-      nsStyleLinkElement::IsImportEnabled() ?
-        sSupportedRelValues : &sSupportedRelValues[1];
-
-    mRelList = new nsDOMTokenList(this, nsGkAtoms::rel, relValues);
+    if (Preferences::GetBool("network.preload")) {
+      mRelList = new nsDOMTokenList(this, nsGkAtoms::rel, sSupportedRelValues);
+    } else {
+      mRelList = new nsDOMTokenList(this, nsGkAtoms::rel, sSupportedRelValuesNoPreload);
+    }
   }
   return mRelList;
 }
@@ -508,7 +468,7 @@ HTMLLinkElement::GetStyleSheetInfo(nsAString& aTitle,
 
   nsAutoString rel;
   GetAttr(kNameSpaceID_None, nsGkAtoms::rel, rel);
-  uint32_t linkTypes = nsStyleLinkElement::ParseLinkTypes(rel, NodePrincipal());
+  uint32_t linkTypes = nsStyleLinkElement::ParseLinkTypes(rel);
   // Is it a stylesheet link?
   if (!(linkTypes & nsStyleLinkElement::eSTYLESHEET)) {
     return;
@@ -544,14 +504,12 @@ HTMLLinkElement::GetStyleSheetInfo(nsAString& aTitle,
   // If we get here we assume that we're loading a css file, so set the
   // type to 'text/css'
   aType.AssignLiteral("text/css");
-
-  return;
 }
 
 CORSMode
 HTMLLinkElement::GetCORSMode() const
 {
-  return AttrValueToCORSMode(GetParsedAttr(nsGkAtoms::crossorigin)); 
+  return AttrValueToCORSMode(GetParsedAttr(nsGkAtoms::crossorigin));
 }
 
 EventStates
@@ -560,11 +518,12 @@ HTMLLinkElement::IntrinsicState() const
   return Link::LinkState() | nsGenericHTMLElement::IntrinsicState();
 }
 
-size_t
-HTMLLinkElement::SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
+void
+HTMLLinkElement::AddSizeOfExcludingThis(nsWindowSizes& aSizes,
+                                        size_t* aNodeSize) const
 {
-  return nsGenericHTMLElement::SizeOfExcludingThis(aMallocSizeOf) +
-         Link::SizeOfExcludingThis(aMallocSizeOf);
+  nsGenericHTMLElement::AddSizeOfExcludingThis(aSizes, aNodeSize);
+  *aNodeSize += Link::SizeOfExcludingThis(aSizes.mState);
 }
 
 JSObject*
@@ -573,10 +532,10 @@ HTMLLinkElement::WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
   return HTMLLinkElementBinding::Wrap(aCx, this, aGivenProto);
 }
 
-already_AddRefed<nsIDocument>
-HTMLLinkElement::GetImport()
+void
+HTMLLinkElement::GetAs(nsAString& aResult)
 {
-  return mImportLoader ? RefPtr<nsIDocument>(mImportLoader->GetImport()).forget() : nullptr;
+  GetEnumAttr(nsGkAtoms::as, EmptyCString().get(), aResult);
 }
 
 } // namespace dom

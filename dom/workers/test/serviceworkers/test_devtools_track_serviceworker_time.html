@@ -9,16 +9,16 @@
 
 <script type="text/javascript">
 
+let { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+
 const State = {
   BYTECHECK: -1,
-  INSTALLING: 0,
-  INSTALLED: 1,
-  ACTIVATING: 2,
-  ACTIVATED: 3,
-  REDUNDANT: 4
+  INSTALLING: Ci.nsIServiceWorkerInfo.STATE_INSTALLING,
+  INSTALLED: Ci.nsIServiceWorkerInfo.STATE_INSTALLED,
+  ACTIVATING: Ci.nsIServiceWorkerInfo.STATE_ACTIVATING,
+  ACTIVATED: Ci.nsIServiceWorkerInfo.STATE_ACTIVATED,
+  REDUNDANT: Ci.nsIServiceWorkerInfo.STATE_REDUNDANT
 };
-
-let { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 let swm = Cc["@mozilla.org/serviceworkers/manager;1"].
           getService(Ci.nsIServiceWorkerManager);
 
@@ -53,6 +53,8 @@ let expectedResults = [
     state: State.ACTIVATED, installedTimeRecorded: true,
     activatedTimeRecorded: true, redundantTimeRecorded: false
   },
+
+  // On unregister
   {
     state: State.REDUNDANT, installedTimeRecorded: true,
     activatedTimeRecorded: true, redundantTimeRecorded: true
@@ -170,6 +172,15 @@ function testServiceWorkerInfo() {
   return promise;
 }
 
+async function testHttpCacheUpdateTime() {
+  let iframe = document.querySelector("iframe");
+  let reg = await iframe.contentWindow.navigator.serviceWorker.getRegistration();
+  let lastUpdateTime = registrationInfo.lastUpdateTime;
+  await reg.update();
+  is(lastUpdateTime, registrationInfo.lastUpdateTime,
+     "The update time should not change when SW script is read from http cache.");
+}
+
 function unregister() {
   info("Unregister the ServiceWorker");
 
@@ -196,6 +207,7 @@ function runTest() {
   return Promise.resolve()
     .then(register)
     .then(testServiceWorkerInfo)
+    .then(testHttpCacheUpdateTime)
     .then(unregister)
     .catch(aError => ok(false, "Some test failed with error " + aError))
     .then(cleanAll)

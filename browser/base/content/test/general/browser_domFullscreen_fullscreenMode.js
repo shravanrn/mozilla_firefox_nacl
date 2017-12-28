@@ -1,4 +1,5 @@
 /* eslint-env mozilla/frame-script */
+/* eslint-disable mozilla/no-arbitrary-setTimeout */
 
 "use strict";
 
@@ -16,6 +17,9 @@ function frameScript() {
       inDOMFullscreen: !!content.document.fullscreenElement,
       inFullscreen: content.fullScreen
     });
+  });
+  addMessageListener("Test:WaitActivated", () => {
+    waitUntilActive();
   });
   content.document.addEventListener("fullscreenchange", () => {
     sendAsyncMessage("Test:FullscreenChanged", {
@@ -65,6 +69,13 @@ const FS_CHANGE_DOM = 1 << 0;
 const FS_CHANGE_SIZE = 1 << 1;
 const FS_CHANGE_BOTH = FS_CHANGE_DOM | FS_CHANGE_SIZE;
 
+function waitForDocActivated() {
+  return new Promise(resolve => {
+    listenOneMessage("Test:Activated", resolve);
+    gMessageManager.sendAsyncMessage("Test:WaitActivated");
+  });
+}
+
 function waitForFullscreenChanges(aFlags) {
   return new Promise(resolve => {
     let fullscreenData = null;
@@ -72,11 +83,18 @@ function waitForFullscreenChanges(aFlags) {
     function tryResolve() {
       if ((!(aFlags & FS_CHANGE_DOM) || fullscreenData) &&
           (!(aFlags & FS_CHANGE_SIZE) || sizemodeChanged)) {
-        if (!fullscreenData) {
-          queryFullscreenState().then(resolve);
-        } else {
-          resolve(fullscreenData);
-        }
+        // In the platforms that support reporting occlusion state (e.g. Mac),
+        // enter/exit fullscreen mode will trigger docshell being set to
+        // non-activate and then set to activate back again.
+        // For those platform, we should wait until the docshell has been
+        // activated again, otherwise, the fullscreen request might be denied.
+        waitForDocActivated().then(() => {
+          if (!fullscreenData) {
+            queryFullscreenState().then(resolve);
+          } else {
+            resolve(fullscreenData);
+          }
+        });
       }
     }
     if (aFlags & FS_CHANGE_SIZE) {
@@ -146,17 +164,15 @@ add_task(async function() {
     ["full-screen-api.transition-duration.enter", "0 0"],
     ["full-screen-api.transition-duration.leave", "0 0"]);
 
-  let tab = BrowserTestUtils.addTab(gBrowser, kPage);
-  let browser = tab.linkedBrowser;
-  gBrowser.selectedTab = tab;
-  await waitForDocLoadComplete();
-
-  registerCleanupFunction(() => {
-    if (browser.contentWindow.fullScreen) {
-      BrowserFullScreen();
+  registerCleanupFunction(async function() {
+    if (window.fullScreen) {
+      executeSoon(() => BrowserFullScreen());
+      await waitForFullscreenChanges(FS_CHANGE_SIZE);
     }
-    gBrowser.removeTab(tab);
   });
+
+  let tab = await BrowserTestUtils.openNewForegroundTab({ gBrowser, url: kPage });
+  let browser = tab.linkedBrowser;
 
   gMessageManager = browser.messageManager;
   gMessageManager.loadFrameScript(
@@ -220,4 +236,6 @@ add_task(async function() {
       await waitForFullscreenChanges(FS_CHANGE_SIZE);
     }
   }
+
+  await BrowserTestUtils.removeTab(tab);
 });

@@ -55,25 +55,25 @@ impl UnicodeRange {
 }
 
 fn parse_tokens<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(), BasicParseError<'i>> {
-    match input.next_including_whitespace()? {
+    match input.next_including_whitespace()?.clone() {
         Token::Delim('+') => {
-            match input.next_including_whitespace()? {
+            match *input.next_including_whitespace()? {
                 Token::Ident(_) => {}
                 Token::Delim('?') => {}
-                t => return Err(BasicParseError::UnexpectedToken(t))
+                ref t => return Err(BasicParseError::UnexpectedToken(t.clone()))
             }
             parse_question_marks(input)
         }
-        Token::Dimension(..) => {
+        Token::Dimension { .. } => {
             parse_question_marks(input)
         }
-        Token::Number(_) => {
-            let after_number = input.position();
+        Token::Number { .. } => {
+            let after_number = input.state();
             match input.next_including_whitespace() {
-                Ok(Token::Delim('?')) => parse_question_marks(input),
-                Ok(Token::Dimension(..)) => {}
-                Ok(Token::Number(_)) => {}
-                _ => input.reset(after_number)
+                Ok(&Token::Delim('?')) => parse_question_marks(input),
+                Ok(&Token::Dimension { .. }) => {}
+                Ok(&Token::Number { .. }) => {}
+                _ => input.reset(&after_number)
             }
         }
         t => return Err(BasicParseError::UnexpectedToken(t))
@@ -84,11 +84,11 @@ fn parse_tokens<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(), BasicParseErro
 /// Consume as many '?' as possible
 fn parse_question_marks(input: &mut Parser) {
     loop {
-        let position = input.position();
+        let start = input.state();
         match input.next_including_whitespace() {
-            Ok(Token::Delim('?')) => {}
+            Ok(&Token::Delim('?')) => {}
             _ => {
-                input.reset(position);
+                input.reset(&start);
                 return
             }
         }

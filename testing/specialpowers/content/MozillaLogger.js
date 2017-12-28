@@ -89,7 +89,7 @@ MozillaFileLogger.prototype = {
     var PR_CREATE_FILE  = 0x08;
     var PR_APPEND       = 0x10;
     this._file = Components.classes["@mozilla.org/file/local;1"].
-                            createInstance(Components.interfaces.nsILocalFile);
+                            createInstance(Components.interfaces.nsIFile);
     this._file.initWithPath(path);
     this._foStream = Components.classes["@mozilla.org/network/file-output-stream;1"].
                                      createInstance(Components.interfaces.nsIFileOutputStream);
@@ -98,7 +98,7 @@ MozillaFileLogger.prototype = {
 
     this._converter = Components.classes["@mozilla.org/intl/converter-output-stream;1"].
                     createInstance(Components.interfaces.nsIConverterOutputStream);
-    this._converter.init(this._foStream, "UTF-8", 0, 0);
+    this._converter.init(this._foStream, "UTF-8");
   },
 
   getLogCallback() {

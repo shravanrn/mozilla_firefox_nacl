@@ -13,14 +13,13 @@ const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "LanguageDetector",
-                                  "resource:///modules/translation/LanguageDetector.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "MessageChannel",
-                                  "resource://gre/modules/MessageChannel.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "Schemas",
-                                  "resource://gre/modules/Schemas.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "WebNavigationFrames",
-                                  "resource://gre/modules/WebNavigationFrames.jsm");
+XPCOMUtils.defineLazyModuleGetters(this, {
+  LanguageDetector: "resource:///modules/translation/LanguageDetector.jsm",
+  MessageChannel: "resource://gre/modules/MessageChannel.jsm",
+  Schemas: "resource://gre/modules/Schemas.jsm",
+  TelemetryStopwatch: "resource://gre/modules/TelemetryStopwatch.jsm",
+  WebNavigationFrames: "resource://gre/modules/WebNavigationFrames.jsm",
+});
 
 XPCOMUtils.defineLazyServiceGetter(this, "styleSheetService",
                                    "@mozilla.org/content/style-sheet-service;1",
@@ -69,6 +68,7 @@ XPCOMUtils.defineLazyGetter(this, "console", ExtensionUtils.getConsole);
 var DocumentManager;
 
 const CATEGORY_EXTENSION_SCRIPTS_CONTENT = "webextension-scripts-content";
+const CONTENT_SCRIPT_INJECTION_HISTOGRAM = "WEBEXT_CONTENT_SCRIPT_INJECTION_MS";
 
 var apiManager = new class extends SchemaAPIManager {
   constructor() {
@@ -137,8 +137,16 @@ class CacheMap extends DefaultMap {
 
 class ScriptCache extends CacheMap {
   constructor(options) {
-    super(SCRIPT_EXPIRY_TIMEOUT_MS,
-          url => ChromeUtils.compileScript(url, options));
+    super(SCRIPT_EXPIRY_TIMEOUT_MS);
+    this.options = options;
+  }
+
+  defaultConstructor(url) {
+    let promise = ChromeUtils.compileScript(url, this.options);
+    promise.then(script => {
+      promise.script = script;
+    });
+    return promise;
   }
 }
 
@@ -254,14 +262,25 @@ class Script {
 
   async injectInto(window) {
     let context = this.extension.getContext(window);
+    try {
+      if (this.runAt === "document_end") {
+        await promiseDocumentReady(window.document);
+      } else if (this.runAt === "document_idle") {
+        let readyThenIdle = promiseDocumentReady(window.document).then(() => {
+          return new Promise(resolve =>
+            window.requestIdleCallback(resolve, {timeout: idleTimeout}));
+        });
 
-    if (this.runAt === "document_end") {
-      await promiseDocumentReady(window.document);
-    } else if (this.runAt === "document_idle") {
-      await promiseDocumentLoaded(window.document);
+        await Promise.race([
+          readyThenIdle,
+          promiseDocumentLoaded(window.document),
+        ]);
+      }
+
+      return this.inject(context);
+    } catch (e) {
+      return Promise.reject(context.normalizeError(e));
     }
-
-    return this.inject(context);
   }
 
   /**
@@ -309,33 +328,40 @@ class Script {
       }
     }
 
-    let scriptsPromise = Promise.all(this.compileScripts());
+    let scriptPromises = this.compileScripts();
 
-    // If we're supposed to inject at the start of the document load,
-    // and we haven't already missed that point, block further parsing
-    // until the scripts have been loaded.
-    let {document} = context.contentWindow;
-    if (this.runAt === "document_start" && document.readyState !== "complete") {
-      document.blockParsing(scriptsPromise);
+    let scripts = scriptPromises.map(promise => promise.script);
+    // If not all scripts are already available in the cache, block
+    // parsing and wait all promises to resolve.
+    if (!scripts.every(script => script)) {
+      let promise = Promise.all(scriptPromises);
+
+      // If we're supposed to inject at the start of the document load,
+      // and we haven't already missed that point, block further parsing
+      // until the scripts have been loaded.
+      let {document} = context.contentWindow;
+      if (this.runAt === "document_start" && document.readyState !== "complete") {
+        document.blockParsing(promise, {blockScriptCreated: false});
+      }
+
+      scripts = await promise;
     }
 
-    let scripts = await scriptsPromise;
     let result;
-
-    if (this.runAt === "document_idle") {
-      await new Promise(resolve =>
-          context.contentWindow.requestIdleCallback(resolve,
-                                                    {timeout: idleTimeout}));
-    }
 
     // The evaluations below may throw, in which case the promise will be
     // automatically rejected.
-    for (let script of scripts) {
-      result = script.executeInGlobal(context.cloneScope);
-    }
+    TelemetryStopwatch.start(CONTENT_SCRIPT_INJECTION_HISTOGRAM, context);
+    try {
+      for (let script of scripts) {
+        result = script.executeInGlobal(context.cloneScope);
+      }
 
-    if (this.matcher.jsCode) {
-      result = Cu.evalInSandbox(this.matcher.jsCode, context.cloneScope, "latest");
+      if (this.matcher.jsCode) {
+        result = Cu.evalInSandbox(this.matcher.jsCode, context.cloneScope, "latest");
+      }
+    } finally {
+      TelemetryStopwatch.finish(CONTENT_SCRIPT_INJECTION_HISTOGRAM, context);
     }
 
     await cssPromise;
@@ -526,7 +552,7 @@ DocumentManager = {
   initialized: false,
 
   lazyInit() {
-    if (this.initalized) {
+    if (this.initialized) {
       return;
     }
     this.initialized = true;
@@ -705,8 +731,14 @@ this.ExtensionContent = {
       return null;
     };
 
-    let promises = Array.from(this.enumerateWindows(global.docShell), executeInWin)
-                        .filter(promise => promise);
+    let promises;
+    try {
+      promises = Array.from(this.enumerateWindows(global.docShell), executeInWin)
+                      .filter(promise => promise);
+    } catch (e) {
+      Cu.reportError(e);
+      return Promise.reject({message: "An unexpected error occurred"});
+    }
 
     if (!promises.length) {
       if (options.frame_id) {
@@ -751,7 +783,12 @@ this.ExtensionContent = {
                                                docShell.ENUMERATE_FORWARDS);
 
     for (let docShell of XPCOMUtils.IterSimpleEnumerator(enum_, Ci.nsIInterfaceRequestor)) {
-      yield docShell.getInterface(Ci.nsIDOMWindow);
+      try {
+        yield docShell.getInterface(Ci.nsIDOMWindow);
+      } catch (e) {
+        // This can fail if the docShell is being destroyed, so just
+        // ignore the error.
+      }
     }
   },
 };

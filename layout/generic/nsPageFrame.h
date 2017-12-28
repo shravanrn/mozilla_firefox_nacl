@@ -24,11 +24,10 @@ public:
 
   virtual void Reflow(nsPresContext*      aPresContext,
                       ReflowOutput& aDesiredSize,
-                      const ReflowInput& aMaxSize,
+                      const ReflowInput& aReflowInput,
                       nsReflowStatus&      aStatus) override;
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 
 #ifdef DEBUG_FRAME_DUMP
@@ -48,8 +47,13 @@ public:
   // user's settings
   virtual bool HonorPrintBackgroundSettings() override { return false; }
 
-  void PaintHeaderFooter(nsRenderingContext& aRenderingContext,
+  void PaintHeaderFooter(gfxContext& aRenderingContext,
                          nsPoint aPt, bool aSubpixelAA);
+
+  /**
+   * Return our page content frame.
+   */
+  void AppendDirectlyOwnedAnonBoxes(nsTArray<OwnedAnonBox>& aResult) override;
 
 protected:
   explicit nsPageFrame(nsStyleContext* aContext);
@@ -60,13 +64,13 @@ protected:
     eFooter
   } nsHeaderFooterEnum;
 
-  nscoord GetXPosition(nsRenderingContext& aRenderingContext,
+  nscoord GetXPosition(gfxContext&          aRenderingContext,
                        nsFontMetrics&       aFontMetrics,
-                       const nsRect&        aRect, 
+                       const nsRect&        aRect,
                        int32_t              aJust,
                        const nsString&      aStr);
 
-  void DrawHeaderFooter(nsRenderingContext& aRenderingContext,
+  void DrawHeaderFooter(gfxContext&          aRenderingContext,
                         nsFontMetrics&       aFontMetrics,
                         nsHeaderFooterEnum   aHeaderFooter,
                         int32_t              aJust,
@@ -76,7 +80,7 @@ protected:
                         nscoord              aAscent,
                         nscoord              aWidth);
 
-  void DrawHeaderFooter(nsRenderingContext& aRenderingContext,
+  void DrawHeaderFooter(gfxContext&          aRenderingContext,
                         nsFontMetrics&       aFontMetrics,
                         nsHeaderFooterEnum   aHeaderFooter,
                         const nsString&      aStrLeft,
@@ -96,7 +100,7 @@ protected:
 };
 
 
-class nsPageBreakFrame : public nsLeafFrame
+class nsPageBreakFrame final : public nsLeafFrame
 {
   NS_DECL_FRAMEARENA_HELPERS(nsPageBreakFrame)
 

@@ -12,8 +12,6 @@ const kDayInSeconds = 86400;
 const kYearInSeconds = kDayInSeconds * 365;
 
 function run_test() {
-  installTestEngine();
-
   let srv = new HttpServer();
 
   srv.registerPathHandler("/lookup_defaults", (metadata, response) => {
@@ -66,6 +64,10 @@ add_task(async function no_request_if_prefed_off() {
   Services.prefs.setBoolPref("browser.search.geoSpecificDefaults", false);
   await asyncInit();
   checkNoRequest();
+  await promiseAfterCache();
+
+  // Install kTestEngineName and wait for it to reach the disk.
+  await installTestEngine();
   await promiseAfterCache();
 
   // The default engine should be set based on the prefs.
@@ -126,6 +128,53 @@ add_task(async function should_recheck_if_interval_expired() {
   do_check_eq(typeof metadata.searchDefaultExpir, "number");
   do_check_true(metadata.searchDefaultExpir >= date + kYearInSeconds * 1000);
   do_check_true(metadata.searchDefaultExpir < date + (kYearInSeconds + 3600) * 1000);
+});
+
+add_task(async function should_recheck_if_appversion_changed() {
+  let data = await promiseCacheData();
+
+  do_check_eq(data.appVersion, Services.appinfo.version);
+
+  // Set app version to something old
+  data.appVersion = "1";
+  await promiseSaveCacheData(data);
+
+  await asyncReInit();
+  checkRequest();
+  await promiseAfterCache();
+
+  // Check that the appVersion has been updated
+  data = await promiseCacheData();
+  do_check_eq(data.appVersion, Services.appinfo.version);
+});
+
+add_task(async function should_recheck_if_appversion_changed_sync() {
+  let data = await promiseCacheData();
+
+  do_check_eq(data.appVersion, Services.appinfo.version);
+
+  // Set app version to something old
+  data.appVersion = "1";
+  await promiseSaveCacheData(data);
+
+  let commitPromise = promiseAfterCache();
+  let unInitPromise = waitForSearchNotification("uninit-complete");
+  let reInitPromise = asyncReInit();
+  await unInitPromise;
+
+  // Synchronously check the current default engine, to force a sync init.
+  // The hash is wrong, so we should fallback to the default engine from prefs.
+  do_check_false(Services.search.isInitialized);
+  Services.search.getEngines();
+  do_check_true(Services.search.isInitialized);
+
+  await reInitPromise;
+  checkRequest();
+  await commitPromise;
+
+  // Check that the appVersion has been updated
+  data = await promiseCacheData();
+  do_check_eq(data.appVersion, Services.appinfo.version);
 });
 
 add_task(async function should_recheck_when_broken_hash() {

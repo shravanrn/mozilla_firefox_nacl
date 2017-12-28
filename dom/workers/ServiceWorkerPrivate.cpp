@@ -11,6 +11,7 @@
 #include "nsContentUtils.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIHttpHeaderVisitor.h"
+#include "nsINamed.h"
 #include "nsINetworkInterceptController.h"
 #include "nsIPushErrorReporter.h"
 #include "nsISupportsImpl.h"
@@ -45,8 +46,8 @@ NS_IMPL_CYCLE_COLLECTION(ServiceWorkerPrivate, mSupportsArray)
 NS_IMPL_CYCLE_COLLECTION_ROOT_NATIVE(ServiceWorkerPrivate, AddRef)
 NS_IMPL_CYCLE_COLLECTION_UNROOT_NATIVE(ServiceWorkerPrivate, Release)
 
-// Tracks the "dom.disable_open_click_delay" preference.  Modified on main
-// thread, read on worker threads.
+// Tracks the "dom.serviceWorkers.disable_open_click_delay" preference.  Modified
+// on main thread, read on worker threads.
 // It is updated every time a "notificationclick" event is dispatched. While
 // this is done without synchronization, at the worst, the thread will just get
 // an older value within which a popup is allowed to be displayed, which will
@@ -123,8 +124,10 @@ public:
                                     KeepAliveToken* aKeepAliveToken,
                                     LifeCycleEventCallback* aScriptEvaluationCallback)
     : WorkerRunnable(aWorkerPrivate)
-    , mServiceWorkerPrivate(new nsMainThreadPtrHolder<ServiceWorkerPrivate>(aServiceWorkerPrivate))
-    , mKeepAliveToken(new nsMainThreadPtrHolder<KeepAliveToken>(aKeepAliveToken))
+    , mServiceWorkerPrivate(new nsMainThreadPtrHolder<ServiceWorkerPrivate>(
+        "CheckScriptEvaluationWithCallback::mServiceWorkerPrivate", aServiceWorkerPrivate))
+    , mKeepAliveToken(new nsMainThreadPtrHolder<KeepAliveToken>(
+        "CheckScriptEvaluationWithCallback::mKeepAliveToken", aKeepAliveToken))
     , mScriptEvaluationCallback(aScriptEvaluationCallback)
 #ifdef DEBUG
     , mDone(false)
@@ -144,8 +147,11 @@ public:
     aWorkerPrivate->AssertIsOnWorkerThread();
 
     bool fetchHandlerWasAdded = aWorkerPrivate->FetchHandlerWasAdded();
-    nsCOMPtr<nsIRunnable> runnable = NewRunnableMethod<bool>(this,
-      &CheckScriptEvaluationWithCallback::ReportFetchFlag, fetchHandlerWasAdded);
+    nsCOMPtr<nsIRunnable> runnable = NewRunnableMethod<bool>(
+      "dom::workers::CheckScriptEvaluationWithCallback::ReportFetchFlag",
+      this,
+      &CheckScriptEvaluationWithCallback::ReportFetchFlag,
+      fetchHandlerWasAdded);
     aWorkerPrivate->DispatchToMainThread(runnable.forget());
 
     ReportScriptEvaluationResult(aWorkerPrivate->WorkerScriptExecutedSuccessfully());
@@ -374,7 +380,10 @@ private:
     CycleCollectedJSContext* cx = CycleCollectedJSContext::Get();
     MOZ_ASSERT(cx);
 
-    RefPtr<nsIRunnable> r = NewRunnableMethod(this, &KeepAliveHandler::MaybeDone);
+    RefPtr<nsIRunnable> r =
+      NewRunnableMethod("dom::workers::KeepAliveHandler::MaybeDone",
+                        this,
+                        &KeepAliveHandler::MaybeDone);
     cx->DispatchToMicroTask(r.forget());
   }
 };
@@ -387,9 +396,11 @@ class RegistrationUpdateRunnable : public Runnable
   const bool mNeedTimeCheck;
 
 public:
-  RegistrationUpdateRunnable(nsMainThreadPtrHandle<ServiceWorkerRegistrationInfo>& aRegistration,
-                             bool aNeedTimeCheck)
-    : mRegistration(aRegistration)
+  RegistrationUpdateRunnable(
+    nsMainThreadPtrHandle<ServiceWorkerRegistrationInfo>& aRegistration,
+    bool aNeedTimeCheck)
+    : Runnable("dom::workers::RegistrationUpdateRunnable")
+    , mRegistration(aRegistration)
     , mNeedTimeCheck(aNeedTimeCheck)
   {
     MOZ_DIAGNOSTIC_ASSERT(mRegistration);
@@ -422,7 +433,8 @@ public:
     MOZ_ASSERT(aKeepAliveToken);
 
     mKeepAliveToken =
-      new nsMainThreadPtrHolder<KeepAliveToken>(aKeepAliveToken);
+      new nsMainThreadPtrHolder<KeepAliveToken>(
+        "ExtendableEventWorkerRunnable::mKeepAliveToken", aKeepAliveToken);
   }
 
   nsresult
@@ -447,7 +459,8 @@ public:
     aEvent->SetKeepAliveHandler(keepAliveHandler);
 
     ErrorResult result;
-    result = aWorkerScope->DispatchDOMEvent(nullptr, aEvent, nullptr, nullptr);
+    bool dummy;
+    result = aWorkerScope->DispatchEvent(aEvent, &dummy);
     if (NS_WARN_IF(result.Failed())) {
       result.SuppressException();
       return NS_ERROR_FAILURE;
@@ -861,9 +874,11 @@ public:
         mMessageId.IsEmpty()) {
       return;
     }
-    nsCOMPtr<nsIRunnable> runnable =
-      NewRunnableMethod<uint16_t>(this,
-        &PushErrorReporter::ReportOnMainThread, aReason);
+    nsCOMPtr<nsIRunnable> runnable = NewRunnableMethod<uint16_t>(
+      "dom::workers::PushErrorReporter::ReportOnMainThread",
+      this,
+      &PushErrorReporter::ReportOnMainThread,
+      aReason);
     MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
       workerPrivate->DispatchToMainThread(runnable.forget())));
   }
@@ -997,7 +1012,8 @@ ServiceWorkerPrivate::SendPushEvent(const nsAString& aMessageId,
   RefPtr<KeepAliveToken> token = CreateEventKeepAliveToken();
 
   nsMainThreadPtrHandle<ServiceWorkerRegistrationInfo> regInfo(
-    new nsMainThreadPtrHolder<ServiceWorkerRegistrationInfo>(aRegistration, false));
+    new nsMainThreadPtrHolder<ServiceWorkerRegistrationInfo>(
+      "ServiceWorkerRegistrationInfo", aRegistration, false));
 
   RefPtr<WorkerRunnable> r = new SendPushEventRunnable(mWorkerPrivate,
                                                        token,
@@ -1039,6 +1055,7 @@ namespace {
 
 class AllowWindowInteractionHandler final : public ExtendableEventCallback
                                           , public nsITimerCallback
+                                          , public nsINamed
                                           , public WorkerHolder
 {
   nsCOMPtr<nsITimer> mTimer;
@@ -1123,6 +1140,14 @@ class AllowWindowInteractionHandler final : public ExtendableEventCallback
     return NS_OK;
   }
 
+  // nsINamed virtual methods
+  NS_IMETHOD
+  GetName(nsACString& aName) override
+  {
+    aName.AssignLiteral("AllowWindowInteractionHandler");
+    return NS_OK;
+  }
+
   // WorkerHolder virtual methods
   bool
   Notify(Status aStatus) override
@@ -1150,7 +1175,7 @@ public:
   }
 };
 
-NS_IMPL_ISUPPORTS(AllowWindowInteractionHandler, nsITimerCallback)
+NS_IMPL_ISUPPORTS(AllowWindowInteractionHandler, nsITimerCallback, nsINamed)
 
 class SendNotificationEventRunnable final : public ExtendableEventWorkerRunnable
 {
@@ -1262,7 +1287,8 @@ ServiceWorkerPrivate::SendNotificationEvent(const nsAString& aEventName,
   WakeUpReason why;
   if (aEventName.EqualsLiteral(NOTIFICATION_CLICK_EVENT_NAME)) {
     why = NotificationClickEvent;
-    gDOMDisableOpenClickDelay = Preferences::GetInt("dom.disable_open_click_delay");
+    gDOMDisableOpenClickDelay =
+      Preferences::GetInt("dom.serviceWorkers.disable_open_click_delay");
   } else if (aEventName.EqualsLiteral(NOTIFICATION_CLOSE_EVENT_NAME)) {
     why = NotificationCloseEvent;
   } else {
@@ -1485,6 +1511,15 @@ public:
 
     if (mMarkLaunchServiceWorkerEnd) {
       mInterceptedChannel->SetLaunchServiceWorkerEnd(TimeStamp::Now());
+
+      // A probe to measure sw launch time for telemetry.
+      TimeStamp launchStartTime = TimeStamp();
+      mInterceptedChannel->GetLaunchServiceWorkerStart(&launchStartTime);
+
+      TimeStamp launchEndTime = TimeStamp();
+      mInterceptedChannel->GetLaunchServiceWorkerEnd(&launchEndTime);
+      Telemetry::AccumulateTimeDelta(Telemetry::SERVICE_WORKER_LAUNCH_TIME,
+                                     launchStartTime, launchEndTime);
     }
 
     mInterceptedChannel->SetDispatchFetchEventEnd(TimeStamp::Now());
@@ -1508,8 +1543,10 @@ private:
   class ResumeRequest final : public Runnable {
     nsMainThreadPtrHandle<nsIInterceptedChannel> mChannel;
   public:
-    explicit ResumeRequest(nsMainThreadPtrHandle<nsIInterceptedChannel>& aChannel)
-      : mChannel(aChannel)
+    explicit ResumeRequest(
+      nsMainThreadPtrHandle<nsIInterceptedChannel>& aChannel)
+      : Runnable("dom::workers::FetchEventRunnable::ResumeRequest")
+      , mChannel(aChannel)
     {
       mChannel->SetFinishResponseStart(TimeStamp::Now());
     }
@@ -1567,7 +1604,7 @@ private:
                                                               mReferrerPolicy,
                                                               mContentPolicyType,
                                                               mIntegrity);
-    internalReq->SetBody(mUploadStream);
+    internalReq->SetBody(mUploadStream, -1);
     // For Telemetry, note that this Request object was created by a Fetch event.
     internalReq->SetCreatedByFetchEvent();
 
@@ -1575,7 +1612,10 @@ private:
     if (NS_WARN_IF(!global)) {
       return false;
     }
-    RefPtr<Request> request = new Request(global, internalReq);
+
+    // TODO This request object should be created with a AbortSignal object
+    // which should be aborted if the loading is aborted. See bug 1394102.
+    RefPtr<Request> request = new Request(global, internalReq, nullptr);
 
     MOZ_ASSERT_IF(internalReq->IsNavigationRequest(),
                   request->Redirect() == RequestRedirect::Manual);
@@ -1668,7 +1708,9 @@ ServiceWorkerPrivate::SendFetchEvent(nsIInterceptedChannel* aChannel,
   // if the ServiceWorker script fails to load for some reason, just resume
   // the original channel.
   nsCOMPtr<nsIRunnable> failRunnable =
-    NewRunnableMethod(aChannel, &nsIInterceptedChannel::ResetInterception);
+    NewRunnableMethod("nsIInterceptedChannel::ResetInterception",
+                      aChannel,
+                      &nsIInterceptedChannel::ResetInterception);
 
   aChannel->SetLaunchServiceWorkerStart(TimeStamp::Now());
   aChannel->SetDispatchFetchEventStart(TimeStamp::Now());
@@ -1685,10 +1727,12 @@ ServiceWorkerPrivate::SendFetchEvent(nsIInterceptedChannel* aChannel,
   }
 
   nsMainThreadPtrHandle<nsIInterceptedChannel> handle(
-    new nsMainThreadPtrHolder<nsIInterceptedChannel>(aChannel, false));
+    new nsMainThreadPtrHolder<nsIInterceptedChannel>(
+      "nsIInterceptedChannel", aChannel, false));
 
   nsMainThreadPtrHandle<ServiceWorkerRegistrationInfo> regInfo(
-    new nsMainThreadPtrHolder<ServiceWorkerRegistrationInfo>(registration, false));
+    new nsMainThreadPtrHolder<ServiceWorkerRegistrationInfo>(
+      "ServiceWorkerRegistrationInfo", registration, false));
 
   RefPtr<KeepAliveToken> token = CreateEventKeepAliveToken();
 
@@ -1775,7 +1819,7 @@ ServiceWorkerPrivate::SpawnWorkerIfNeeded(WakeUpReason aWhy,
   // If we are loading a script for a ServiceWorker then we must not
   // try to intercept it.  If the interception matches the current
   // ServiceWorker's scope then we could deadlock the load.
-  info.mLoadFlags = mInfo->GetLoadFlags() |
+  info.mLoadFlags = mInfo->GetImportsLoadFlags() |
                     nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
 
   rv = info.mBaseURI->GetHost(info.mDomain);
@@ -1999,6 +2043,7 @@ ServiceWorkerPrivate::IsIdle() const
 namespace {
 
 class ServiceWorkerPrivateTimerCallback final : public nsITimerCallback
+                                              , public nsINamed
 {
 public:
   typedef void (ServiceWorkerPrivate::*Method)(nsITimer*);
@@ -2018,6 +2063,13 @@ public:
     return NS_OK;
   }
 
+  NS_IMETHOD
+  GetName(nsACString& aName) override
+  {
+    aName.AssignLiteral("ServiceWorkerPrivateTimerCallback");
+    return NS_OK;
+  }
+
 private:
   ~ServiceWorkerPrivateTimerCallback() = default;
 
@@ -2027,7 +2079,7 @@ private:
   NS_DECL_THREADSAFE_ISUPPORTS
 };
 
-NS_IMPL_ISUPPORTS(ServiceWorkerPrivateTimerCallback, nsITimerCallback);
+NS_IMPL_ISUPPORTS(ServiceWorkerPrivateTimerCallback, nsITimerCallback, nsINamed);
 
 } // anonymous namespace
 

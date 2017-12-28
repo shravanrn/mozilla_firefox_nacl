@@ -8,13 +8,6 @@ xul|caption {
   background-color: transparent;
 }
 
-xul|button,
-html|button,
-xul|colorpicker[type="button"],
-xul|menulist {
-  margin: 2px 4px;
-}
-
 xul|menulist:not([editable="true"]) > xul|*.menulist-dropmarker {
   margin-top: 1px;
   margin-bottom: 1px;
@@ -30,7 +23,8 @@ xul|checkbox {
   }
 
   xul|*.checkbox-check[checked] {
-    list-style-image: url("chrome://global/skin/in-content/check.svg#check-native");
+    fill: -moz-dialogText;
+    stroke: none;
     background-color: -moz-dialog;
   }
 }
@@ -46,8 +40,8 @@ xul|radio {
   }
 
   xul|*.radio-check[selected] {
-    list-style-image: url("chrome://global/skin/in-content/radio.svg#radio-native");
     background-color: -moz-dialog;
+    fill: -moz-dialogText;
   }
 }
 
@@ -75,4 +69,12 @@ html|input[type="checkbox"]:-moz-focusring + html|label:before {
   xul|listbox xul|listitem[selected="true"] {
      border: 2px dotted Highlight;
   }
+}
+
+*|*.header-name {
+  font-size: 1.83rem;
+}
+
+*|*.category-name {
+  font-size: 1.33rem;
 }

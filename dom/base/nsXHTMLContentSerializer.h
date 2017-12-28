@@ -15,21 +15,27 @@
 
 #include "mozilla/Attributes.h"
 #include "nsXMLContentSerializer.h"
-#include "nsIEntityConverter.h"
 #include "nsString.h"
 #include "nsTArray.h"
 
 class nsIContent;
 class nsIAtom;
 
+namespace mozilla {
+class Encoding;
+}
+
 class nsXHTMLContentSerializer : public nsXMLContentSerializer {
  public:
   nsXHTMLContentSerializer();
   virtual ~nsXHTMLContentSerializer();
 
-  NS_IMETHOD Init(uint32_t flags, uint32_t aWrapColumn,
-                  const char* aCharSet, bool aIsCopying,
-                  bool aRewriteEncodingDeclaration) override;
+  NS_IMETHOD Init(uint32_t flags,
+                  uint32_t aWrapColumn,
+                  const mozilla::Encoding* aEncoding,
+                  bool aIsCopying,
+                  bool aRewriteEncodingDeclaration,
+                  bool* aNeedsPreformatScanning) override;
 
   NS_IMETHOD AppendText(nsIContent* aText,
                         int32_t aStartOffset,
@@ -92,15 +98,10 @@ class nsXHTMLContentSerializer : public nsXMLContentSerializer {
   virtual bool AppendAndTranslateEntities(const nsAString& aStr,
                                           nsAString& aOutputStr) override;
 
-  nsresult EscapeURI(nsIContent* aContent,
-                     const nsAString& aURI,
-                     nsAString& aEscapedURI);
-
 private:
   bool IsElementPreformatted(nsIContent* aNode);
 
 protected:
-  nsCOMPtr<nsIEntityConverter> mEntityConverter;
 
   /*
    * isHTMLParser should be set to true by the HTML parser which inherits from
@@ -126,7 +127,7 @@ protected:
   // whole documents.
   bool          mRewriteEncodingDeclaration;
 
-  // To keep track of First LI child of OL in selected range 
+  // To keep track of First LI child of OL in selected range
   bool          mIsFirstChildOfOL;
 
   // To keep track of startvalue of OL and first list item for nested lists

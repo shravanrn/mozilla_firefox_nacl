@@ -18,24 +18,24 @@ https://trac.torproject.org/projects/tor/ticket/1517
 <canvas id="test-canvas" width="100" height="100"></canvas>
 
 <!-- The main testing script -->
-<script type="application/javascript;version=1.7">
+<script type="application/javascript">
   SimpleTest.requestFlakyTimeout("testing JS time-based fingerprinting");
 
   // Prepare for test of AudioContext.currentTime
   let audioContext = new AudioContext();
   // Prepare for test of CanvasStream.currentTime
   let canvas = document.getElementById("test-canvas");
-  let context = canvas.getContext('2d');
+  let context = canvas.getContext("2d");
   context.fillText("test", 20, 20);
   let canvasStream = canvas.captureStream(25);
 
   // Known ways to generate time stamps, in milliseconds
   const timeStampCodes = [
-    'performance.now()',
-    'new Date().getTime()',
-    'new Event("").timeStamp',
-    'new File([], "").lastModified',
-    'new File([], "").lastModifiedDate.getTime()',
+    "performance.now()",
+    "new Date().getTime()",
+    "new Event(\"\").timeStamp",
+    "new File([], \"\").lastModified",
+    "new File([], \"\").lastModifiedDate.getTime()",
   ];
 
   const kExpectedResolution = 100;
@@ -70,25 +70,25 @@ https://trac.torproject.org/projects/tor/ticket/1517
     worker.terminate();
   }
 
-  add_task(function* testWorker() {
+  add_task(async function testWorker() {
     // Create one worker before setting the pref, and one after, in order to
     // check that the resolution is updated whether or not the worker was
     // already started
     let worker1 = new Worker("worker_child.js");
-    yield SpecialPowers.pushPrefEnv({
+    await SpecialPowers.pushPrefEnv({
       "set": [["privacy.resistFingerprinting", true]]});
     let worker2 = new Worker("worker_child.js");
     // Allow ~550 ms to elapse, so we can get non-zero
     // time values for all elements.
-    yield new Promise(resolve => window.setTimeout(resolve, 550));
-    yield checkWorker(worker1);
-    yield checkWorker(worker2);
+    await new Promise(resolve => window.setTimeout(resolve, 550));
+    await checkWorker(worker1);
+    await checkWorker(worker2);
   });
 
-  add_task(function* testDOM() {
+  add_task(async function testDOM() {
     let timeStampCodesDOM = timeStampCodes.concat([
-      'audioContext.currentTime * 1000',
-      'canvasStream.currentTime * 1000',
+      "audioContext.currentTime * 1000",
+      "canvasStream.currentTime * 1000",
     ]);
     // Loop through each timeStampCode, evaluate it,
     // and check if it is rounded to the nearest 100 ms.

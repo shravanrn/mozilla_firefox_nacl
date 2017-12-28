@@ -91,7 +91,7 @@ public:
 
   // Handles calling OnStart/Stop if there are errors during diversion.
   // Called asynchronously from FailDiversion.
-  void NotifyDiversionFailed(nsresult aErrorCode, bool aSkipResume = true);
+  void NotifyDiversionFailed(nsresult aErrorCode);
 
   // Forwarded to nsHttpChannel::SetApplyConversion.
   void SetApplyConversion(bool aApplyConversion) {
@@ -151,6 +151,7 @@ protected:
               const bool&                allowSpdy,
               const bool&                allowAltSvc,
               const bool&                beConservative,
+              const uint32_t&            tlsFlags,
               const OptionalLoadInfoArgs& aLoadInfoArgs,
               const OptionalHttpResponseHead& aSynthesizedResponseHead,
               const nsCString&           aSecurityInfoSerialization,
@@ -171,7 +172,8 @@ protected:
               const TimeStamp&           aDispatchFetchEventStart,
               const TimeStamp&           aDispatchFetchEventEnd,
               const TimeStamp&           aHandleFetchEventStart,
-              const TimeStamp&           aHandleFetchEventEnd);
+              const TimeStamp&           aHandleFetchEventEnd,
+              const bool&                aForceMainDocumentChannel);
 
   virtual mozilla::ipc::IPCResult RecvSetPriority(const int16_t& priority) override;
   virtual mozilla::ipc::IPCResult RecvSetClassOfService(const uint32_t& cos) override;
@@ -206,7 +208,7 @@ protected:
   MOZ_MUST_USE nsresult ResumeForDiversion();
 
   // Asynchronously calls NotifyDiversionFailed.
-  void FailDiversion(nsresult aErrorCode, bool aSkipResume = true);
+  void FailDiversion(nsresult aErrorCode);
 
   friend class HttpChannelParentListener;
   RefPtr<mozilla::dom::TabParent> mTabParent;
@@ -214,6 +216,7 @@ protected:
   MOZ_MUST_USE nsresult
   ReportSecurityMessage(const nsAString& aMessageTag,
                         const nsAString& aMessageCategory) override;
+  nsresult LogBlockedCORSRequest(const nsAString& aMessage) override;
 
   // Calls SendDeleteSelf and sets mIPCClosed to true because we should not
   // send any more messages after that. Bug 1274886

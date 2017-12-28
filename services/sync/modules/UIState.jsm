@@ -72,6 +72,9 @@ const UIStateInternal = {
 
   init() {
     this._initialized = true;
+    if (!Services.prefs.prefHasUserValue("services.sync.username")) {
+      return;
+    }
     // Refresh the state in the background.
     this.refreshState().catch(e => {
       Cu.reportError(e);
@@ -104,9 +107,10 @@ const UIStateInternal = {
 
   // Builds a new state from scratch.
   async refreshState() {
-    this._state = {};
-    await this._refreshFxAState();
-    this._setLastSyncTime(this._state); // We want this in case we change accounts.
+    const newState = {};
+    await this._refreshFxAState(newState);
+    this._setLastSyncTime(newState); // We want this in case we change accounts.
+    this._state = newState;
 
     this.notifyStateUpdated();
     return this.state;
@@ -124,25 +128,26 @@ const UIStateInternal = {
     Services.obs.notifyObservers(null, ON_UPDATE);
   },
 
-  async _refreshFxAState() {
+  async _refreshFxAState(newState) {
     let userData = await this._getUserData();
-    this._populateWithUserData(this._state, userData);
-    if (this.state.status != STATUS_SIGNED_IN) {
+    await this._populateWithUserData(newState, userData);
+    if (newState.status != STATUS_SIGNED_IN) {
       return;
     }
     let profile = await this._getProfile();
     if (!profile) {
       return;
     }
-    this._populateWithProfile(this._state, profile);
+    this._populateWithProfile(newState, profile);
   },
 
-  _populateWithUserData(state, userData) {
+  async _populateWithUserData(state, userData) {
     let status;
     if (!userData) {
       status = STATUS_NOT_CONFIGURED;
     } else {
-      if (this._loginFailed()) {
+      let loginFailed = await this._loginFailed();
+      if (loginFailed) {
         status = STATUS_LOGIN_FAILED;
       } else if (!userData.verified) {
         status = STATUS_NOT_VERIFIED;
@@ -191,7 +196,16 @@ const UIStateInternal = {
     }
   },
 
-  _loginFailed() {
+  async _loginFailed() {
+    // First ask FxA if it thinks the user needs re-authentication. In practice,
+    // this check is probably canonical (ie, we probably don't really need
+    // the check below at all as we drop local session info on the first sign
+    // of a problem) - but we keep it for now to keep the risk down.
+    let hasLocalSession = await this.fxAccounts.hasLocalSession();
+    if (!hasLocalSession) {
+      return true;
+    }
+
     // Referencing Weave.Service will implicitly initialize sync, and we don't
     // want to force that - so first check if it is ready.
     let service = Cc["@mozilla.org/weave/service;1"]

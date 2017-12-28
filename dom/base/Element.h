@@ -62,6 +62,7 @@ class nsDOMStringMap;
 
 namespace mozilla {
 class DeclarationBlock;
+class TextEditor;
 namespace dom {
   struct AnimationFilter;
   struct ScrollIntoViewOptions;
@@ -84,13 +85,18 @@ NS_GetContentList(nsINode* aRootNode,
 
 // Element-specific flags
 enum {
-  // These two bits are shared by Gecko's and Servo's restyle systems for
+  // These four bits are shared by Gecko's and Servo's restyle systems for
   // different purposes. They should not be accessed directly, and access to
   // them should be properly guarded by asserts.
   ELEMENT_SHARED_RESTYLE_BIT_1 = ELEMENT_FLAG_BIT(0),
   ELEMENT_SHARED_RESTYLE_BIT_2 = ELEMENT_FLAG_BIT(1),
   ELEMENT_SHARED_RESTYLE_BIT_3 = ELEMENT_FLAG_BIT(2),
   ELEMENT_SHARED_RESTYLE_BIT_4 = ELEMENT_FLAG_BIT(3),
+
+  ELEMENT_SHARED_RESTYLE_BITS = ELEMENT_SHARED_RESTYLE_BIT_1 |
+                                ELEMENT_SHARED_RESTYLE_BIT_2 |
+                                ELEMENT_SHARED_RESTYLE_BIT_3 |
+                                ELEMENT_SHARED_RESTYLE_BIT_4,
 
   // Whether this node has dirty descendants for Servo's style system.
   ELEMENT_HAS_DIRTY_DESCENDANTS_FOR_SERVO = ELEMENT_SHARED_RESTYLE_BIT_1,
@@ -148,8 +154,7 @@ enum {
                               ELEMENT_POTENTIAL_RESTYLE_ROOT_FLAGS |
                               ELEMENT_IS_CONDITIONAL_RESTYLE_ANCESTOR,
 
-  // Set if this element is marked as 'scrollgrab' (see bug 912666)
-  ELEMENT_HAS_SCROLLGRAB = ELEMENT_FLAG_BIT(5),
+  // ELEMENT_FLAG_BIT(5) is currently unused
 
   // Remaining bits are for subclasses
   ELEMENT_TYPE_SPECIFIC_BITS_OFFSET = NODE_TYPE_SPECIFIC_BITS_OFFSET + 6
@@ -204,6 +209,8 @@ public:
 #endif // MOZILLA_INTERNAL_API
 
   NS_DECLARE_STATIC_IID_ACCESSOR(NS_ELEMENT_IID)
+
+  NS_DECL_ADDSIZEOFEXCLUDINGTHIS
 
   NS_IMETHOD QueryInterface(REFNSIID aIID, void** aInstancePtr) override;
 
@@ -303,6 +310,23 @@ public:
    * Clear all style state locks on this element.
    */
   void ClearStyleStateLocks();
+
+  /**
+   * Accessors for the state of our dir attribute.
+   */
+  bool HasDirAuto() const
+  {
+    return State().HasState(NS_EVENT_STATE_DIR_ATTR_LIKE_AUTO);
+  }
+
+  /**
+   * Elements with dir="rtl" or dir="ltr".
+   */
+  bool HasFixedDir() const
+  {
+    return State().HasAtLeastOneOfStates(NS_EVENT_STATE_DIR_ATTR_LTR |
+                                         NS_EVENT_STATE_DIR_ATTR_RTL);
+  }
 
   /**
    * Get the inline style declaration, if any, for this element.
@@ -447,19 +471,26 @@ public:
 
   bool GetBindingURL(nsIDocument* aDocument, css::URLValue **aResult);
 
-  // The bdi element defaults to dir=auto if it has no dir attribute set.
-  // Other elements will only have dir=auto if they have an explicit dir=auto,
-  // which will mean that HasValidDir() returns true but HasFixedDir() returns
-  // false
-  inline bool HasDirAuto() const {
-    return (!HasFixedDir() &&
-            (HasValidDir() || IsHTMLElement(nsGkAtoms::bdi)));
-  }
-
   Directionality GetComputedDirectionality() const;
 
-  inline Element* GetFlattenedTreeParentElement() const;
-  inline Element* GetFlattenedTreeParentElementForStyle() const;
+  static const uint32_t kAllServoDescendantBits =
+    ELEMENT_HAS_DIRTY_DESCENDANTS_FOR_SERVO |
+    ELEMENT_HAS_ANIMATION_ONLY_DIRTY_DESCENDANTS_FOR_SERVO |
+    NODE_DESCENDANTS_NEED_FRAMES;
+
+  /**
+   * Notes that something in the given subtree of this element needs dirtying,
+   * and that all the relevant dirty bits have already been propagated up to the
+   * element.
+   *
+   * This is important because `NoteDirtyForServo` uses the dirty bits to reason
+   * about the shape of the tree, so we can't just call into there.
+   */
+  void NoteDirtySubtreeForServo();
+
+  void NoteDirtyForServo();
+  void NoteAnimationOnlyDirtyForServo();
+  void NoteDescendantsNeedFramesForServo();
 
   bool HasDirtyDescendantsForServo() const
   {
@@ -477,17 +508,27 @@ public:
     UnsetFlags(ELEMENT_HAS_DIRTY_DESCENDANTS_FOR_SERVO);
   }
 
-  inline void NoteDirtyDescendantsForServo();
+  bool HasAnimationOnlyDirtyDescendantsForServo() const {
+    MOZ_ASSERT(IsStyledByServo());
+    return HasFlag(ELEMENT_HAS_ANIMATION_ONLY_DIRTY_DESCENDANTS_FOR_SERVO);
+  }
 
-#ifdef DEBUG
-  inline bool DirtyDescendantsBitIsPropagatedForServo();
-#endif
+  void SetHasAnimationOnlyDirtyDescendantsForServo() {
+    MOZ_ASSERT(IsStyledByServo());
+    SetFlags(ELEMENT_HAS_ANIMATION_ONLY_DIRTY_DESCENDANTS_FOR_SERVO);
+  }
+
+  void UnsetHasAnimationOnlyDirtyDescendantsForServo() {
+    MOZ_ASSERT(IsStyledByServo());
+    UnsetFlags(ELEMENT_HAS_ANIMATION_ONLY_DIRTY_DESCENDANTS_FOR_SERVO);
+  }
 
   bool HasServoData() const {
     return !!mServoData.Get();
   }
 
-  void ClearServoData();
+  void ClearServoData() { ClearServoData(GetComposedDoc()); }
+  void ClearServoData(nsIDocument* aDocument);
 
   /**
    * Gets the custom element data used by web components custom element.
@@ -497,7 +538,7 @@ public:
    */
   inline CustomElementData* GetCustomElementData() const
   {
-    nsDOMSlots *slots = GetExistingDOMSlots();
+    nsExtendedDOMSlots* slots = GetExistingExtendedDOMSlots();
     if (slots) {
       return slots->mCustomElementData;
     }
@@ -582,6 +623,16 @@ protected:
     RemoveStatesSilently(aStates);
     NotifyStateChange(aStates);
   }
+  virtual void ToggleStates(EventStates aStates, bool aNotify)
+  {
+    NS_PRECONDITION(!aStates.HasAtLeastOneOfStates(INTRINSIC_STATES),
+                    "Should only be removing externally-managed states here");
+    mState ^= aStates;
+    if (aNotify) {
+      NotifyStateChange(aStates);
+    }
+  }
+
 public:
   // Public methods to manage state bits in MANUALLY_MANAGED_STATES.
   void AddManuallyManagedStates(EventStates aStates)
@@ -676,6 +727,13 @@ public:
                               bool aNotify, nsAttrValue& aOldValue,
                               uint8_t* aModType, bool* aHasListeners,
                               bool* aOldValueSet);
+
+  /**
+   * Sets the class attribute to a value that contains no whitespace.
+   * Assumes that we are not notifying and that the attribute hasn't been
+   * set previously.
+   */
+  nsresult SetSingleClassFromParser(nsIAtom* aSingleClassName);
 
   virtual nsresult SetAttr(int32_t aNameSpaceID, nsIAtom* aName, nsIAtom* aPrefix,
                            const nsAString& aValue, bool aNotify) override;
@@ -998,7 +1056,7 @@ public:
 
   ShadowRoot *FastGetShadowRoot() const
   {
-    nsDOMSlots* slots = GetExistingDOMSlots();
+    nsExtendedDOMSlots* slots = GetExistingExtendedDOMSlots();
     return slots ? slots->mShadowRoot.get() : nullptr;
   }
 
@@ -1033,11 +1091,11 @@ public:
   }
   int32_t ClientWidth()
   {
-    return nsPresContext::AppUnitsToIntCSSPixels(GetClientAreaRect().width);
+    return nsPresContext::AppUnitsToIntCSSPixels(GetClientAreaRect().Width());
   }
   int32_t ClientHeight()
   {
-    return nsPresContext::AppUnitsToIntCSSPixels(GetClientAreaRect().height);
+    return nsPresContext::AppUnitsToIntCSSPixels(GetClientAreaRect().Height());
   }
   int32_t ScrollTopMin()
   {
@@ -1237,9 +1295,9 @@ public:
   nsINode* GetScopeChainParent() const override;
 
   /**
-   * Locate an nsIEditor rooted at this content node, if there is one.
+   * Locate a TextEditor rooted at this content node, if there is one.
    */
-  nsIEditor* GetEditorInternal();
+  mozilla::TextEditor* GetTextEditorInternal();
 
   /**
    * Helper method for NS_IMPL_BOOL_ATTR macro.
@@ -1337,6 +1395,7 @@ public:
   float FontSizeInflation();
 
   net::ReferrerPolicy GetReferrerPolicyAsEnum();
+  net::ReferrerPolicy ReferrerPolicyFromAttr(const nsAttrValue* aValue);
 
   /*
    * Helpers for .dataset.  This is implemented on Element, though only some
@@ -1786,15 +1845,16 @@ _elementName::Clone(mozilla::dom::NodeInfo *aNodeInfo, nsINode **aResult,   \
   return rv;                                                                \
 }
 
-#define NS_IMPL_ELEMENT_CLONE_WITH_INIT(_elementName)                       \
+#define EXPAND(...) __VA_ARGS__
+#define NS_IMPL_ELEMENT_CLONE_WITH_INIT_HELPER(_elementName, extra_args_)   \
 nsresult                                                                    \
 _elementName::Clone(mozilla::dom::NodeInfo *aNodeInfo, nsINode **aResult,   \
                     bool aPreallocateChildren) const                        \
 {                                                                           \
   *aResult = nullptr;                                                       \
   already_AddRefed<mozilla::dom::NodeInfo> ni =                             \
-    RefPtr<mozilla::dom::NodeInfo>(aNodeInfo).forget();                   \
-  _elementName *it = new _elementName(ni);                                  \
+    RefPtr<mozilla::dom::NodeInfo>(aNodeInfo).forget();                     \
+  _elementName *it = new _elementName(ni EXPAND extra_args_);               \
   if (!it) {                                                                \
     return NS_ERROR_OUT_OF_MEMORY;                                          \
   }                                                                         \
@@ -1811,6 +1871,11 @@ _elementName::Clone(mozilla::dom::NodeInfo *aNodeInfo, nsINode **aResult,   \
                                                                             \
   return rv;                                                                \
 }
+
+#define NS_IMPL_ELEMENT_CLONE_WITH_INIT(_elementName) \
+  NS_IMPL_ELEMENT_CLONE_WITH_INIT_HELPER(_elementName, ())
+#define NS_IMPL_ELEMENT_CLONE_WITH_INIT_AND_PARSER(_elementName) \
+  NS_IMPL_ELEMENT_CLONE_WITH_INIT_HELPER(_elementName, (, NOT_FROM_PARSER))
 
 /**
  * A macro to implement the getter and setter for a given string

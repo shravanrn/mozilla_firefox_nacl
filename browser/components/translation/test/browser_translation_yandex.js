@@ -6,11 +6,18 @@
 
 "use strict";
 
+// The folllowing rejection is left unhandled in some cases. This bug should be
+// fixed, but for the moment this file is whitelisted.
+//
+// NOTE: Whitelisting a class of rejections should be limited. Normally you
+//       should use "expectUncaughtRejection" to flag individual failures.
+Cu.import("resource://testing-common/PromiseTestUtils.jsm", this);
+PromiseTestUtils.whitelistRejectionsGlobally(/NS_ERROR_ILLEGAL_VALUE/);
+
 const kEnginePref = "browser.translation.engine";
 const kApiKeyPref = "browser.translation.yandex.apiKeyOverride";
 const kShowUIPref = "browser.translation.ui.show";
 
-const {Promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
 const {Translation} = Cu.import("resource:///modules/translation/Translation.jsm", {});
 
 add_task(async function setup() {
@@ -71,10 +78,10 @@ add_task(async function test_yandex_attribution() {
 
 
 add_task(async function test_preference_attribution() {
-
     let prefUrl = "about:preferences#general";
+    let waitPrefLoaded = TestUtils.topicObserved("sync-pane-loaded", () => true);
     let tab = await promiseTestPageLoad(prefUrl);
-
+    await waitPrefLoaded;
     let browser = gBrowser.getBrowserForTab(tab);
     let win = browser.contentWindow;
     let bingAttribution = win.document.getElementById("bingAttribution");
@@ -82,7 +89,6 @@ add_task(async function test_preference_attribution() {
     ok(bingAttribution.hidden, "Bing attribution should be hidden.");
 
     gBrowser.removeTab(tab);
-
 });
 
 /**

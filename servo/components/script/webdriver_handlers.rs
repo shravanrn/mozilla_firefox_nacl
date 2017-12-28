@@ -22,9 +22,7 @@ use dom::htmliframeelement::HTMLIFrameElement;
 use dom::htmlinputelement::HTMLInputElement;
 use dom::htmloptionelement::HTMLOptionElement;
 use dom::node::{Node, window_from_node};
-use euclid::point::Point2D;
-use euclid::rect::Rect;
-use euclid::size::Size2D;
+use euclid::{Point2D, Rect, Size2D};
 use hyper_serde::Serde;
 use ipc_channel::ipc::{self, IpcSender};
 use js::jsapi::{HandleValue, JSContext};
@@ -394,7 +392,7 @@ pub fn handle_is_selected(documents: &Documents,
             else if let Some(option_element) = node.downcast::<HTMLOptionElement>() {
                 Ok(option_element.Selected())
             }
-            else if let Some(_) = node.downcast::<HTMLElement>() {
+            else if node.is::<HTMLElement>() {
                 Ok(false) // regular elements are not selectable
             } else {
                 Err(())

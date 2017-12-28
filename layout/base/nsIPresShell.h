@@ -1,19 +1,7 @@
 /* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
- *
- * This Original Code has been modified by IBM Corporation.
- * Modifications made by IBM described herein are
- * Copyright (c) International Business Machines
- * Corporation, 2000
- *
- * Modifications to Mozilla code or documentation
- * identified per MPL Section 3.3
- *
- * Date         Modified by     Description of modification
- * 05/03/2000   IBM Corp.       Observer related defines for reflow
- */
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /* a presentation of a document, part 2 */
 
@@ -35,6 +23,7 @@
 #include "nsIContent.h"
 #include "nsISelectionController.h"
 #include "nsQueryFrame.h"
+#include "nsStringFwd.h"
 #include "nsCoord.h"
 #include "nsColor.h"
 #include "nsFrameManagerBase.h"
@@ -51,16 +40,16 @@
 #include "nsFrameState.h"
 #include "Units.h"
 
+class gfxContext;
 class nsDocShell;
 class nsIDocument;
 class nsIFrame;
 class nsPresContext;
+class nsWindowSizes;
 class nsViewManager;
 class nsView;
-class nsRenderingContext;
 class nsIPageSequenceFrame;
 class nsCanvasFrame;
-class nsAString;
 class nsCaret;
 namespace mozilla {
 class AccessibleCaretEventHub;
@@ -77,7 +66,6 @@ template<class E> class nsCOMArray;
 class AutoWeakFrame;
 class WeakFrame;
 class nsIScrollableFrame;
-class gfxContext;
 class nsIDOMEvent;
 class nsDisplayList;
 class nsDisplayListBuilder;
@@ -97,7 +85,6 @@ class DocAccessible;
 } // namespace a11y
 } // namespace mozilla
 #endif
-struct nsArenaMemoryStats;
 class nsITimer;
 
 namespace mozilla {
@@ -288,7 +275,6 @@ public:
   }
 #endif
 
-#ifdef MOZILLA_INTERNAL_API
   mozilla::StyleSetHandle StyleSet() const { return mStyleSet; }
 
   nsCSSFrameConstructor* FrameConstructor() const { return mFrameConstructor; }
@@ -299,8 +285,6 @@ public:
     return reinterpret_cast<nsFrameManager*>
                            (const_cast<nsIPresShell*>(this)->mFrameManager);
   }
-
-#endif
 
   /* Enable/disable author style level. Disabling author style disables the entire
    * author level of the cascade, including the HTML preshint level.
@@ -404,13 +388,8 @@ public:
   /**
    * This calls through to the frame manager to get the root frame.
    */
-  virtual nsIFrame* GetRootFrameExternal() const;
   nsIFrame* GetRootFrame() const {
-#ifdef MOZILLA_INTERNAL_API
     return mFrameManager->GetRootFrame();
-#else
-    return GetRootFrameExternal();
-#endif
   }
 
   /*
@@ -423,21 +402,46 @@ public:
    */
   nsIScrollableFrame* GetRootScrollFrameAsScrollable() const;
 
-  /*
-   * The same as GetRootScrollFrame, but returns an nsIScrollableFrame.
-   * Can be called by code not linked into gklayout.
+  /**
+   * Get the current focused content or DOM selection that should be the
+   * target for scrolling.
    */
-  virtual nsIScrollableFrame* GetRootScrollFrameAsScrollableExternal() const;
+  already_AddRefed<nsIContent> GetContentForScrolling() const;
 
-  /*
+  /**
+   * Get the DOM selection that should be the target for scrolling, if there
+   * is no focused content.
+   */
+  already_AddRefed<nsIContent> GetSelectedContentForScrolling() const;
+
+  /**
+   * Gets nearest scrollable frame from the specified content node. The frame
+   * is scrollable with overflow:scroll or overflow:auto in some direction when
+   * aDirection is eEither.  Otherwise, this returns a nearest frame that is
+   * scrollable in the specified direction.
+   */
+  enum ScrollDirection { eHorizontal, eVertical, eEither };
+  nsIScrollableFrame* GetScrollableFrameToScrollForContent(
+                         nsIContent* aContent,
+                         ScrollDirection aDirection);
+
+  /**
    * Gets nearest scrollable frame from current focused content or DOM
    * selection if there is no focused content. The frame is scrollable with
    * overflow:scroll or overflow:auto in some direction when aDirection is
    * eEither.  Otherwise, this returns a nearest frame that is scrollable in
    * the specified direction.
    */
-  enum ScrollDirection { eHorizontal, eVertical, eEither };
-  nsIScrollableFrame* GetFrameToScrollAsScrollable(ScrollDirection aDirection);
+  nsIScrollableFrame* GetScrollableFrameToScroll(ScrollDirection aDirection);
+
+  /**
+   * Gets nearest ancestor scrollable frame from aFrame.  The frame is
+   * scrollable with overflow:scroll or overflow:auto in some direction when
+   * aDirection is eEither.  Otherwise, this returns a nearest frame that is
+   * scrollable in the specified direction.
+   */
+  nsIScrollableFrame* GetNearestScrollableFrame(nsIFrame* aFrame,
+                                                ScrollDirection aDirection);
 
   /**
    * Returns the page sequence frame associated with the frame hierarchy.
@@ -505,20 +509,12 @@ public:
   virtual void NotifyCounterStylesAreDirty() = 0;
 
   /**
-   * Destroy the frames for aContent.  Note that this may destroy frames
-   * for an ancestor instead - aDestroyedFramesFor contains the content node
-   * where frames were actually destroyed (which should be used in the
-   * CreateFramesFor call).  The frame tree state will be captured before
-   * the frames are destroyed in the frame constructor.
+   * Destroy the frames for aElement, and reconstruct them asynchronously if
+   * needed.
+   *
+   * Note that this may destroy frames for an ancestor instead.
    */
-  virtual void DestroyFramesFor(nsIContent*  aContent,
-                                nsIContent** aDestroyedFramesFor) = 0;
-  /**
-   * Create new frames for aContent.  It will use the last captured layout
-   * history state captured in the frame constructor to restore the state
-   * in the new frame tree.
-   */
-  virtual void CreateFramesFor(nsIContent* aContent) = 0;
+  virtual void DestroyFramesFor(mozilla::dom::Element* aElement) = 0;
 
   void PostRecreateFramesFor(mozilla::dom::Element* aElement);
   void RestyleForAnimation(mozilla::dom::Element* aElement,
@@ -1007,7 +1003,7 @@ public:
   virtual void DumpReflows() = 0;
   virtual void CountReflows(const char * aName, nsIFrame * aFrame) = 0;
   virtual void PaintCount(const char * aName,
-                                      nsRenderingContext* aRenderingContext,
+                                      gfxContext* aRenderingContext,
                                       nsPresContext * aPresContext,
                                       nsIFrame * aFrame,
                                       const nsPoint& aOffset,
@@ -1151,49 +1147,11 @@ public:
                   mozilla::LayoutDeviceIntRect* aScreenRect,
                   uint32_t aFlags) = 0;
 
-  void AddAutoWeakFrameInternal(AutoWeakFrame* aWeakFrame);
-  virtual void AddAutoWeakFrameExternal(AutoWeakFrame* aWeakFrame);
-  void AddWeakFrameInternal(WeakFrame* aWeakFrame);
-  virtual void AddWeakFrameExternal(WeakFrame* aWeakFrame);
+  void AddAutoWeakFrame(AutoWeakFrame* aWeakFrame);
+  void AddWeakFrame(WeakFrame* aWeakFrame);
 
-  void AddAutoWeakFrame(AutoWeakFrame* aWeakFrame)
-  {
-#ifdef MOZILLA_INTERNAL_API
-    AddAutoWeakFrameInternal(aWeakFrame);
-#else
-    AddAutoWeakFrameExternal(aWeakFrame);
-#endif
-  }
-  void AddWeakFrame(WeakFrame* aWeakFrame)
-  {
-#ifdef MOZILLA_INTERNAL_API
-    AddWeakFrameInternal(aWeakFrame);
-#else
-    AddWeakFrameExternal(aWeakFrame);
-#endif
-  }
-
-  void RemoveAutoWeakFrameInternal(AutoWeakFrame* aWeakFrame);
-  virtual void RemoveAutoWeakFrameExternal(AutoWeakFrame* aWeakFrame);
-  void RemoveWeakFrameInternal(WeakFrame* aWeakFrame);
-  virtual void RemoveWeakFrameExternal(WeakFrame* aWeakFrame);
-
-  void RemoveAutoWeakFrame(AutoWeakFrame* aWeakFrame)
-  {
-#ifdef MOZILLA_INTERNAL_API
-    RemoveAutoWeakFrameInternal(aWeakFrame);
-#else
-    RemoveAutoWeakFrameExternal(aWeakFrame);
-#endif
-  }
-  void RemoveWeakFrame(WeakFrame* aWeakFrame)
-  {
-#ifdef MOZILLA_INTERNAL_API
-    RemoveWeakFrameInternal(aWeakFrame);
-#else
-    RemoveWeakFrameExternal(aWeakFrame);
-#endif
-  }
+  void RemoveAutoWeakFrame(AutoWeakFrame* aWeakFrame);
+  void RemoveWeakFrame(WeakFrame* aWeakFrame);
 
 #ifdef DEBUG
   nsIFrame* GetDrawEventTargetFrame() { return mDrawEventTargetFrame; }
@@ -1422,6 +1380,17 @@ public:
   virtual already_AddRefed<nsPIDOMWindowOuter> GetRootWindow() = 0;
 
   /**
+   * This returns the focused DOM window under our top level window.
+   * I.e., when we are deactive, this returns the *last* focused DOM window.
+   */
+  virtual already_AddRefed<nsPIDOMWindowOuter> GetFocusedDOMWindowInOurWindow() = 0;
+
+  /**
+   * Get the focused content under this window.
+   */
+  already_AddRefed<nsIContent> GetFocusedContentInOurWindow() const;
+
+  /**
    * Get the layer manager for the widget of the root view, if it has
    * one.
    */
@@ -1568,13 +1537,7 @@ public:
   virtual void DispatchSynthMouseMove(mozilla::WidgetGUIEvent* aEvent,
                                       bool aFlushOnHoverChange) = 0;
 
-  virtual void AddSizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf,
-                                      nsArenaMemoryStats* aArenaObjectsSize,
-                                      size_t* aPresShellSize,
-                                      size_t* aStyleSetsSize,
-                                      size_t* aTextRunsSize,
-                                      size_t* aPresContextSize,
-                                      size_t* aFramePropertiesSize) = 0;
+  virtual void AddSizeOfIncludingThis(nsWindowSizes& aWindowSizes) const = 0;
 
   /**
    * Methods that retrieve the cached font inflation preferences.
@@ -1616,6 +1579,21 @@ public:
   void NotifyFontSizeInflationEnabledIsDirty()
   {
     mFontSizeInflationEnabledIsDirty = true;
+  }
+
+  /**
+   * Return true if the most recent interruptible reflow was interrupted.
+   */
+  bool IsReflowInterrupted() const {
+    return mWasLastReflowInterrupted;
+  }
+
+  /**
+   * Return true if the the interruptible reflows have to be suppressed.
+   * This may happen only if if the most recent reflow was interrupted.
+   */
+  bool SuppressInterruptibleReflows() const {
+    return mWasLastReflowInterrupted;
   }
 
   //////////////////////////////////////////////////////////////////////////////
@@ -1663,15 +1641,6 @@ public:
    * Refresh observer management.
    */
 protected:
-  virtual bool AddRefreshObserverExternal(nsARefreshObserver* aObserver,
-                                          mozilla::FlushType aFlushType);
-  bool AddRefreshObserverInternal(nsARefreshObserver* aObserver,
-                                  mozilla::FlushType aFlushType);
-  virtual bool RemoveRefreshObserverExternal(nsARefreshObserver* aObserver,
-                                             mozilla::FlushType aFlushType);
-  bool RemoveRefreshObserverInternal(nsARefreshObserver* aObserver,
-                                     mozilla::FlushType aFlushType);
-
   void DoObserveStyleFlushes();
   void DoObserveLayoutFlushes();
 
@@ -1709,22 +1678,9 @@ protected:
 
 public:
   bool AddRefreshObserver(nsARefreshObserver* aObserver,
-                          mozilla::FlushType aFlushType) {
-#ifdef MOZILLA_INTERNAL_API
-    return AddRefreshObserverInternal(aObserver, aFlushType);
-#else
-    return AddRefreshObserverExternal(aObserver, aFlushType);
-#endif
-  }
-
+                          mozilla::FlushType aFlushType);
   bool RemoveRefreshObserver(nsARefreshObserver* aObserver,
-                             mozilla::FlushType aFlushType) {
-#ifdef MOZILLA_INTERNAL_API
-    return RemoveRefreshObserverInternal(aObserver, aFlushType);
-#else
-    return RemoveRefreshObserverExternal(aObserver, aFlushType);
-#endif
-  }
+                             mozilla::FlushType aFlushType);
 
   virtual bool AddPostRefreshObserver(nsAPostRefreshObserver* aObserver);
   virtual bool RemovePostRefreshObserver(nsAPostRefreshObserver* aObserver);
@@ -1815,7 +1771,6 @@ protected:
   nsTHashtable<nsPtrHashKey<void>> mAllocatedPointers;
 #endif
 
-
   // Count of the number of times this presshell has been painted to a window.
   uint64_t                  mPaintCount;
 
@@ -1854,7 +1809,8 @@ protected:
   bool                      mIsFirstPaint : 1;
   bool                      mObservesMutationsForPrint : 1;
 
-  bool                      mSuppressInterruptibleReflows : 1;
+  // Whether the most recent interruptible reflow was actually interrupted:
+  bool                      mWasLastReflowInterrupted : 1;
   bool                      mScrollPositionClampingScrollPortSizeSet : 1;
 
   // True if a layout flush might not be a no-op

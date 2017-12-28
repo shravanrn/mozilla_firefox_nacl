@@ -10,6 +10,7 @@ include ProtocolTypes;
 include protocol PMediaSystemResourceManager;
 
 include "mozilla/GfxMessageUtils.h";
+include "mozilla/layers/LayersMessageUtils.h";
 include "mozilla/layers/WebRenderMessageUtils.h";
 
 using struct mozilla::layers::TextureInfo from "mozilla/layers/CompositorTypes.h";
@@ -59,7 +60,7 @@ parent:
   async PTexture(SurfaceDescriptor aSharedData, LayersBackend aBackend, TextureFlags aTextureFlags, uint64_t aSerial, MaybeExternalImageId aExternalImageId);
   async PMediaSystemResourceManager();
 
-  sync NewCompositable(CompositableHandle aHandle, TextureInfo aInfo);
+  sync NewCompositable(CompositableHandle aHandle, TextureInfo aInfo, LayersBackend aBackend);
   async ReleaseCompositable(CompositableHandle aHandle);
 };
 

@@ -97,7 +97,7 @@ Assert.prototype = {
       }
       a = pSlice.call(a);
       b = pSlice.call(b);
-      return _deepEqual(a, b);
+      return this._deepEqual(a, b);
     }
     try {
       var ka = Object.keys(a),
@@ -396,7 +396,8 @@ Assert.prototype = {
     // XXX Bug 634948
     // Regex objects are transformed to strings when evaluated in a sandbox
     // For now lets re-create the regex from its string representation
-    let pattern = flags = "";
+    let pattern = "";
+    let flags = "";
     try {
       let matches = aRegex.toString().match(/\/(.*)\/(.*)/);
 
@@ -591,14 +592,15 @@ Assert.prototype = {
     var timeoutInterval = hwindow.setInterval(wait, interval);
     var thread = Services.tm.currentThread;
 
-    while (self.result !== true && !self.timeIsUp) {
-      thread.processNextEvent(true);
-
+    Services.tm.spinEventLoopUntil(() => {
       let type = typeof(self.result);
-      if (type !== 'boolean')
+      if (type !== 'boolean') {
         throw TypeError("waitFor() callback has to return a boolean" +
                         " instead of '" + type + "'");
-    }
+      }
+
+      return self.result === true || self.timeIsUp;
+    });
 
     hwindow.clearInterval(timeoutInterval);
 

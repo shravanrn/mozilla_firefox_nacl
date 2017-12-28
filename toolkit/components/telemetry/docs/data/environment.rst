@@ -13,7 +13,7 @@ Some parts of the environment must be fetched asynchronously at startup. We don'
 This currently affects the following sections:
 
 - profile
-- addons
+- add-ons
 
 
 Structure:
@@ -32,11 +32,12 @@ Structure:
         platformVersion: <string>, // e.g. "35.0"
         xpcomAbi: <string>, // e.g. "x86-msvc"
         hotfixVersion: <string>, // e.g. "20141211.01"
+        updaterAvailable: <bool>, // Whether the app was built with app update available (MOZ_UPDATER)
       },
       settings: {
         addonCompatibilityCheckEnabled: <bool>, // Whether application compatibility is respected for add-ons
         blocklistEnabled: <bool>, // true on failure
-        isDefaultBrowser: <bool>, // null on failure, not available on Android
+        isDefaultBrowser: <bool>, // null on failure and until session restore completes, not available on Android
         defaultSearchEngine: <string>, // e.g. "yahoo"
         defaultSearchEngineData: {, // data about the current default engine
           name: <string>, // engine name, e.g. "Yahoo"; or "NONE" if no default
@@ -197,11 +198,15 @@ Structure:
               gpuProcess: { // Out-of-process compositing ("GPU process") feature
                 status: <string>, // "Available" means currently in use
               },
+              advancedLayers: { // Advanced Layers compositing. Only present if D3D11 enabled.
+                status: <string>,    // See the status codes above.
+              },
             },
           },
+        appleModelId: <string>, // Mac only or null on failure
       },
       addons: {
-        activeAddons: { // the currently enabled addons
+        activeAddons: { // the currently enabled add-ons
           <addon id>: {
             blocklisted: <bool>,
             description: <string>, // null if not available
@@ -212,7 +217,7 @@ Structure:
             scope: <integer>,
             type: <string>, // "extension", "service", ...
             foreignInstall: <bool>,
-            hasBinaryComponents: <bool>
+            hasBinaryComponents: <bool>,
             installDay: <number>, // days since UNIX epoch, 0 on failure
             updateDay: <number>, // days since UNIX epoch, 0 on failure
             signedState: <integer>, // whether the add-on is signed by AMO, only present for extensions
@@ -306,6 +311,10 @@ The object contains:
   [profile]/searchplugins/engine.xml
   [distribution]/searchplugins/common/engine.xml
   [other]/engine.xml
+  [other]/addEngineWithDetails
+  [other]/addEngineWithDetails:extensionID
+  [http/https]example.com/engine-name.xml
+  [http/https]example.com/engine-name.xml:extensionID
 
 - an ``origin`` property: the value will be ``default`` for engines that are built-in or from distribution partners, ``verified`` for user-installed engines with valid verification hashes, ``unverified`` for non-default engines without verification hash, and ``invalid`` for engines with broken verification hashes.
 
@@ -391,6 +400,8 @@ activeAddons
 ~~~~~~~~~~~~
 
 Starting from Firefox 44, the length of the following string fields: ``name``, ``description`` and ``version`` is limited to 100 characters. The same limitation applies to the same fields in ``theme`` and ``activePlugins``.
+
+Some of the fields in the record for each add-on are not available during startup.  The fields that will always be present are ``id``, ``version``, ``type``, ``updateDate``, ``scope``, ``isSystem``, ``isWebExtension``, and ``multiprocessCompatible``.  All the other fields documented above become present shortly after the ``sessionstore-windows-restored`` event is dispatched.
 
 experiments
 -----------

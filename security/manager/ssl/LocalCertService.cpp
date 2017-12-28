@@ -97,7 +97,8 @@ public:
   LocalCertGetTask(const nsACString& aNickname,
                    nsILocalCertGetCallback* aCallback)
     : LocalCertTask(aNickname)
-    , mCallback(new nsMainThreadPtrHolder<nsILocalCertGetCallback>(aCallback))
+    , mCallback(new nsMainThreadPtrHolder<nsILocalCertGetCallback>(
+        "LocalCertGetTask::mCallback", aCallback))
     , mCert(nullptr)
   {
   }
@@ -302,8 +303,8 @@ private:
     }
 
     // Check that subject and issuer match nickname
-    nsXPIDLString subjectName;
-    nsXPIDLString issuerName;
+    nsAutoString subjectName;
+    nsAutoString issuerName;
     mCert->GetSubjectName(subjectName);
     mCert->GetIssuerName(issuerName);
     if (!subjectName.Equals(issuerName)) {
@@ -354,7 +355,8 @@ public:
   LocalCertRemoveTask(const nsACString& aNickname,
                       nsILocalCertCallback* aCallback)
     : LocalCertTask(aNickname)
-    , mCallback(new nsMainThreadPtrHolder<nsILocalCertCallback>(aCallback))
+    , mCallback(new nsMainThreadPtrHolder<nsILocalCertCallback>(
+        "LocalCertRemoveTask::mCallback", aCallback))
   {
   }
 

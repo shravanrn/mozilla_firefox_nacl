@@ -6,19 +6,57 @@
 #include "VRDisplayHost.h"
 #include "gfxVR.h"
 #include "ipc/VRLayerParent.h"
+#include "mozilla/layers/TextureHost.h"
+#include "mozilla/dom/GamepadBinding.h" // For GamepadMappingType
 
 #if defined(XP_WIN)
 
 #include <d3d11.h>
 #include "gfxWindowsPlatform.h"
 #include "../layers/d3d11/CompositorD3D11.h"
+#include "mozilla/gfx/DeviceManagerDx.h"
 #include "mozilla/layers/TextureD3D11.h"
+
+#elif defined(XP_MACOSX)
+
+#include "mozilla/gfx/MacIOSurface.h"
 
 #endif
 
 using namespace mozilla;
 using namespace mozilla::gfx;
 using namespace mozilla::layers;
+
+VRDisplayHost::AutoRestoreRenderState::AutoRestoreRenderState(VRDisplayHost* aDisplay)
+  : mDisplay(aDisplay)
+  , mSuccess(true)
+{
+#if defined(XP_WIN)
+  ID3D11DeviceContext1* context = mDisplay->GetD3DDeviceContext();
+  ID3DDeviceContextState* state = mDisplay->GetD3DDeviceContextState();
+  if (!context || !state) {
+    mSuccess = false;
+    return;
+  }
+  context->SwapDeviceContextState(state, getter_AddRefs(mPrevDeviceContextState));
+#endif
+}
+
+VRDisplayHost::AutoRestoreRenderState::~AutoRestoreRenderState()
+{
+#if defined(XP_WIN)
+  ID3D11DeviceContext1* context = mDisplay->GetD3DDeviceContext();
+  if (context && mSuccess) {
+    context->SwapDeviceContextState(mPrevDeviceContextState, nullptr);
+  }
+#endif
+}
+
+bool
+VRDisplayHost::AutoRestoreRenderState::IsSuccess()
+{
+  return mSuccess;
+}
 
 VRDisplayHost::VRDisplayHost(VRDeviceType aType)
  : mFrameStarted(false)
@@ -35,6 +73,68 @@ VRDisplayHost::~VRDisplayHost()
 {
   MOZ_COUNT_DTOR(VRDisplayHost);
 }
+
+#if defined(XP_WIN)
+bool
+VRDisplayHost::CreateD3DObjects()
+{
+  if (!mDevice) {
+    RefPtr<ID3D11Device> device = gfx::DeviceManagerDx::Get()->GetCompositorDevice();
+    if (!device) {
+      NS_WARNING("VRDisplayHost::CreateD3DObjects failed to get a D3D11Device");
+      return false;
+    }
+    if (FAILED(device->QueryInterface(__uuidof(ID3D11Device1), getter_AddRefs(mDevice)))) {
+      NS_WARNING("VRDisplayHost::CreateD3DObjects failed to get a D3D11Device1");
+      return false;
+    }
+  }
+  if (!mContext) {
+    mDevice->GetImmediateContext1(getter_AddRefs(mContext));
+    if (!mContext) {
+      NS_WARNING("VRDisplayHost::CreateD3DObjects failed to get an immediate context");
+      return false;
+    }
+  }
+  if (!mDeviceContextState) {
+    D3D_FEATURE_LEVEL featureLevels[] {
+      D3D_FEATURE_LEVEL_11_1,
+      D3D_FEATURE_LEVEL_11_0
+    };
+    mDevice->CreateDeviceContextState(0,
+                                      featureLevels,
+                                      2,
+                                      D3D11_SDK_VERSION,
+                                      __uuidof(ID3D11Device1),
+                                      nullptr,
+                                      getter_AddRefs(mDeviceContextState));
+  }
+  if (!mDeviceContextState) {
+    NS_WARNING("VRDisplayHost::CreateD3DObjects failed to get a D3D11DeviceContextState");
+    return false;
+  }
+  return true;
+}
+
+ID3D11Device1*
+VRDisplayHost::GetD3DDevice()
+{
+  return mDevice;
+}
+
+ID3D11DeviceContext1*
+VRDisplayHost::GetD3DDeviceContext()
+{
+  return mContext;
+}
+
+ID3DDeviceContextState*
+VRDisplayHost::GetD3DDeviceContextState()
+{
+  return mDeviceContextState;
+}
+
+#endif // defined(XP_WIN)
 
 void
 VRDisplayHost::SetGroupMask(uint32_t aGroupMask)
@@ -82,6 +182,8 @@ VRDisplayHost::RemoveLayer(VRLayerParent *aLayer)
 void
 VRDisplayHost::StartFrame()
 {
+  AutoProfilerTracing tracing("VR", "GetSensorState");
+
   mLastFrameStart = TimeStamp::Now();
   ++mDisplayInfo.mFrameId;
   mDisplayInfo.mLastSensorState[mDisplayInfo.mFrameId % kVRMaxLatencyFrames] = GetSensorState();
@@ -152,25 +254,29 @@ VRDisplayHost::NotifyVSync()
   }
 }
 
-#if defined(XP_WIN)
-
 void
 VRDisplayHost::SubmitFrame(VRLayerParent* aLayer, PTextureParent* aTexture,
+                           uint64_t aFrameId,
                            const gfx::Rect& aLeftEyeRect,
                            const gfx::Rect& aRightEyeRect)
 {
+  AutoProfilerTracing tracing("VR", "SubmitFrameAtVRDisplayHost");
+
   if ((mDisplayInfo.mGroupMask & aLayer->GetGroup()) == 0) {
     // Suppress layers hidden by the group mask
     return;
   }
 
   // Ensure that we only accept the first SubmitFrame call per RAF cycle.
-  if (!mFrameStarted) {
+  if (!mFrameStarted || aFrameId != mDisplayInfo.mFrameId) {
     return;
   }
   mFrameStarted = false;
 
+#if defined(XP_WIN)
+
   TextureHost* th = TextureHost::AsTextureHost(aTexture);
+
   // WebVR doesn't use the compositor to compose the frame, so use
   // AutoLockTextureHostWithoutCompositor here.
   AutoLockTextureHostWithoutCompositor autoLock(th);
@@ -190,13 +296,38 @@ VRDisplayHost::SubmitFrame(VRLayerParent* aLayer, PTextureParent* aTexture,
 
   TextureSourceD3D11* sourceD3D11 = source->AsSourceD3D11();
   if (!sourceD3D11) {
-    NS_WARNING("WebVR support currently only implemented for D3D11");
+    NS_WARNING("VRDisplayHost::SubmitFrame failed to get a TextureSourceD3D11");
     return;
   }
 
   if (!SubmitFrame(sourceD3D11, texSize, aLeftEyeRect, aRightEyeRect)) {
     return;
   }
+
+#elif defined(XP_MACOSX)
+
+  TextureHost* th = TextureHost::AsTextureHost(aTexture);
+
+  MacIOSurface* surf = th->GetMacIOSurface();
+  if (!surf) {
+    NS_WARNING("VRDisplayHost::SubmitFrame failed to get a MacIOSurface");
+    return;
+  }
+
+  IntSize texSize = gfx::IntSize(surf->GetDevicePixelWidth(),
+                                 surf->GetDevicePixelHeight());
+
+  if (!SubmitFrame(surf, texSize, aLeftEyeRect, aRightEyeRect)) {
+    return;
+  }
+
+#else
+
+  NS_WARNING("WebVR is not supported on this platform.");
+  return;
+#endif
+
+#if defined(XP_WIN) || defined(XP_MACOSX)
 
   /**
    * Trigger the next VSync immediately after we are successfully
@@ -211,19 +342,8 @@ VRDisplayHost::SubmitFrame(VRLayerParent* aLayer, PTextureParent* aTexture,
   VRManager *vm = VRManager::Get();
   MOZ_ASSERT(vm);
   vm->NotifyVRVsync(mDisplayInfo.mDisplayID);
-}
-
-#else
-
-void
-VRDisplayHost::SubmitFrame(VRLayerParent* aLayer, PTextureParent* aTexture,
-                           const gfx::Rect& aLeftEyeRect,
-                           const gfx::Rect& aRightEyeRect)
-{
-  NS_WARNING("WebVR only supported in Windows.");
-}
-
 #endif
+}
 
 bool
 VRDisplayHost::CheckClearDisplayInfoDirty()
@@ -235,12 +355,18 @@ VRDisplayHost::CheckClearDisplayInfoDirty()
   return true;
 }
 
-VRControllerHost::VRControllerHost(VRDeviceType aType)
- : mVibrateIndex(0)
+VRControllerHost::VRControllerHost(VRDeviceType aType, dom::GamepadHand aHand,
+                                   uint32_t aDisplayID)
+ : mButtonPressed(0)
+ , mButtonTouched(0)
+ , mVibrateIndex(0)
 {
   MOZ_COUNT_CTOR(VRControllerHost);
   mControllerInfo.mType = aType;
-  mControllerInfo.mControllerID = VRSystemManager::AllocateDisplayID();
+  mControllerInfo.mHand = aHand;
+  mControllerInfo.mMappingType = dom::GamepadMappingType::_empty;
+  mControllerInfo.mDisplayID = aDisplayID;
+  mControllerInfo.mControllerID = VRSystemManager::AllocateControllerID();
 }
 
 VRControllerHost::~VRControllerHost()

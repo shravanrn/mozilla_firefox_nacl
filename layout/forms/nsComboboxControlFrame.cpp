@@ -5,6 +5,7 @@
 
 #include "nsComboboxControlFrame.h"
 
+#include "gfxContext.h"
 #include "gfxUtils.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/PathHelpers.h"
@@ -20,7 +21,6 @@
 #include "nsPIDOMWindow.h"
 #include "nsIPresShell.h"
 #include "nsPresState.h"
-#include "nsContentList.h"
 #include "nsView.h"
 #include "nsViewManager.h"
 #include "nsIDOMEventListener.h"
@@ -38,7 +38,6 @@
 #include "nsDisplayList.h"
 #include "nsITheme.h"
 #include "nsThemeConstants.h"
-#include "nsRenderingContext.h"
 #include "mozilla/Likely.h"
 #include <algorithm>
 #include "nsTextNode.h"
@@ -383,7 +382,8 @@ class nsResizeDropdownAtFinalPosition final
 {
 public:
   explicit nsResizeDropdownAtFinalPosition(nsComboboxControlFrame* aFrame)
-    : mFrame(aFrame)
+    : mozilla::Runnable("nsResizeDropdownAtFinalPosition")
+    , mFrame(aFrame)
   {
   }
 
@@ -519,7 +519,11 @@ nsComboboxControlFrame::GetCSSTransformTranslation()
 class nsAsyncRollup : public Runnable
 {
 public:
-  explicit nsAsyncRollup(nsComboboxControlFrame* aFrame) : mFrame(aFrame) {}
+  explicit nsAsyncRollup(nsComboboxControlFrame* aFrame)
+    : mozilla::Runnable("nsAsyncRollup")
+    , mFrame(aFrame)
+  {
+  }
   NS_IMETHOD Run() override
   {
     if (mFrame.IsAlive()) {
@@ -534,7 +538,11 @@ public:
 class nsAsyncResize : public Runnable
 {
 public:
-  explicit nsAsyncResize(nsComboboxControlFrame* aFrame) : mFrame(aFrame) {}
+  explicit nsAsyncResize(nsComboboxControlFrame* aFrame)
+    : mozilla::Runnable("nsAsyncResize")
+    , mFrame(aFrame)
+  {
+  }
   NS_IMETHOD Run() override
   {
     if (mFrame.IsAlive()) {
@@ -735,7 +743,7 @@ static void printSize(char * aDesc, nscoord aSize)
 //-------------------------------------------------------------------
 
 nscoord
-nsComboboxControlFrame::GetIntrinsicISize(nsRenderingContext* aRenderingContext,
+nsComboboxControlFrame::GetIntrinsicISize(gfxContext* aRenderingContext,
                                           nsLayoutUtils::IntrinsicISizeType aType)
 {
   // get the scrollbar width, we'll use this later
@@ -791,7 +799,7 @@ nsComboboxControlFrame::GetIntrinsicISize(nsRenderingContext* aRenderingContext,
 }
 
 nscoord
-nsComboboxControlFrame::GetMinISize(nsRenderingContext *aRenderingContext)
+nsComboboxControlFrame::GetMinISize(gfxContext *aRenderingContext)
 {
   nscoord minISize;
   DISPLAY_MIN_WIDTH(this, minISize);
@@ -800,7 +808,7 @@ nsComboboxControlFrame::GetMinISize(nsRenderingContext *aRenderingContext)
 }
 
 nscoord
-nsComboboxControlFrame::GetPrefISize(nsRenderingContext *aRenderingContext)
+nsComboboxControlFrame::GetPrefISize(gfxContext *aRenderingContext)
 {
   nscoord prefISize;
   DISPLAY_PREF_WIDTH(this, prefISize);
@@ -815,6 +823,7 @@ nsComboboxControlFrame::Reflow(nsPresContext*          aPresContext,
                                nsReflowStatus&          aStatus)
 {
   MarkInReflow();
+  MOZ_ASSERT(aStatus.IsEmpty(), "Caller should pass a fresh reflow status!");
   // Constraints we try to satisfy:
 
   // 1) Default inline size of button is the vertical scrollbar size
@@ -1010,9 +1019,8 @@ nsComboboxControlFrame::RedisplayText()
                  "If we happen to run our redisplay event now, we might kill "
                  "ourselves!");
 
-    RefPtr<RedisplayTextEvent> event = new RedisplayTextEvent(this);
-    mRedisplayTextEvent = event;
-    nsContentUtils::AddScriptRunner(event);
+    mRedisplayTextEvent = new RedisplayTextEvent(this);
+    nsContentUtils::AddScriptRunner(mRedisplayTextEvent.get());
   }
   return rv;
 }
@@ -1189,15 +1197,10 @@ nsComboboxControlFrame::GetContentInsertionFrame() {
 }
 
 void
-nsComboboxControlFrame::DoUpdateStyleOfOwnedAnonBoxes(
-  ServoStyleSet& aStyleSet,
-  nsStyleChangeList& aChangeList,
-  nsChangeHint aHintForThisFrame)
+nsComboboxControlFrame::AppendDirectlyOwnedAnonBoxes(nsTArray<OwnedAnonBox>& aResult)
 {
-  UpdateStyleOfChildAnonBox(mDropdownFrame, aStyleSet, aChangeList,
-                            aHintForThisFrame);
-  UpdateStyleOfChildAnonBox(mDisplayFrame, aStyleSet, aChangeList,
-                            aHintForThisFrame);
+  aResult.AppendElement(OwnedAnonBox(mDropdownFrame));
+  aResult.AppendElement(OwnedAnonBox(mDisplayFrame));
 }
 
 nsresult
@@ -1309,7 +1312,6 @@ public:
                           nsReflowStatus&          aStatus) override;
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 
 protected:
@@ -1324,6 +1326,8 @@ nsComboboxDisplayFrame::Reflow(nsPresContext*           aPresContext,
                                const ReflowInput& aReflowInput,
                                nsReflowStatus&          aStatus)
 {
+  MOZ_ASSERT(aStatus.IsEmpty(), "Caller should pass a fresh reflow status!");
+
   ReflowInput state(aReflowInput);
   if (state.ComputedBSize() == NS_INTRINSICSIZE) {
     // Note that the only way we can have a computed block size here is
@@ -1344,15 +1348,14 @@ nsComboboxDisplayFrame::Reflow(nsPresContext*           aPresContext,
 
 void
 nsComboboxDisplayFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                         const nsRect&           aDirtyRect,
                                          const nsDisplayListSet& aLists)
 {
   nsDisplayListCollection set;
-  nsBlockFrame::BuildDisplayList(aBuilder, aDirtyRect, set);
+  nsBlockFrame::BuildDisplayList(aBuilder, set);
 
   // remove background items if parent frame is themed
   if (mComboBox->IsThemed()) {
-    set.BorderBackground()->DeleteAll();
+    set.BorderBackground()->DeleteAll(aBuilder);
   }
 
   set.MoveTo(aLists);
@@ -1417,8 +1420,8 @@ nsComboboxControlFrame::DestroyFrom(nsIFrame* aDestructRoot)
 
   // Cleanup frames in popup child list
   mPopupFrames.DestroyFramesFrom(aDestructRoot);
-  nsContentUtils::DestroyAnonymousContent(&mDisplayContent);
-  nsContentUtils::DestroyAnonymousContent(&mButtonContent);
+  DestroyAnonymousContent(mDisplayContent.forget());
+  DestroyAnonymousContent(mButtonContent.forget());
   nsBlockFrame::DestroyFrom(aDestructRoot);
 }
 
@@ -1539,12 +1542,12 @@ public:
 #endif
 
   virtual void Paint(nsDisplayListBuilder* aBuilder,
-                     nsRenderingContext* aCtx) override;
+                     gfxContext* aCtx) override;
   NS_DISPLAY_DECL_NAME("ComboboxFocus", TYPE_COMBOBOX_FOCUS)
 };
 
 void nsDisplayComboboxFocus::Paint(nsDisplayListBuilder* aBuilder,
-                                   nsRenderingContext* aCtx)
+                                   gfxContext* aCtx)
 {
   static_cast<nsComboboxControlFrame*>(mFrame)
     ->PaintFocus(*aCtx->GetDrawTarget(), ToReferenceFrame());
@@ -1552,14 +1555,8 @@ void nsDisplayComboboxFocus::Paint(nsDisplayListBuilder* aBuilder,
 
 void
 nsComboboxControlFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                         const nsRect&           aDirtyRect,
                                          const nsDisplayListSet& aLists)
 {
-#ifdef NOISY
-  printf("%p paint at (%d, %d, %d, %d)\n", this,
-    aDirtyRect.x, aDirtyRect.y, aDirtyRect.width, aDirtyRect.height);
-#endif
-
   if (aBuilder->IsForEventDelivery()) {
     // Don't allow children to receive events.
     // REVIEW: following old GetFrameForPoint
@@ -1567,7 +1564,7 @@ nsComboboxControlFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   } else {
     // REVIEW: Our in-flow child frames are inline-level so they will paint in our
     // content list, so we don't need to mess with layers.
-    nsBlockFrame::BuildDisplayList(aBuilder, aDirtyRect, aLists);
+    nsBlockFrame::BuildDisplayList(aBuilder, aLists);
   }
 
   // draw a focus indicator only when focus rings should be drawn
@@ -1677,6 +1674,7 @@ nsComboboxControlFrame::SaveState(nsPresState** aState)
   MOZ_ASSERT(!(*aState));
   (*aState) = new nsPresState();
   (*aState)->SetDroppedDown(mDroppedDown);
+  (*aState)->SetPreviewText(mPreviewText);
   return NS_OK;
 }
 
@@ -1686,6 +1684,7 @@ nsComboboxControlFrame::RestoreState(nsPresState* aState)
   if (!aState) {
     return NS_ERROR_FAILURE;
   }
+  aState->GetPreviewText(mPreviewText);
   ShowList(aState->GetDroppedDown()); // might destroy us
   return NS_OK;
 }

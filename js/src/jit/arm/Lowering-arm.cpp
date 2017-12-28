@@ -537,7 +537,7 @@ LIRGeneratorARM::visitWasmSelect(MWasmSelect* ins)
 }
 
 void
-LIRGeneratorARM::visitAsmJSNeg(MAsmJSNeg* ins)
+LIRGeneratorARM::visitWasmNeg(MWasmNeg* ins)
 {
     if (ins->type() == MIRType::Int32) {
         define(new(alloc()) LNegI(useRegisterAtStart(ins->input())), ins);
@@ -1056,4 +1056,10 @@ LIRGeneratorARM::visitExtendInt32ToInt64(MExtendInt32ToInt64* ins)
     def.setVirtualRegister(ins->virtualRegister());
 
     lir->setDef(0, def);
+}
+
+void
+LIRGeneratorARM::visitSignExtendInt64(MSignExtendInt64* ins)
+{
+    defineInt64(new(alloc()) LSignExtendInt64(useInt64RegisterAtStart(ins->input())), ins);
 }

@@ -1951,6 +1951,20 @@ CSS_PROP_FONT(
     nullptr,
     offsetof(nsStyleFont, mFont.sizeAdjust),
     eStyleAnimType_float)
+#ifndef CSS_PROP_LIST_EXCLUDE_INTERNAL
+CSS_PROP_USERINTERFACE(
+    -moz-font-smoothing-background-color,
+    _moz_font_smoothing_background_color,
+    CSS_PROP_DOMPROP_PREFIXED(FontSmoothingBackgroundColor),
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_VALUE |
+        CSS_PROPERTY_ENABLED_IN_UA_SHEETS_AND_CHROME,
+    "",
+    VARIANT_HC,
+    nullptr,
+    offsetof(nsStyleUserInterface, mFontSmoothingBackgroundColor),
+    eStyleAnimType_Color)
+#endif // CSS_PROP_LIST_EXCLUDE_INTERNAL
 CSS_PROP_FONT(
     font-stretch,
     font_stretch,
@@ -3737,12 +3751,13 @@ CSS_PROP_DISPLAY(
     ShapeOutside,
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_VALUE_PARSER_FUNCTION |
-        CSS_PROPERTY_APPLIES_TO_FIRST_LETTER,
+        CSS_PROPERTY_APPLIES_TO_FIRST_LETTER |
+        CSS_PROPERTY_STORES_CALC,
     "layout.css.shape-outside.enabled",
     0,
     nullptr,
     CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Discrete) // FIXME: Bug 1289049 for adding animation support
+    eStyleAnimType_Custom)
 CSS_PROP_SVG(
     shape-rendering,
     shape_rendering,
@@ -4494,6 +4509,41 @@ CSS_PROP_UIRESET(
     kWindowShadowKTable,
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_None)
+CSS_PROP_UIRESET(
+    -moz-window-opacity,
+    _moz_window_opacity,
+    CSS_PROP_DOMPROP_PREFIXED(WindowOpacity),
+    CSS_PROPERTY_INTERNAL | CSS_PROPERTY_PARSE_VALUE,
+    "",
+    VARIANT_HN,
+    nullptr,
+    offsetof(nsStyleUIReset, mWindowOpacity),
+    eStyleAnimType_float)
+CSS_PROP_UIRESET(
+    -moz-window-transform,
+    _moz_window_transform,
+    CSS_PROP_DOMPROP_PREFIXED(WindowTransform),
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_FUNCTION |
+        CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH,
+    "",
+    0,
+    nullptr,
+    offsetof(nsStyleUIReset, mSpecifiedWindowTransform),
+    eStyleAnimType_Custom)
+CSS_PROP_UIRESET(
+    -moz-window-transform-origin,
+    _moz_window_transform_origin,
+    CSS_PROP_DOMPROP_PREFIXED(WindowTransformOrigin),
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_FUNCTION |
+        CSS_PROPERTY_STORES_CALC |
+        CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH,
+    "",
+    0,
+    kImageLayerPositionKTable,
+    CSS_PROP_NO_OFFSET,
+    eStyleAnimType_Custom)
 #endif // CSS_PROP_LIST_EXCLUDE_INTERNAL
 CSS_PROP_TEXT(
     word-break,

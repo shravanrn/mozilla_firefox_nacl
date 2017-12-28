@@ -5,7 +5,6 @@
 "use strict";
 
 const { Arg, generateActorSpec, RetVal } = require("devtools/shared/protocol");
-require("devtools/shared/specs/node");
 
 const gridSpec = generateActorSpec({
   typeName: "grid",
@@ -15,13 +14,6 @@ const gridSpec = generateActorSpec({
 
 const layoutSpec = generateActorSpec({
   typeName: "layout",
-
-  events: {
-    "grid-layout-changed": {
-      type: "grid-layout-changed",
-      grids: Arg(0, "array:grid")
-    }
-  },
 
   methods: {
     getAllGrids: {

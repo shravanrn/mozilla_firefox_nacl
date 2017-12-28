@@ -24,17 +24,26 @@
 //! address in the GPU cache of a given resource slot
 //! for this frame.
 
+use api::{ColorF, LayerRect};
 use device::FrameId;
+use internal_types::UvRect;
 use profiler::GpuCacheProfileCounters;
 use renderer::MAX_VERTEX_TEXTURE_WIDTH;
-use std::mem;
-use webrender_traits::{ColorF, LayerRect};
+use std::{mem, u16, u32};
+use std::ops::Add;
 
 pub const GPU_CACHE_INITIAL_HEIGHT: u32 = 512;
 const FRAMES_BEFORE_EVICTION: usize = 10;
+const NEW_ROWS_PER_RESIZE: u32 = 512;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 struct Epoch(u32);
+
+impl Epoch {
+    fn next(&mut self) {
+        *self = Epoch(self.0.wrapping_add(1));
+    }
+}
 
 #[derive(Debug, Copy, Clone)]
 struct CacheLocation {
@@ -48,6 +57,12 @@ pub struct GpuBlockData {
     pub data: [f32; 4],
 }
 
+impl GpuBlockData {
+    pub fn empty() -> GpuBlockData {
+        GpuBlockData { data: [0.0; 4] }
+    }
+}
+
 /// Conversion helpers for GpuBlockData
 impl Into<GpuBlockData> for ColorF {
     fn into(self) -> GpuBlockData {
@@ -59,19 +74,27 @@ impl Into<GpuBlockData> for ColorF {
 
 impl Into<GpuBlockData> for [f32; 4] {
     fn into(self) -> GpuBlockData {
-        GpuBlockData {
-            data: self,
-        }
+        GpuBlockData { data: self }
     }
 }
 
 impl Into<GpuBlockData> for LayerRect {
     fn into(self) -> GpuBlockData {
         GpuBlockData {
-            data: [ self.origin.x,
-                    self.origin.y,
-                    self.size.width,
-                    self.size.height ],
+            data: [
+                self.origin.x,
+                self.origin.y,
+                self.size.width,
+                self.size.height,
+            ],
+        }
+    }
+}
+
+impl Into<GpuBlockData> for UvRect {
+    fn into(self) -> GpuBlockData {
+        GpuBlockData {
+            data: [self.uv0.x, self.uv0.y, self.uv1.x, self.uv1.y],
         }
     }
 }
@@ -91,9 +114,7 @@ pub struct GpuCacheHandle {
 
 impl GpuCacheHandle {
     pub fn new() -> GpuCacheHandle {
-        GpuCacheHandle {
-            location: None,
-        }
+        GpuCacheHandle { location: None }
     }
 }
 
@@ -111,6 +132,24 @@ impl GpuCacheAddress {
         GpuCacheAddress {
             u: u as u16,
             v: v as u16,
+        }
+    }
+
+    pub fn invalid() -> GpuCacheAddress {
+        GpuCacheAddress {
+            u: u16::MAX,
+            v: u16::MAX,
+        }
+    }
+}
+
+impl Add<usize> for GpuCacheAddress {
+    type Output = GpuCacheAddress;
+
+    fn add(self, other: usize) -> GpuCacheAddress {
+        GpuCacheAddress {
+            u: self.u + other as u16,
+            v: self.v,
         }
     }
 }
@@ -131,12 +170,10 @@ struct Block {
 }
 
 impl Block {
-    fn new(address: GpuCacheAddress,
-           next: Option<BlockIndex>,
-           frame_id: FrameId) -> Block {
+    fn new(address: GpuCacheAddress, next: Option<BlockIndex>, frame_id: FrameId) -> Block {
         Block {
-            address: address,
-            next: next,
+            address,
+            next,
             last_access_time: frame_id,
             epoch: Epoch(0),
         }
@@ -158,7 +195,7 @@ struct Row {
 impl Row {
     fn new(block_count_per_item: usize) -> Row {
         Row {
-            block_count_per_item: block_count_per_item,
+            block_count_per_item,
         }
     }
 }
@@ -172,7 +209,7 @@ pub enum GpuCacheUpdate {
         block_index: usize,
         block_count: usize,
         address: GpuCacheAddress,
-    }
+    },
 }
 
 pub struct GpuCacheUpdateList {
@@ -193,6 +230,10 @@ struct FreeBlockLists {
     free_list_2: Option<BlockIndex>,
     free_list_4: Option<BlockIndex>,
     free_list_8: Option<BlockIndex>,
+    free_list_16: Option<BlockIndex>,
+    free_list_32: Option<BlockIndex>,
+    free_list_64: Option<BlockIndex>,
+    free_list_128: Option<BlockIndex>,
     free_list_large: Option<BlockIndex>,
 }
 
@@ -203,12 +244,18 @@ impl FreeBlockLists {
             free_list_2: None,
             free_list_4: None,
             free_list_8: None,
+            free_list_16: None,
+            free_list_32: None,
+            free_list_64: None,
+            free_list_128: None,
             free_list_large: None,
         }
     }
 
-    fn get_actual_block_count_and_free_list(&mut self,
-                                            block_count: usize) -> (usize, &mut Option<BlockIndex>) {
+    fn get_actual_block_count_and_free_list(
+        &mut self,
+        block_count: usize,
+    ) -> (usize, &mut Option<BlockIndex>) {
         // Find the appropriate free list to use
         // based on the block size.
         match block_count {
@@ -217,7 +264,11 @@ impl FreeBlockLists {
             2 => (2, &mut self.free_list_2),
             3...4 => (4, &mut self.free_list_4),
             5...8 => (8, &mut self.free_list_8),
-            9...MAX_VERTEX_TEXTURE_WIDTH => (MAX_VERTEX_TEXTURE_WIDTH, &mut self.free_list_large),
+            9...16 => (16, &mut self.free_list_16),
+            17...32 => (32, &mut self.free_list_32),
+            33...64 => (64, &mut self.free_list_64),
+            65...128 => (128, &mut self.free_list_128),
+            129...MAX_VERTEX_TEXTURE_WIDTH => (MAX_VERTEX_TEXTURE_WIDTH, &mut self.free_list_large),
             _ => panic!("Can't allocate > MAX_VERTEX_TEXTURE_WIDTH per resource!"),
         }
     }
@@ -265,20 +316,20 @@ impl Texture {
     // Push new data into the cache. The ```pending_block_index``` field represents
     // where the data was pushed into the texture ```pending_blocks``` array.
     // Return the allocated address for this data.
-    fn push_data(&mut self,
-                 pending_block_index: usize,
-                 block_count: usize,
-                 frame_id: FrameId) -> CacheLocation {
+    fn push_data(
+        &mut self,
+        pending_block_index: Option<usize>,
+        block_count: usize,
+        frame_id: FrameId,
+    ) -> CacheLocation {
         // Find the appropriate free list to use based on the block size.
         let (alloc_size, free_list) = self.free_lists
-                                          .get_actual_block_count_and_free_list(block_count);
+            .get_actual_block_count_and_free_list(block_count);
 
         // See if we need a new row (if free-list has nothing available)
         if free_list.is_none() {
-            // TODO(gw): Handle the case where we need to resize
-            //           the cache texture itself!
             if self.rows.len() as u32 == self.height {
-                panic!("need to re-alloc texture!!");
+                self.height += NEW_ROWS_PER_RESIZE;
             }
 
             // Create a new row.
@@ -290,7 +341,7 @@ impl Texture {
             // in this row, and link it in to the free-list for this
             // block size.
             let mut prev_block_index = None;
-            for i in 0..items_per_row {
+            for i in 0 .. items_per_row {
                 let address = GpuCacheAddress::new(i * alloc_size, row_index);
                 let block_index = BlockIndex(self.blocks.len());
                 let block = Block::new(address, prev_block_index, frame_id);
@@ -314,13 +365,15 @@ impl Texture {
         self.occupied_list_head = Some(free_block_index);
         self.allocated_block_count += alloc_size;
 
-        // Add this update to the pending list of blocks that need
-        // to be updated on the GPU.
-        self.updates.push(GpuCacheUpdate::Copy {
-            block_index: pending_block_index,
-            block_count: block_count,
-            address: block.address,
-        });
+        if let Some(pending_block_index) = pending_block_index {
+            // Add this update to the pending list of blocks that need
+            // to be updated on the GPU.
+            self.updates.push(GpuCacheUpdate::Copy {
+                block_index: pending_block_index,
+                block_count,
+                address: block.address,
+            });
+        }
 
         CacheLocation {
             block_index: free_block_index,
@@ -356,9 +409,9 @@ impl Texture {
                     // Use the row metadata to determine which free-list
                     // this block belongs to.
                     let (_, free_list) = self.free_lists
-                                             .get_actual_block_count_and_free_list(row.block_count_per_item);
+                        .get_actual_block_count_and_free_list(row.block_count_per_item);
 
-                    block.epoch = Epoch(block.epoch.0 + 1);
+                    block.epoch.next();
                     block.next = *free_list;
                     *free_list = Some(index);
 
@@ -400,12 +453,24 @@ pub struct GpuDataRequest<'a> {
 }
 
 impl<'a> GpuDataRequest<'a> {
-    pub fn push(&mut self, block: GpuBlockData) {
-        self.texture.pending_blocks.push(block);
+    pub fn push<B>(&mut self, block: B)
+    where
+        B: Into<GpuBlockData>,
+    {
+        self.texture.pending_blocks.push(block.into());
     }
 
     pub fn extend_from_slice(&mut self, blocks: &[GpuBlockData]) {
         self.texture.pending_blocks.extend_from_slice(blocks);
+    }
+
+    pub fn current_used_block_num(&self) -> usize {
+        self.texture.pending_blocks.len() - self.start_index
+    }
+
+    /// Consume the request and return the number of blocks written
+    pub fn close(self) -> usize {
+        self.texture.pending_blocks.len() - self.start_index
     }
 }
 
@@ -413,9 +478,8 @@ impl<'a> Drop for GpuDataRequest<'a> {
     fn drop(&mut self) {
         // Push the data to the texture pending updates list.
         let block_count = self.texture.pending_blocks.len() - self.start_index;
-        let location = self.texture.push_data(self.start_index,
-                                              block_count,
-                                              self.frame_id);
+        let location = self.texture
+            .push_data(Some(self.start_index), block_count, self.frame_id);
         self.handle.location = Some(location);
     }
 }
@@ -444,6 +508,16 @@ impl GpuCache {
         self.texture.evict_old_blocks(self.frame_id);
     }
 
+    // Invalidate a (possibly) existing block in the cache.
+    // This means the next call to request() for this location
+    // will rebuild the data and upload it to the GPU.
+    pub fn invalidate(&mut self, handle: &GpuCacheHandle) {
+        if let Some(ref location) = handle.location {
+            let block = &mut self.texture.blocks[location.block_index.0];
+            block.epoch.next();
+        }
+    }
+
     // Request a resource be added to the cache. If the resource
     /// is already in the cache, `None` will be returned.
     pub fn request<'a>(&'a mut self, handle: &'a mut GpuCacheHandle) -> Option<GpuDataRequest<'a>> {
@@ -453,23 +527,54 @@ impl GpuCache {
             if block.epoch == location.epoch {
                 // Mark last access time to avoid evicting this block.
                 block.last_access_time = self.frame_id;
-                return None
+                return None;
             }
         }
+
         Some(GpuDataRequest {
-            handle: handle,
+            handle,
             frame_id: self.frame_id,
             start_index: self.texture.pending_blocks.len(),
             texture: &mut self.texture,
         })
     }
 
+    // Push an array of data blocks to be uploaded to the GPU
+    // unconditionally for this frame. The cache handle will
+    // assert if the caller tries to retrieve the address
+    // of this handle on a subsequent frame. This is typically
+    // used for uploading data that changes every frame, and
+    // therefore makes no sense to try and cache.
+    pub fn push_per_frame_blocks(&mut self, blocks: &[GpuBlockData]) -> GpuCacheHandle {
+        let start_index = self.texture.pending_blocks.len();
+        self.texture.pending_blocks.extend_from_slice(blocks);
+        let location = self.texture
+            .push_data(Some(start_index), blocks.len(), self.frame_id);
+        GpuCacheHandle {
+            location: Some(location),
+        }
+    }
+
+    // Reserve space in the cache for per-frame blocks that
+    // will be resolved by the render thread via the
+    // external image callback.
+    pub fn push_deferred_per_frame_blocks(&mut self, block_count: usize) -> GpuCacheHandle {
+        let location = self.texture.push_data(None, block_count, self.frame_id);
+        GpuCacheHandle {
+            location: Some(location),
+        }
+    }
+
     /// End the frame. Return the list of updates to apply to the
     /// device specific cache texture.
-    pub fn end_frame(&mut self,
-                     profile_counters: &mut GpuCacheProfileCounters) -> GpuCacheUpdateList {
+    pub fn end_frame(
+        &mut self,
+        profile_counters: &mut GpuCacheProfileCounters,
+    ) -> GpuCacheUpdateList {
         profile_counters.allocated_rows.set(self.texture.rows.len());
-        profile_counters.allocated_blocks.set(self.texture.allocated_block_count);
+        profile_counters
+            .allocated_blocks
+            .set(self.texture.allocated_block_count);
 
         GpuCacheUpdateList {
             height: self.texture.height,
@@ -483,8 +588,7 @@ impl GpuCache {
     /// and built for this frame. Attempting to get the address for a
     /// freed or pending slot will panic!
     pub fn get_address(&self, id: &GpuCacheHandle) -> GpuCacheAddress {
-        let location = id.location
-                         .expect("handle not requested or allocated!");
+        let location = id.location.expect("handle not requested or allocated!");
         let block = &self.texture.blocks[location.block_index.0];
         debug_assert_eq!(block.epoch, location.epoch);
         debug_assert_eq!(block.last_access_time, self.frame_id);

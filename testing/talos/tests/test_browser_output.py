@@ -3,6 +3,7 @@
 """
 test talos browser output parsing
 """
+from __future__ import absolute_import
 
 import os
 import unittest
@@ -185,6 +186,7 @@ class TestTalosError(unittest.TestCase):
         # passing invalid value for argument result_raw
         with self.assertRaises(TalosError):
             BrowserLogResults(results_raw="__FAIL<bad test>__FAIL")
+
 
 if __name__ == '__main__':
     unittest.main()

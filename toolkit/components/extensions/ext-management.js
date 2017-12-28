@@ -14,8 +14,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
 XPCOMUtils.defineLazyServiceGetter(this, "promptService",
                                    "@mozilla.org/embedcomp/prompt-service;1",
                                    "nsIPromptService");
-XPCOMUtils.defineLazyModuleGetter(this, "EventEmitter",
-                                  "resource://devtools/shared/event-emitter.js");
 
 XPCOMUtils.defineLazyGetter(this, "GlobalManager", () => {
   const {GlobalManager} = Cu.import("resource://gre/modules/Extension.jsm", {});
@@ -89,12 +87,22 @@ const getExtensionInfoForAddon = (extension, addon) => {
 
 const listenerMap = new WeakMap();
 // Some management APIs are intentionally limited.
-const allowedTypes = ["theme"];
+const allowedTypes = ["theme", "extension"];
 
-class AddonListener {
+function checkAllowedAddon(addon) {
+  if (addon.isSystem || addon.isAPIExtension) {
+    return false;
+  }
+  if (addon.type == "extension" && !addon.isWebExtension) {
+    return false;
+  }
+  return allowedTypes.includes(addon.type);
+}
+
+class AddonListener extends ExtensionUtils.EventEmitter {
   constructor() {
+    super();
     AddonManager.addAddonListener(this);
-    EventEmitter.decorate(this);
   }
 
   release() {
@@ -107,28 +115,28 @@ class AddonListener {
   }
 
   onEnabled(addon) {
-    if (!allowedTypes.includes(addon.type)) {
+    if (!checkAllowedAddon(addon)) {
       return;
     }
     this.emit("onEnabled", this.getExtensionInfo(addon));
   }
 
   onDisabled(addon) {
-    if (!allowedTypes.includes(addon.type)) {
+    if (!checkAllowedAddon(addon)) {
       return;
     }
     this.emit("onDisabled", this.getExtensionInfo(addon));
   }
 
   onInstalled(addon) {
-    if (!allowedTypes.includes(addon.type)) {
+    if (!checkAllowedAddon(addon)) {
       return;
     }
     this.emit("onInstalled", this.getExtensionInfo(addon));
   }
 
   onUninstalled(addon) {
-    if (!allowedTypes.includes(addon.type)) {
+    if (!checkAllowedAddon(addon)) {
       return;
     }
     this.emit("onUninstalled", this.getExtensionInfo(addon));
@@ -161,11 +169,24 @@ this.management = class extends ExtensionAPI {
     let {extension} = context;
     return {
       management: {
+        async get(id) {
+          let addon = await AddonManager.getAddonByID(id);
+          if (!addon) {
+            throw new ExtensionError(`No such addon ${id}`);
+          }
+          if (!checkAllowedAddon(addon)) {
+            throw new ExtensionError("get not allowed for this addon");
+          }
+          // If the extension is enabled get it and use it for more data.
+          let ext = GlobalManager.extensionMap.get(addon.id);
+          return getExtensionInfoForAddon(ext, addon);
+        },
+
         async getAll() {
           let addons = await AddonManager.getAddonsByTypes(allowedTypes);
-          return addons.map(addon => {
+          return addons.filter(checkAllowedAddon).map(addon => {
             // If the extension is enabled get it and use it for more data.
-            let ext = addon.isWebExtension && GlobalManager.extensionMap.get(addon.id);
+            let ext = GlobalManager.extensionMap.get(addon.id);
             return getExtensionInfoForAddon(ext, addon);
           });
         },
@@ -204,13 +225,16 @@ this.management = class extends ExtensionAPI {
           if (!addon) {
             throw new ExtensionError(`No such addon ${id}`);
           }
-          if (!allowedTypes.includes(addon.type)) {
+          if (addon.type !== "theme") {
             throw new ExtensionError("setEnabled applies only to theme addons");
+          }
+          if (addon.isSystem) {
+            throw new ExtensionError("setEnabled cannot be used with a system addon");
           }
           addon.userDisabled = !enabled;
         },
 
-        onDisabled: new SingletonEventManager(context, "management.onDisabled", fire => {
+        onDisabled: new EventManager(context, "management.onDisabled", fire => {
           let listener = (event, data) => {
             fire.async(data);
           };
@@ -221,7 +245,7 @@ this.management = class extends ExtensionAPI {
           };
         }).api(),
 
-        onEnabled: new SingletonEventManager(context, "management.onEnabled", fire => {
+        onEnabled: new EventManager(context, "management.onEnabled", fire => {
           let listener = (event, data) => {
             fire.async(data);
           };
@@ -232,7 +256,7 @@ this.management = class extends ExtensionAPI {
           };
         }).api(),
 
-        onInstalled: new SingletonEventManager(context, "management.onInstalled", fire => {
+        onInstalled: new EventManager(context, "management.onInstalled", fire => {
           let listener = (event, data) => {
             fire.async(data);
           };
@@ -243,7 +267,7 @@ this.management = class extends ExtensionAPI {
           };
         }).api(),
 
-        onUninstalled: new SingletonEventManager(context, "management.onUninstalled", fire => {
+        onUninstalled: new EventManager(context, "management.onUninstalled", fire => {
           let listener = (event, data) => {
             fire.async(data);
           };

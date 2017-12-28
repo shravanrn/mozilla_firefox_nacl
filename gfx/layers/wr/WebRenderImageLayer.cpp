@@ -10,6 +10,7 @@
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/ImageClient.h"
+#include "mozilla/layers/IpcResourceUpdateQueue.h"
 #include "mozilla/layers/ScrollingLayersHelper.h"
 #include "mozilla/layers/StackingContextHelper.h"
 #include "mozilla/layers/TextureClientRecycleAllocator.h"
@@ -24,6 +25,7 @@ using namespace gfx;
 
 WebRenderImageLayer::WebRenderImageLayer(WebRenderLayerManager* aLayerManager)
   : ImageLayer(aLayerManager, static_cast<WebRenderLayer*>(this))
+  , mKey(Nothing())
   , mImageClientContainerType(CompositableType::UNKNOWN)
 {
   MOZ_COUNT_CTOR(WebRenderImageLayer);
@@ -32,16 +34,23 @@ WebRenderImageLayer::WebRenderImageLayer(WebRenderLayerManager* aLayerManager)
 WebRenderImageLayer::~WebRenderImageLayer()
 {
   MOZ_COUNT_DTOR(WebRenderImageLayer);
+  ClearWrResources();
+}
 
+void
+WebRenderImageLayer::ClearWrResources()
+{
   if (mKey.isSome()) {
     WrManager()->AddImageKeyForDiscard(mKey.value());
+    mKey = Nothing();
   }
-
   if (mExternalImageId.isSome()) {
     WrBridge()->DeallocExternalImageId(mExternalImageId.ref());
+    mExternalImageId = Nothing();
   }
   if (mPipelineId.isSome()) {
-    WrBridge()->RemovePipelineIdForAsyncCompositable(mPipelineId.ref());
+    WrBridge()->RemovePipelineIdForCompositable(mPipelineId.ref());
+    mPipelineId = Nothing();
   }
 }
 
@@ -85,6 +94,7 @@ WebRenderImageLayer::GetAsSourceSurface()
 void
 WebRenderImageLayer::ClearCachedResources()
 {
+  ClearWrResources();
   if (mImageClient) {
     mImageClient->ClearCachedResources();
   }
@@ -100,8 +110,46 @@ WebRenderImageLayer::SupportsAsyncUpdate()
   return false;
 }
 
+Maybe<wr::ImageKey>
+WebRenderImageLayer::UpdateImageKey(ImageClientSingle* aImageClient,
+                                    ImageContainer* aContainer,
+                                    Maybe<wr::ImageKey>& aOldKey,
+                                    wr::ExternalImageId& aExternalImageId,
+                                    wr::IpcResourceUpdateQueue& aResources)
+{
+  MOZ_ASSERT(aImageClient);
+  MOZ_ASSERT(aContainer);
+
+  uint32_t oldCounter = aImageClient->GetLastUpdateGenerationCounter();
+
+  bool ret = aImageClient->UpdateImage(aContainer, /* unused */0);
+  if (!ret || aImageClient->IsEmpty()) {
+    // Delete old key
+    if (aOldKey.isSome()) {
+      WrManager()->AddImageKeyForDiscard(aOldKey.value());
+    }
+    return Nothing();
+  }
+
+  // Reuse old key if generation is not updated.
+  if (oldCounter == aImageClient->GetLastUpdateGenerationCounter() && aOldKey.isSome()) {
+    return aOldKey;
+  }
+
+  // Delete old key, we are generating a new key.
+  // TODO: stop doing this!
+  if (aOldKey.isSome()) {
+    WrManager()->AddImageKeyForDiscard(aOldKey.value());
+  }
+
+  wr::WrImageKey key = GenerateImageKey();
+  aResources.AddExternalImage(aExternalImageId, key);
+  return Some(key);
+}
+
 void
 WebRenderImageLayer::RenderLayer(wr::DisplayListBuilder& aBuilder,
+                                 wr::IpcResourceUpdateQueue& aResources,
                                  const StackingContextHelper& aSc)
 {
   if (!mContainer) {
@@ -142,25 +190,25 @@ WebRenderImageLayer::RenderLayer(wr::DisplayListBuilder& aBuilder,
     MOZ_ASSERT(mExternalImageId.isNothing());
 
     // Push IFrame for async image pipeline.
+    // XXX Remove this once partial display list update is supported.
+
+    ScrollingLayersHelper scroller(this, aBuilder, aResources, aSc);
 
     ParentLayerRect bounds = GetLocalTransformTyped().TransformBounds(Bounds());
 
-    // As with WebRenderTextLayer, because we don't push a stacking context for
-    // this async image pipeline, WR doesn't know about the transform on this layer.
-    // Therefore we need to apply that transform to the bounds before we pass it on to WR.
-    // The conversion from ParentLayerPixel to LayerPixel below is a result of
-    // changing the reference layer from "this layer" to the "the layer that
-    // created aSc".
+    // We don't push a stacking context for this async image pipeline here.
+    // Instead, we do it inside the iframe that hosts the image. As a result,
+    // a bunch of the calculations normally done as part of that stacking
+    // context need to be done manually and pushed over to the parent side,
+    // where it will be done when we build the display list for the iframe.
+    // That happens in AsyncImagePipelineManager.
+
     LayerRect rect = ViewAs<LayerPixel>(bounds,
         PixelCastJustification::MovingDownToChildren);
     DumpLayerInfo("Image Layer async", rect);
 
-    // XXX Remove IFrame for async image pipeline when partial display list update is supported.
-    WrClipRegionToken clipRegion = aBuilder.PushClipRegion(aSc.ToRelativeWrRect(rect));
-    aBuilder.PushIFrame(aSc.ToRelativeWrRect(rect), clipRegion, mPipelineId.ref());
-
-    // Prepare data that are necessary for async image pipelin.
-    // They are used within WebRenderCompositableHolder
+    wr::LayoutRect r = aSc.ToRelativeLayoutRect(rect);
+    aBuilder.PushIFrame(r, true, mPipelineId.ref());
 
     gfx::Matrix4x4 scTransform = GetTransform();
     // Translate is applied as part of PushIFrame()
@@ -177,17 +225,12 @@ WebRenderImageLayer::RenderLayer(wr::DisplayListBuilder& aBuilder,
     }
     LayerRect scBounds = BoundsForStackingContext();
     wr::ImageRendering filter = wr::ToImageRendering(mSamplingFilter);
-    wr::MixBlendMode mixBlendMode = wr::ToWrMixBlendMode(GetMixBlendMode());
-
-    StackingContextHelper sc(aSc, aBuilder, this);
-    Maybe<WrImageMask> mask = BuildWrMaskLayer(&sc);
+    wr::MixBlendMode mixBlendMode = wr::ToMixBlendMode(GetMixBlendMode());
 
     WrBridge()->AddWebRenderParentCommand(OpUpdateAsyncImagePipeline(mPipelineId.value(),
                                                                      scBounds,
                                                                      scTransform,
                                                                      scaleToSize,
-                                                                     ClipRect(),
-                                                                     mask,
                                                                      filter,
                                                                      mixBlendMode));
     return;
@@ -205,12 +248,13 @@ WebRenderImageLayer::RenderLayer(wr::DisplayListBuilder& aBuilder,
   mKey = UpdateImageKey(mImageClient->AsImageClientSingle(),
                         mContainer,
                         mKey,
-                        mExternalImageId.ref());
+                        mExternalImageId.ref(),
+                        aResources);
   if (mKey.isNothing()) {
     return;
   }
 
-  ScrollingLayersHelper scroller(this, aBuilder, aSc);
+  ScrollingLayersHelper scroller(this, aBuilder, aResources, aSc);
   StackingContextHelper sc(aSc, aBuilder, this);
 
   LayerRect rect(0, 0, size.width, size.height);
@@ -220,12 +264,6 @@ WebRenderImageLayer::RenderLayer(wr::DisplayListBuilder& aBuilder,
     rect = LayerRect(0, 0, mScaleToSize.width, mScaleToSize.height);
   }
 
-  LayerRect clipRect = ClipRect().valueOr(rect);
-  Maybe<WrImageMask> mask = BuildWrMaskLayer(&sc);
-  WrClipRegionToken clip = aBuilder.PushClipRegion(
-      sc.ToRelativeWrRect(clipRect),
-      mask.ptrOr(nullptr));
-
   wr::ImageRendering filter = wr::ToImageRendering(mSamplingFilter);
 
   DumpLayerInfo("Image Layer", rect);
@@ -234,11 +272,14 @@ WebRenderImageLayer::RenderLayer(wr::DisplayListBuilder& aBuilder,
                   GetLayer(),
                   Stringify(filter).c_str());
   }
-  aBuilder.PushImage(sc.ToRelativeWrRect(rect), clip, filter, mKey.value());
+  wr::LayoutRect r = sc.ToRelativeLayoutRect(rect);
+  aBuilder.PushImage(r, r, true, filter, mKey.value());
 }
 
-Maybe<WrImageMask>
-WebRenderImageLayer::RenderMaskLayer(const gfx::Matrix4x4& aTransform)
+Maybe<wr::WrImageMask>
+WebRenderImageLayer::RenderMaskLayer(const StackingContextHelper& aSc,
+                                     const gfx::Matrix4x4& aTransform,
+                                     wr::IpcResourceUpdateQueue& aResources)
 {
   if (!mContainer) {
      return Nothing();
@@ -278,16 +319,17 @@ WebRenderImageLayer::RenderMaskLayer(const gfx::Matrix4x4& aTransform)
   mKey = UpdateImageKey(mImageClient->AsImageClientSingle(),
                         mContainer,
                         mKey,
-                        mExternalImageId.ref());
+                        mExternalImageId.ref(),
+                        aResources);
   if (mKey.isNothing()) {
     return Nothing();
   }
 
   gfx::IntSize size = image->GetSize();
-  WrImageMask imageMask;
+  wr::WrImageMask imageMask;
   imageMask.image = mKey.value();
   Rect maskRect = aTransform.TransformBounds(Rect(0, 0, size.width, size.height));
-  imageMask.rect = wr::ToWrRect(maskRect);
+  imageMask.rect = aSc.ToRelativeLayoutRect(ViewAs<LayerPixel>(maskRect));
   imageMask.repeat = false;
   return Some(imageMask);
 }

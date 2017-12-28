@@ -209,8 +209,7 @@ AudioSession::Start()
                                 getter_AddRefs(bundle));
     NS_ENSURE_TRUE(bundle, NS_ERROR_FAILURE);
 
-    bundle->GetStringFromName(u"brandFullName",
-                              getter_Copies(mDisplayName));
+    bundle->GetStringFromName("brandFullName", mDisplayName);
 
     wchar_t *buffer;
     mIconPath.GetMutableData(&buffer, MAX_PATH);
@@ -282,6 +281,7 @@ AudioSession::Start()
     return NS_ERROR_FAILURE;
   }
 
+  // Increments refcount of 'this'.
   hr = mAudioSessionControl->RegisterAudioSessionNotification(this);
   if (FAILED(hr)) {
     StopInternal();
@@ -298,6 +298,7 @@ AudioSession::StopInternal()
 {
   if (mAudioSessionControl &&
       (mState == STARTED || mState == STOPPED)) {
+    // Decrement refcount of 'this'
     mAudioSessionControl->UnregisterAudioSessionNotification(this);
   }
   mAudioSessionControl = nullptr;
@@ -409,7 +410,8 @@ AudioSession::OnSessionDisconnected(AudioSessionDisconnectReason aReason)
   // Run our code asynchronously.  Per MSDN we can't do anything interesting
   // in this callback.
   nsCOMPtr<nsIRunnable> runnable =
-    NewRunnableMethod(this, &AudioSession::OnSessionDisconnectedInternal);
+    NewRunnableMethod("widget::AudioSession::OnSessionDisconnectedInternal",
+                      this, &AudioSession::OnSessionDisconnectedInternal);
   NS_DispatchToMainThread(runnable);
   return S_OK;
 }
@@ -420,6 +422,10 @@ AudioSession::OnSessionDisconnectedInternal()
   if (!mAudioSessionControl)
     return NS_OK;
 
+  // When successful, UnregisterAudioSessionNotification will decrement the
+  // refcount of 'this'.  Start will re-increment it.  In the interim,
+  // we'll need to reference ourselves.
+  RefPtr<AudioSession> kungFuDeathGrip(this);
   mAudioSessionControl->UnregisterAudioSessionNotification(this);
   mAudioSessionControl = nullptr;
 

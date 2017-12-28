@@ -47,17 +47,16 @@ public:
                         bool&          aRedraw);
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 
   virtual ~nsTextBoxFrame();
 
-  void PaintTitle(nsRenderingContext& aRenderingContext,
+  void PaintTitle(gfxContext&          aRenderingContext,
                   const nsRect&        aDirtyRect,
                   nsPoint              aPt,
                   const nscolor*       aOverrideColor);
 
-  nsRect GetComponentAlphaBounds();
+  nsRect GetComponentAlphaBounds() const;
 
   virtual bool ComputesOwnOverflowArea() override;
 
@@ -80,21 +79,21 @@ protected:
 
   // REVIEW: SORRY! Couldn't resist devirtualizing these
   void LayoutTitle(nsPresContext*      aPresContext,
-                   nsRenderingContext& aRenderingContext,
+                   gfxContext&          aRenderingContext,
                    const nsRect&        aRect);
 
   void CalculateUnderline(DrawTarget* aDrawTarget, nsFontMetrics& aFontMetrics);
 
   void CalcTextSize(nsBoxLayoutState& aBoxLayoutState);
 
-  void CalcDrawRect(nsRenderingContext &aRenderingContext);
+  void CalcDrawRect(gfxContext &aRenderingContext);
 
   explicit nsTextBoxFrame(nsStyleContext* aContext);
 
-  nscoord CalculateTitleForWidth(nsRenderingContext& aRenderingContext,
+  nscoord CalculateTitleForWidth(gfxContext&          aRenderingContext,
                                  nscoord              aWidth);
 
-  void GetTextSize(nsRenderingContext& aRenderingContext,
+  void GetTextSize(gfxContext&          aRenderingContext,
                    const nsString&      aString,
                    nsSize&              aSize,
                    nscoord&             aAscent);
@@ -106,7 +105,7 @@ private:
   bool AlwaysAppendAccessKey();
   bool InsertSeparatorBeforeAccessKey();
 
-  void DrawText(nsRenderingContext& aRenderingContext,
+  void DrawText(gfxContext&         aRenderingContext,
                 const nsRect&       aDirtyRect,
                 const nsRect&       aTextRect,
                 const nscolor*      aOverrideColor);

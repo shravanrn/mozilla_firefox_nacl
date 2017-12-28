@@ -8,6 +8,7 @@
 
 #include "nsTArray.h"
 #include "nsIScreen.h"
+#include "nsIThread.h"
 #include "nsCOMPtr.h"
 #include "mozilla/RefPtr.h"
 
@@ -18,6 +19,9 @@
 #include "gfxVR.h"
 #include "VRDisplayHost.h"
 
+#if defined(XP_MACOSX)
+class MacIOSurface;
+#endif
 namespace mozilla {
 namespace gfx {
 namespace impl {
@@ -27,6 +31,7 @@ class VRDisplayOpenVR : public VRDisplayHost
 public:
   virtual void NotifyVSync() override;
   void ZeroSensor() override;
+  bool GetIsHmdPresent();
 
 protected:
   virtual VRHMDSensorState GetSensorState() override;
@@ -34,6 +39,11 @@ protected:
   virtual void StopPresentation() override;
 #if defined(XP_WIN)
   virtual bool SubmitFrame(mozilla::layers::TextureSourceD3D11* aSource,
+                           const IntSize& aSize,
+                           const gfx::Rect& aLeftEyeRect,
+                           const gfx::Rect& aRightEyeRect) override;
+#elif defined(XP_MACOSX)
+  virtual bool SubmitFrame(MacIOSurface* aMacIOSurface,
                            const IntSize& aSize,
                            const gfx::Rect& aLeftEyeRect,
                            const gfx::Rect& aRightEyeRect) override;
@@ -53,23 +63,31 @@ protected:
   ::vr::IVRChaperone *mVRChaperone;
   ::vr::IVRCompositor *mVRCompositor;
 
+  VRTelemetry mTelemetry;
   bool mIsPresenting;
+  bool mIsHmdPresent;
 
   void UpdateStageParameters();
   void PollEvents();
+  bool SubmitFrame(void* aTextureHandle,
+                   ::vr::ETextureType aTextureType,
+                   const IntSize& aSize,
+                   const gfx::Rect& aLeftEyeRect,
+                   const gfx::Rect& aRightEyeRect);
 };
 
 class VRControllerOpenVR : public VRControllerHost
 {
 public:
-  explicit VRControllerOpenVR(dom::GamepadHand aHand, uint32_t aNumButtons,
-                              uint32_t aNumAxes, ::vr::ETrackedDeviceClass aDeviceType);
+  explicit VRControllerOpenVR(dom::GamepadHand aHand, uint32_t aDisplayID, uint32_t aNumButtons,
+                              uint32_t aNumTriggers, uint32_t aNumAxes,
+                              const nsCString& aId);
   void SetTrackedIndex(uint32_t aTrackedIndex);
   uint32_t GetTrackedIndex();
   float GetAxisMove(uint32_t aAxis);
   void SetAxisMove(uint32_t aAxis, float aValue);
-  void SetTrigger(float aValue);
-  float GetTrigger();
+  void SetTrigger(uint32_t aButton, float aValue);
+  float GetTrigger(uint32_t aButton);
   void SetHand(dom::GamepadHand aHand);
   void VibrateHaptic(::vr::IVRSystem* aVRSystem,
                      uint32_t aHapticIndex,
@@ -92,7 +110,7 @@ private:
 
   // The index of tracked devices from ::vr::IVRSystem.
   uint32_t mTrackedIndex;
-  float mTrigger;
+  nsTArray<float> mTrigger;
   nsTArray<float> mAxisMove;
   nsCOMPtr<nsIThread> mVibrateThread;
   Atomic<bool> mIsVibrateStopped;
@@ -132,6 +150,7 @@ private:
                          uint64_t aButtonTouched);
   void HandleTriggerPress(uint32_t aControllerIdx,
                           uint32_t aButton,
+                          uint32_t aTrigger,
                           float aValue);
   void HandleAxisMove(uint32_t aControllerIdx, uint32_t aAxis,
                       float aValue);
@@ -140,6 +159,9 @@ private:
                           VRControllerHost* aController);
   dom::GamepadHand GetGamepadHandFromControllerRole(
                           ::vr::ETrackedControllerRole aRole);
+  void GetControllerDeviceId(::vr::ETrackedDeviceClass aDeviceType,
+                             ::vr::TrackedDeviceIndex_t aDeviceIndex,
+                             nsCString& aId);
 
   // there can only be one
   RefPtr<impl::VRDisplayOpenVR> mOpenVRHMD;

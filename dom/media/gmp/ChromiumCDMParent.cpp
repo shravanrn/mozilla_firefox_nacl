@@ -4,17 +4,24 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "ChromiumCDMParent.h"
-#include "mozilla/gmp/GMPTypes.h"
+
+#include "ChromiumCDMCallback.h"
+#include "ChromiumCDMCallbackProxy.h"
+#include "ChromiumCDMProxy.h"
+#include "content_decryption_module.h"
 #include "GMPContentChild.h"
 #include "GMPContentParent.h"
-#include "mozilla/Unused.h"
-#include "ChromiumCDMProxy.h"
-#include "mozilla/dom/MediaKeyMessageEventBinding.h"
-#include "mozilla/Telemetry.h"
-#include "content_decryption_module.h"
 #include "GMPLog.h"
-#include "MediaPrefs.h"
 #include "GMPUtils.h"
+#include "MediaPrefs.h"
+#include "mozilla/dom/MediaKeyMessageEventBinding.h"
+#include "mozilla/gmp/GMPTypes.h"
+#include "mozilla/Telemetry.h"
+#include "mozilla/Unused.h"
+#include "mp4_demuxer/AnnexB.h"
+#include "mp4_demuxer/H264.h"
+
+#define NS_DispatchToMainThread(...) CompileError_UseAbstractMainThreadInstead
 
 namespace mozilla {
 namespace gmp {
@@ -35,15 +42,17 @@ ChromiumCDMParent::ChromiumCDMParent(GMPContentParent* aContentParent,
 }
 
 bool
-ChromiumCDMParent::Init(ChromiumCDMProxy* aProxy,
+ChromiumCDMParent::Init(ChromiumCDMCallback* aCDMCallback,
                         bool aAllowDistinctiveIdentifier,
-                        bool aAllowPersistentState)
+                        bool aAllowPersistentState,
+                        nsIEventTarget* aMainThread)
 {
   GMP_LOG("ChromiumCDMParent::Init(this=%p)", this);
-  if (!aProxy) {
+  if (!aCDMCallback || !aMainThread) {
     return false;
   }
-  mProxy = aProxy;
+  mCDMCallback = aCDMCallback;
+  mMainThread = aMainThread;
   return SendInit(aAllowDistinctiveIdentifier, aAllowPersistentState);
 }
 
@@ -205,6 +214,7 @@ ChromiumCDMParent::InitCDMInputBuffer(gmp::CDMInputBuffer& aBuffer,
 bool
 ChromiumCDMParent::SendBufferToCDM(uint32_t aSizeInBytes)
 {
+  GMP_LOG("ChromiumCDMParent::SendBufferToCDM() size=%" PRIu32, aSizeInBytes);
   Shmem shmem;
   if (!AllocShmem(aSizeInBytes, Shmem::SharedMemory::TYPE_BASIC, &shmem)) {
     return false;
@@ -271,7 +281,7 @@ ChromiumCDMParent::RecvOnResolveNewSessionPromise(const uint32_t& aPromiseId,
           this,
           aPromiseId,
           aSessionId.get());
-  if (!mProxy || mIsShutdown) {
+  if (!mCDMCallback || mIsShutdown) {
     return IPC_OK();
   }
 
@@ -283,12 +293,7 @@ ChromiumCDMParent::RecvOnResolveNewSessionPromise(const uint32_t& aPromiseId,
     return IPC_OK();
   }
 
-  RefPtr<Runnable> task =
-    NewRunnableMethod<uint32_t, nsString>(mProxy,
-                                          &ChromiumCDMProxy::OnSetSessionId,
-                                          token.value(),
-                                          NS_ConvertUTF8toUTF16(aSessionId));
-  NS_DispatchToMainThread(task);
+  mCDMCallback->SetSessionId(token.value(), aSessionId);
 
   ResolvePromise(aPromiseId);
 
@@ -304,17 +309,15 @@ ChromiumCDMParent::RecvResolveLoadSessionPromise(const uint32_t& aPromiseId,
           this,
           aPromiseId,
           aSuccessful);
-  if (!mProxy || mIsShutdown) {
+  if (!mCDMCallback || mIsShutdown) {
     return IPC_OK();
   }
 
-  NS_DispatchToMainThread(NewRunnableMethod<uint32_t, bool>(
-    mProxy,
-    &ChromiumCDMProxy::OnResolveLoadSessionPromise,
-    aPromiseId,
-    aSuccessful));
+  mCDMCallback->ResolveLoadSessionPromise(aPromiseId, aSuccessful);
+
   return IPC_OK();
 }
+
 void
 ChromiumCDMParent::ResolvePromise(uint32_t aPromiseId)
 {
@@ -323,11 +326,11 @@ ChromiumCDMParent::ResolvePromise(uint32_t aPromiseId)
 
   // Note: The MediaKeys rejects all pending DOM promises when it
   // initiates shutdown.
-  if (!mProxy || mIsShutdown) {
+  if (!mCDMCallback || mIsShutdown) {
     return;
   }
-  NS_DispatchToMainThread(NewRunnableMethod<uint32_t>(
-    mProxy, &ChromiumCDMProxy::ResolvePromise, aPromiseId));
+
+  mCDMCallback->ResolvePromise(aPromiseId);
 }
 
 ipc::IPCResult
@@ -335,6 +338,22 @@ ChromiumCDMParent::RecvOnResolvePromise(const uint32_t& aPromiseId)
 {
   ResolvePromise(aPromiseId);
   return IPC_OK();
+}
+
+void
+ChromiumCDMParent::RejectPromise(uint32_t aPromiseId,
+                                 nsresult aError,
+                                 const nsCString& aErrorMessage)
+{
+  GMP_LOG(
+    "ChromiumCDMParent::RejectPromise(this=%p, pid=%u)", this, aPromiseId);
+  // Note: The MediaKeys rejects all pending DOM promises when it
+  // initiates shutdown.
+  if (!mCDMCallback || mIsShutdown) {
+    return;
+  }
+
+  mCDMCallback->RejectPromise(aPromiseId, aError, aErrorMessage);
 }
 
 static nsresult
@@ -364,26 +383,6 @@ ToNsresult(uint32_t aError)
   return NS_ERROR_DOM_TIMEOUT_ERR; // Note: Unique placeholder.
 }
 
-void
-ChromiumCDMParent::RejectPromise(uint32_t aPromiseId,
-                                 nsresult aError,
-                                 const nsCString& aErrorMessage)
-{
-  GMP_LOG(
-    "ChromiumCDMParent::RejectPromise(this=%p, pid=%u)", this, aPromiseId);
-  // Note: The MediaKeys rejects all pending DOM promises when it
-  // initiates shutdown.
-  if (!mProxy || mIsShutdown) {
-    return;
-  }
-  NS_DispatchToMainThread(NewRunnableMethod<uint32_t, nsresult, nsCString>(
-    mProxy,
-    &ChromiumCDMProxy::RejectPromise,
-    aPromiseId,
-    aError,
-    aErrorMessage));
-}
-
 ipc::IPCResult
 ChromiumCDMParent::RecvOnRejectPromise(const uint32_t& aPromiseId,
                                        const uint32_t& aError,
@@ -394,21 +393,6 @@ ChromiumCDMParent::RecvOnRejectPromise(const uint32_t& aPromiseId,
   return IPC_OK();
 }
 
-static dom::MediaKeyMessageType
-ToDOMMessageType(uint32_t aMessageType)
-{
-  switch (static_cast<cdm::MessageType>(aMessageType)) {
-    case cdm::kLicenseRequest:
-      return dom::MediaKeyMessageType::License_request;
-    case cdm::kLicenseRenewal:
-      return dom::MediaKeyMessageType::License_renewal;
-    case cdm::kLicenseRelease:
-      return dom::MediaKeyMessageType::License_release;
-  }
-  MOZ_ASSERT_UNREACHABLE("Invalid cdm::MessageType enum value.");
-  return dom::MediaKeyMessageType::License_request;
-}
-
 ipc::IPCResult
 ChromiumCDMParent::RecvOnSessionMessage(const nsCString& aSessionId,
                                         const uint32_t& aMessageType,
@@ -417,41 +401,12 @@ ChromiumCDMParent::RecvOnSessionMessage(const nsCString& aSessionId,
   GMP_LOG("ChromiumCDMParent::RecvOnSessionMessage(this=%p, sid=%s)",
           this,
           aSessionId.get());
-  if (!mProxy || mIsShutdown) {
+  if (!mCDMCallback || mIsShutdown) {
     return IPC_OK();
   }
-  RefPtr<CDMProxy> proxy = mProxy;
-  nsString sid = NS_ConvertUTF8toUTF16(aSessionId);
-  dom::MediaKeyMessageType messageType = ToDOMMessageType(aMessageType);
-  nsTArray<uint8_t> msg(Move(aMessage));
-  NS_DispatchToMainThread(
-    NS_NewRunnableFunction([proxy, sid, messageType, msg]() mutable {
-      proxy->OnSessionMessage(sid, messageType, msg);
-    }));
-  return IPC_OK();
-}
 
-static dom::MediaKeyStatus
-ToDOMMediaKeyStatus(uint32_t aStatus)
-{
-  switch (static_cast<cdm::KeyStatus>(aStatus)) {
-    case cdm::kUsable:
-      return dom::MediaKeyStatus::Usable;
-    case cdm::kInternalError:
-      return dom::MediaKeyStatus::Internal_error;
-    case cdm::kExpired:
-      return dom::MediaKeyStatus::Expired;
-    case cdm::kOutputRestricted:
-      return dom::MediaKeyStatus::Output_restricted;
-    case cdm::kOutputDownscaled:
-      return dom::MediaKeyStatus::Output_downscaled;
-    case cdm::kStatusPending:
-      return dom::MediaKeyStatus::Status_pending;
-    case cdm::kReleased:
-      return dom::MediaKeyStatus::Released;
-  }
-  MOZ_ASSERT_UNREACHABLE("Invalid cdm::KeyStatus enum value.");
-  return dom::MediaKeyStatus::Internal_error;
+  mCDMCallback->SessionMessage(aSessionId, aMessageType, Move(aMessage));
+  return IPC_OK();
 }
 
 ipc::IPCResult
@@ -460,26 +415,11 @@ ChromiumCDMParent::RecvOnSessionKeysChange(
   nsTArray<CDMKeyInformation>&& aKeysInfo)
 {
   GMP_LOG("ChromiumCDMParent::RecvOnSessionKeysChange(this=%p)", this);
-  if (!mProxy || mIsShutdown) {
+  if (!mCDMCallback || mIsShutdown) {
     return IPC_OK();
   }
-  bool keyStatusesChange = false;
-  {
-    CDMCaps::AutoLock caps(mProxy->Capabilites());
-    for (size_t i = 0; i < aKeysInfo.Length(); i++) {
-      keyStatusesChange |=
-        caps.SetKeyStatus(aKeysInfo[i].mKeyId(),
-                          NS_ConvertUTF8toUTF16(aSessionId),
-                          dom::Optional<dom::MediaKeyStatus>(
-                            ToDOMMediaKeyStatus(aKeysInfo[i].mStatus())));
-    }
-  }
-  if (keyStatusesChange) {
-    NS_DispatchToMainThread(
-      NewRunnableMethod<nsString>(mProxy,
-                                  &ChromiumCDMProxy::OnKeyStatusesChange,
-                                  NS_ConvertUTF8toUTF16(aSessionId)));
-  }
+
+  mCDMCallback->SessionKeysChange(aSessionId, Move(aKeysInfo));
   return IPC_OK();
 }
 
@@ -490,14 +430,11 @@ ChromiumCDMParent::RecvOnExpirationChange(const nsCString& aSessionId,
   GMP_LOG("ChromiumCDMParent::RecvOnExpirationChange(this=%p) time=%lf",
           this,
           aSecondsSinceEpoch);
-  if (!mProxy || mIsShutdown) {
+  if (!mCDMCallback || mIsShutdown) {
     return IPC_OK();
   }
-  NS_DispatchToMainThread(NewRunnableMethod<nsString, UnixTime>(
-    mProxy,
-    &ChromiumCDMProxy::OnExpirationChange,
-    NS_ConvertUTF8toUTF16(aSessionId),
-    GMPTimestamp(aSecondsSinceEpoch * 1000)));
+
+  mCDMCallback->ExpirationChange(aSessionId, aSecondsSinceEpoch);
   return IPC_OK();
 }
 
@@ -505,13 +442,11 @@ ipc::IPCResult
 ChromiumCDMParent::RecvOnSessionClosed(const nsCString& aSessionId)
 {
   GMP_LOG("ChromiumCDMParent::RecvOnSessionClosed(this=%p)", this);
-  if (!mProxy || mIsShutdown) {
+  if (!mCDMCallback || mIsShutdown) {
     return IPC_OK();
   }
-  NS_DispatchToMainThread(
-    NewRunnableMethod<nsString>(mProxy,
-                                &ChromiumCDMProxy::OnSessionClosed,
-                                NS_ConvertUTF8toUTF16(aSessionId)));
+
+  mCDMCallback->SessionClosed(aSessionId);
   return IPC_OK();
 }
 
@@ -522,17 +457,12 @@ ChromiumCDMParent::RecvOnLegacySessionError(const nsCString& aSessionId,
                                             const nsCString& aMessage)
 {
   GMP_LOG("ChromiumCDMParent::RecvOnLegacySessionError(this=%p)", this);
-  if (!mProxy || mIsShutdown) {
+  if (!mCDMCallback || mIsShutdown) {
     return IPC_OK();
   }
-  NS_DispatchToMainThread(
-    NewRunnableMethod<nsString, nsresult, uint32_t, nsString>(
-      mProxy,
-      &ChromiumCDMProxy::OnSessionError,
-      NS_ConvertUTF8toUTF16(aSessionId),
-      ToNsresult(aError),
-      aSystemCode,
-      NS_ConvertUTF8toUTF16(aMessage)));
+
+  mCDMCallback->LegacySessionError(
+    aSessionId, ToNsresult(aError), aSystemCode, aMessage);
   return IPC_OK();
 }
 
@@ -603,10 +533,40 @@ ChromiumCDMParent::RecvDecrypted(const uint32_t& aId,
   return IPC_OK();
 }
 
+ipc::IPCResult
+ChromiumCDMParent::RecvIncreaseShmemPoolSize()
+{
+  GMP_LOG("%s(this=%p) limit=%" PRIu32 " active=%" PRIu32,
+          __func__,
+          this,
+          mVideoShmemLimit,
+          mVideoShmemsActive);
+
+  // Put an upper limit on the number of shmems we tolerate the CDM asking
+  // for, to prevent a memory blow-out. In practice, we expect the CDM to
+  // need less than 5, but some encodings require more.
+  // We'd expect CDMs to not have video frames larger than 720p-1080p
+  // (due to DRM robustness requirements), which is about 1.5MB-3MB per
+  // frame.
+  if (mVideoShmemLimit > 50) {
+    mDecodePromise.RejectIfExists(
+      MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                  RESULT_DETAIL("Failled to ensure CDM has enough shmems.")),
+      __func__);
+    Shutdown();
+    return IPC_OK();
+  }
+  mVideoShmemLimit++;
+
+  EnsureSufficientShmems(mVideoFrameBufferSize);
+
+  return IPC_OK();
+}
+
 bool
 ChromiumCDMParent::PurgeShmems()
 {
-  GMP_LOG("ChromiumCDMParent::PurgeShmems(this=%p) frame_size=%" PRIuSIZE
+  GMP_LOG("ChromiumCDMParent::PurgeShmems(this=%p) frame_size=%zu"
           " limit=%" PRIu32 " active=%" PRIu32,
           this,
           mVideoFrameBufferSize,
@@ -628,7 +588,7 @@ bool
 ChromiumCDMParent::EnsureSufficientShmems(size_t aVideoFrameSize)
 {
   GMP_LOG("ChromiumCDMParent::EnsureSufficientShmems(this=%p) "
-          "size=%" PRIuSIZE " expected_size=%" PRIuSIZE " limit=%" PRIu32
+          "size=%zu expected_size=%zu limit=%" PRIu32
           " active=%" PRIu32,
           this,
           aVideoFrameSize,
@@ -661,10 +621,10 @@ ChromiumCDMParent::EnsureSufficientShmems(size_t aVideoFrameSize)
   // We also have a failure recovery mechanism; if the CDM asks for more
   // buffers than we have shmem's available, ChromiumCDMChild gives the
   // CDM a non-shared memory buffer, and returns the frame to the parent
-  // in an nsTArray<uint8_t> instead of a shmem. Every time this happens,
-  // the parent sends an extra shmem to the CDM process for it to add to the
-  // set of shmems with which to return output. Via this mechanism we should
-  // recover from incorrectly predicting how many shmems to pre-allocate.
+  // in an nsTArray<uint8_t> instead of a shmem. The child then sends a
+  // message to the parent asking it to increase the number of shmems in
+  // the pool. Via this mechanism we should recover from incorrectly
+  // predicting how many shmems to pre-allocate.
   //
   // At decoder start up, we guess how big the shmems need to be based on
   // the video frame dimensions. If we guess wrong, the CDM will follow
@@ -678,17 +638,6 @@ ChromiumCDMParent::EnsureSufficientShmems(size_t aVideoFrameSize)
       return false;
     }
     mVideoFrameBufferSize = aVideoFrameSize;
-  } else {
-    // Put an upper limit on the number of shmems we tolerate the CDM asking
-    // for, to prevent a memory blow-out. In practice, we expect the CDM to
-    // need less than 5, but some encodings require more.
-    // We'd expect CDMs to not have video frames larger than 720p-1080p
-    // (due to DRM robustness requirements), which is about 1.5MB-3MB per
-    // frame.
-    if (mVideoShmemLimit > 50) {
-      return false;
-    }
-    mVideoShmemLimit++;
   }
 
   while (mVideoShmemsActive < mVideoShmemLimit) {
@@ -708,7 +657,9 @@ ipc::IPCResult
 ChromiumCDMParent::RecvDecodedData(const CDMVideoFrame& aFrame,
                                    nsTArray<uint8_t>&& aData)
 {
-  GMP_LOG("ChromiumCDMParent::RecvDecodedData(this=%p)", this);
+  GMP_LOG("ChromiumCDMParent::RecvDecodedData(this=%p) time=%" PRId64,
+          this,
+          aFrame.mTimestamp());
 
   if (mIsShutdown || mDecodePromise.IsEmpty()) {
     return IPC_OK();
@@ -731,7 +682,7 @@ ChromiumCDMParent::RecvDecodedData(const CDMVideoFrame& aFrame,
     return IPC_OK();
   }
 
-  mDecodePromise.ResolveIfExists({ Move(v) }, __func__);
+  ReorderAndReturnOutput(Move(v));
 
   return IPC_OK();
 }
@@ -740,7 +691,11 @@ ipc::IPCResult
 ChromiumCDMParent::RecvDecodedShmem(const CDMVideoFrame& aFrame,
                                     ipc::Shmem&& aShmem)
 {
-  GMP_LOG("ChromiumCDMParent::RecvDecodedShmem(this=%p)", this);
+  GMP_LOG("ChromiumCDMParent::RecvDecodedShmem(this=%p) time=%" PRId64
+          " duration=%" PRId64,
+          this,
+          aFrame.mTimestamp(),
+          aFrame.mDuration());
 
   // On failure we need to deallocate the shmem we're to return to the
   // CDM. On success we return it to the CDM to be reused.
@@ -775,9 +730,24 @@ ChromiumCDMParent::RecvDecodedShmem(const CDMVideoFrame& aFrame,
   // for it again.
   autoDeallocateShmem.release();
 
-  mDecodePromise.ResolveIfExists({ Move(v) }, __func__);
+  ReorderAndReturnOutput(Move(v));
 
   return IPC_OK();
+}
+
+void
+ChromiumCDMParent::ReorderAndReturnOutput(RefPtr<VideoData>&& aFrame)
+{
+  if (mMaxRefFrames == 0) {
+    mDecodePromise.ResolveIfExists({ Move(aFrame) }, __func__);
+    return;
+  }
+  mReorderQueue.Push(Move(aFrame));
+  MediaDataDecoder::DecodedData results;
+  while (mReorderQueue.Length() > mMaxRefFrames) {
+    results.AppendElement(mReorderQueue.Pop());
+  }
+  mDecodePromise.Resolve(Move(results), __func__);
 }
 
 already_AddRefed<VideoData>
@@ -857,8 +827,8 @@ ChromiumCDMParent::ActorDestroy(ActorDestroyReason aWhy)
   GMP_LOG("ChromiumCDMParent::ActorDestroy(this=%p, reason=%d)", this, aWhy);
   MOZ_ASSERT(!mActorDestroyed);
   mActorDestroyed = true;
-  // Shutdown() will clear mProxy, so let's keep a reference for later use.
-  RefPtr<ChromiumCDMProxy> proxy = mProxy;
+  // Shutdown() will clear mCDMCallback, so let's keep a reference for later use.
+  auto callback = mCDMCallback;
   if (!mIsShutdown) {
     // Plugin crash.
     MOZ_ASSERT(aWhy == AbnormalShutdown);
@@ -871,10 +841,8 @@ ChromiumCDMParent::ActorDestroy(ActorDestroyReason aWhy)
     mContentParent = nullptr;
   }
   bool abnormalShutdown = (aWhy == AbnormalShutdown);
-  if (abnormalShutdown && proxy) {
-    RefPtr<Runnable> task =
-      NewRunnableMethod(proxy, &ChromiumCDMProxy::Terminated);
-    NS_DispatchToMainThread(task);
+  if (abnormalShutdown && callback) {
+    callback->Terminated();
   }
   MaybeDisconnect(abnormalShutdown);
 }
@@ -892,8 +860,15 @@ ChromiumCDMParent::InitializeVideoDecoder(
       __func__);
   }
 
+  // The Widevine CDM version 1.4.8.970 and above contain a video decoder that
+  // does not optimally allocate video frames; it requests buffers much larger
+  // than required. The exact formula the CDM uses to calculate their frame
+  // sizes isn't obvious, but they normally request around or slightly more
+  // than 1.5X the optimal amount. So pad the size of buffers we allocate so
+  // that we're likely to have buffers big enough to accomodate the CDM's weird
+  // frame size calculation.
   const size_t bufferSize =
-    I420FrameBufferSizePadded(aInfo.mImage.width, aInfo.mImage.height);
+    1.7 * I420FrameBufferSizePadded(aInfo.mImage.width, aInfo.mImage.height);
   if (bufferSize <= 0) {
     return MediaDataDecoder::InitPromise::CreateAndReject(
       MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
@@ -914,6 +889,13 @@ ChromiumCDMParent::InitializeVideoDecoder(
                   RESULT_DETAIL("Failed to send init video decoder to CDM")),
       __func__);
   }
+
+  mMaxRefFrames =
+    (aConfig.mCodec() == cdm::VideoDecoderConfig::kCodecH264)
+      ? mp4_demuxer::H264::HasSPS(aInfo.mExtraData)
+          ? mp4_demuxer::H264::ComputeMaxRefFrames(aInfo.mExtraData)
+          : 16
+      : 0;
 
   mVideoDecoderInitialized = true;
   mImageContainer = aImageContainer;
@@ -987,11 +969,14 @@ RefPtr<MediaDataDecoder::FlushPromise>
 ChromiumCDMParent::FlushVideoDecoder()
 {
   if (mIsShutdown) {
+    MOZ_ASSERT(mReorderQueue.IsEmpty());
     return MediaDataDecoder::FlushPromise::CreateAndReject(
       MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
                   RESULT_DETAIL("ChromiumCDMParent is shutdown")),
       __func__);
   }
+
+  mReorderQueue.Clear();
 
   mDecodePromise.RejectIfExists(NS_ERROR_DOM_MEDIA_CANCELED, __func__);
   if (!SendResetVideoDecoder()) {
@@ -1005,6 +990,7 @@ ChromiumCDMParent::FlushVideoDecoder()
 ipc::IPCResult
 ChromiumCDMParent::RecvResetVideoDecoderComplete()
 {
+  MOZ_ASSERT(mReorderQueue.IsEmpty());
   if (mIsShutdown) {
     MOZ_ASSERT(mFlushDecoderPromise.IsEmpty());
     return IPC_OK();
@@ -1038,7 +1024,13 @@ ChromiumCDMParent::RecvDrainComplete()
     MOZ_ASSERT(mDecodePromise.IsEmpty());
     return IPC_OK();
   }
-  mDecodePromise.ResolveIfExists(MediaDataDecoder::DecodedData(), __func__);
+
+  MediaDataDecoder::DecodedData samples;
+  while (!mReorderQueue.IsEmpty()) {
+    samples.AppendElement(Move(mReorderQueue.Pop()));
+  }
+
+  mDecodePromise.ResolveIfExists(Move(samples), __func__);
   return IPC_OK();
 }
 RefPtr<ShutdownPromise>
@@ -1086,16 +1078,16 @@ ChromiumCDMParent::Shutdown()
   // proxy will shutdown when the owning MediaKeys is destroyed during cycle
   // collection, and that will not shut down cleanly as the GMP thread will be
   // shutdown by then.
-  if (mProxy) {
-    RefPtr<Runnable> task =
-      NewRunnableMethod(mProxy, &ChromiumCDMProxy::Shutdown);
-    NS_DispatchToMainThread(task.forget());
+  if (mCDMCallback) {
+    mCDMCallback->Shutdown();
   }
 
-  // We may be called from a task holding the last reference to the proxy, so
+  // We may be called from a task holding the last reference to the CDM callback, so
   // let's clear our local weak pointer to ensure it will not be used afterward
   // (including from an already-queued task, e.g.: ActorDestroy).
-  mProxy = nullptr;
+  mCDMCallback = nullptr;
+
+  mReorderQueue.Clear();
 
   for (RefPtr<DecryptJob>& decrypt : mDecrypts) {
     decrypt->PostResult(eme::AbortedErr);
@@ -1130,3 +1122,5 @@ ChromiumCDMParent::Shutdown()
 
 } // namespace gmp
 } // namespace mozilla
+
+#undef NS_DispatchToMainThread

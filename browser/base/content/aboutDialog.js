@@ -16,10 +16,15 @@ function init(aEvent) {
 
   var distroId = Services.prefs.getCharPref("distribution.id", "");
   if (distroId) {
-    var distroVersion = Services.prefs.getCharPref("distribution.version");
+    var distroString = distroId;
+
+    var distroVersion = Services.prefs.getCharPref("distribution.version", "");
+    if (distroVersion) {
+      distroString += " - " + distroVersion;
+    }
 
     var distroIdField = document.getElementById("distributionId");
-    distroIdField.value = distroId + " - " + distroVersion;
+    distroIdField.value = distroString;
     distroIdField.style.display = "block";
 
     var distroAbout = Services.prefs.getStringPref("distribution.about", "");
@@ -64,7 +69,7 @@ function init(aEvent) {
   }
 
   if (AppConstants.MOZ_UPDATER) {
-    gAppUpdater = new appUpdater();
+    gAppUpdater = new appUpdater({ buttonAutoFocus: true });
 
     let channelLabel = document.getElementById("currentChannel");
     let currentChannelText = document.getElementById("currentChannelText");

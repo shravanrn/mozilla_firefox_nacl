@@ -56,10 +56,12 @@ public:
            nsSecurityFlags aSecurityFlags,
            nsContentPolicyType aContentPolicyType);
 
-  // Constructor used for TYPE_DOCUMENT loads which have no reasonable
-  // loadingNode or loadingPrincipal
+  // Constructor used for TYPE_DOCUMENT loads which have a different
+  // loadingContext than other loads. This ContextForTopLevelLoad is
+  // only used for content policy checks.
   LoadInfo(nsPIDOMWindowOuter* aOuterWindow,
            nsIPrincipal* aTriggeringPrincipal,
+           nsISupports* aContextForTopLevelLoad,
            nsSecurityFlags aSecurityFlags);
 
   // create an exact copy of the loadinfo
@@ -94,6 +96,7 @@ private:
            nsIPrincipal* aTriggeringPrincipal,
            nsIPrincipal* aPrincipalToInherit,
            nsIPrincipal* aSandboxedLoadingPrincipal,
+           nsIURI* aResultPrincipalURI,
            nsSecurityFlags aSecurityFlags,
            nsContentPolicyType aContentPolicyType,
            LoadTainting aTainting,
@@ -104,6 +107,7 @@ private:
            uint64_t aInnerWindowID,
            uint64_t aOuterWindowID,
            uint64_t aParentOuterWindowID,
+           uint64_t aTopOuterWindowID,
            uint64_t aFrameOuterWindowID,
            bool aEnforceSecurity,
            bool aInitialSecurityCheckDone,
@@ -115,7 +119,9 @@ private:
            bool aForcePreflight,
            bool aIsPreflight,
            bool aForceHSTSPriming,
-           bool aMixedContentWouldBlock);
+           bool aMixedContentWouldBlock,
+           bool aIsHSTSPriming,
+           bool aIsHSTSPrimingUpgrade);
   LoadInfo(const LoadInfo& rhs);
 
   NS_IMETHOD GetRedirects(JSContext* aCx, JS::MutableHandle<JS::Value> aRedirects,
@@ -141,7 +147,9 @@ private:
   nsCOMPtr<nsIPrincipal>           mTriggeringPrincipal;
   nsCOMPtr<nsIPrincipal>           mPrincipalToInherit;
   nsCOMPtr<nsIPrincipal>           mSandboxedLoadingPrincipal;
+  nsCOMPtr<nsIURI>                 mResultPrincipalURI;
   nsWeakPtr                        mLoadingContext;
+  nsWeakPtr                        mContextForTopLevelLoad;
   nsSecurityFlags                  mSecurityFlags;
   nsContentPolicyType              mInternalContentPolicyType;
   LoadTainting                     mTainting;
@@ -152,6 +160,7 @@ private:
   uint64_t                         mInnerWindowID;
   uint64_t                         mOuterWindowID;
   uint64_t                         mParentOuterWindowID;
+  uint64_t                         mTopOuterWindowID;
   uint64_t                         mFrameOuterWindowID;
   bool                             mEnforceSecurity;
   bool                             mInitialSecurityCheckDone;
@@ -165,6 +174,8 @@ private:
 
   bool                             mForceHSTSPriming : 1;
   bool                             mMixedContentWouldBlock : 1;
+  bool                             mIsHSTSPriming: 1;
+  bool                             mIsHSTSPrimingUpgrade: 1;
 };
 
 } // namespace net

@@ -172,6 +172,7 @@ class AutoSetHandlingSegFault
 # if defined(__linux__) && defined(__mips__)
 #  define EPC_sig(p) ((p)->uc_mcontext.pc)
 #  define RFP_sig(p) ((p)->uc_mcontext.gregs[30])
+#  define RSP_sig(p) ((p)->uc_mcontext.gregs[29])
 # endif
 #elif defined(__NetBSD__)
 # define XMM_sig(p,i) (((struct fxsave64*)(p)->uc_mcontext.__fpregs)->fx_xmm[i])
@@ -255,6 +256,7 @@ class AutoSetHandlingSegFault
 # define RIP_sig(p) ((p)->uc_mcontext->__ss.__rip)
 # define RBP_sig(p) ((p)->uc_mcontext->__ss.__rbp)
 # define RSP_sig(p) ((p)->uc_mcontext->__ss.__rsp)
+# define R14_sig(p) ((p)->uc_mcontext->__ss.__lr)
 # define R15_sig(p) ((p)->uc_mcontext->__ss.__pc)
 #else
 # error "Don't know how to read/write to the thread state via the mcontext_t."
@@ -415,6 +417,7 @@ struct macos_arm_context {
 #elif defined(__mips__)
 # define PC_sig(p) EPC_sig(p)
 # define FP_sig(p) RFP_sig(p)
+# define SP_sig(p) RSP_sig(p)
 #endif
 
 static uint8_t**
@@ -437,23 +440,21 @@ ContextToFP(CONTEXT* context)
 #endif
 }
 
+#ifndef JS_CODEGEN_NONE
 static uint8_t*
 ContextToSP(CONTEXT* context)
 {
-#ifdef JS_CODEGEN_NONE
-    MOZ_CRASH();
-#else
     return reinterpret_cast<uint8_t*>(SP_sig(context));
-#endif
 }
 
-#if defined(__arm__) || defined(__aarch64__)
+# if defined(__arm__) || defined(__aarch64__)
 static uint8_t*
 ContextToLR(CONTEXT* context)
 {
     return reinterpret_cast<uint8_t*>(LR_sig(context));
 }
-#endif
+# endif
+#endif // JS_CODEGEN_NONE
 
 #if defined(XP_DARWIN)
 
@@ -485,11 +486,19 @@ ContextToFP(EMULATOR_CONTEXT* context)
 # elif defined(__i386__)
     return (uint8_t*)context->thread.uts.ts32.__ebp;
 # elif defined(__arm__)
-    return (uint8_t*)context->thread.__fp;
+    return (uint8_t*)context->thread.__r[11];
 # else
 #  error Unsupported architecture
 # endif
 }
+
+# if defined(__arm__) || defined(__aarch64__)
+static uint8_t*
+ContextToLR(EMULATOR_CONTEXT* context)
+{
+    return (uint8_t*)context->thread.__lr;
+}
+# endif
 
 static uint8_t*
 ContextToSP(EMULATOR_CONTEXT* context)
@@ -512,7 +521,9 @@ ToRegisterState(EMULATOR_CONTEXT* context)
     state.fp = ContextToFP(context);
     state.pc = *ContextToPC(context);
     state.sp = ContextToSP(context);
-    // no ARM on Darwin => don't fill state.lr.
+# if defined(__arm__) || defined(__aarch64__)
+    state.lr = ContextToLR(context);
+# endif
     return state;
 }
 #endif // XP_DARWIN
@@ -950,6 +961,12 @@ IsHeapAccessAddress(const Instance &instance, uint8_t* faultingAddress)
            faultingAddress < instance.memoryBase() + accessLimit;
 }
 
+MOZ_COLD static bool
+IsActiveContext(JSContext* cx)
+{
+    return cx == cx->runtime()->activeContext();
+}
+
 #if defined(XP_WIN)
 
 static bool
@@ -969,7 +986,7 @@ HandleFault(PEXCEPTION_POINTERS exception)
 
     // Don't allow recursive handling of signals, see AutoSetHandlingSegFault.
     JSContext* cx = TlsContext.get();
-    if (!cx || cx->handlingSegFault)
+    if (!cx || cx->handlingSegFault || !IsActiveContext(cx))
         return false;
     AutoSetHandlingSegFault handling(cx);
 
@@ -1004,7 +1021,7 @@ HandleFault(PEXCEPTION_POINTERS exception)
         return false;
     }
 
-    const Instance* instance = LookupFaultingInstance(activation, pc, ContextToFP(context));
+    const Instance* instance = LookupFaultingInstance(*code, pc, ContextToFP(context));
     if (!instance)
         return false;
 
@@ -1072,7 +1089,7 @@ static bool
 HandleMachException(JSContext* cx, const ExceptionRequest& request)
 {
     // Don't allow recursive handling of signals, see AutoSetHandlingSegFault.
-    if (cx->handlingSegFault)
+    if (cx->handlingSegFault || !IsActiveContext(cx))
         return false;
     AutoSetHandlingSegFault handling(cx);
 
@@ -1123,7 +1140,11 @@ HandleMachException(JSContext* cx, const ExceptionRequest& request)
     if (!activation)
         return false;
 
-    const Instance* instance = LookupFaultingInstance(activation, pc, ContextToFP(&context));
+    const Code* code = activation->compartment()->wasm.lookupCode(pc);
+    if (!code)
+        return false;
+
+    const Instance* instance = LookupFaultingInstance(*code, pc, ContextToFP(&context));
     if (!instance || !instance->code().containsFunctionPC(pc))
         return false;
 
@@ -1322,7 +1343,7 @@ HandleFault(int signum, siginfo_t* info, void* ctx)
 
     // Don't allow recursive handling of signals, see AutoSetHandlingSegFault.
     JSContext* cx = TlsContext.get();
-    if (!cx || cx->handlingSegFault)
+    if (!cx || cx->handlingSegFault || !IsActiveContext(cx))
         return false;
     AutoSetHandlingSegFault handling(cx);
 
@@ -1331,7 +1352,11 @@ HandleFault(int signum, siginfo_t* info, void* ctx)
         return false;
 
     const CodeSegment* segment;
-    const Instance* instance = LookupFaultingInstance(activation, pc, ContextToFP(context));
+    const Code* code = activation->compartment()->wasm.lookupCode(pc, &segment);
+    if (!code)
+        return false;
+
+    const Instance* instance = LookupFaultingInstance(*code, pc, ContextToFP(context));
     if (!instance || !instance->code().containsFunctionPC(pc, &segment))
         return false;
 
@@ -1426,6 +1451,19 @@ RedirectIonBackedgesToInterruptCheck(JSContext* cx)
     }
 }
 
+bool
+wasm::InInterruptibleCode(JSContext* cx, uint8_t* pc, const CodeSegment** cs)
+{
+    // Only interrupt in function code so that the frame iterators have the
+    // invariant that resumePC always has a function CodeRange and we can't
+    // get into any weird interrupt-during-interrupt-stub cases.
+    if (!cx->compartment())
+        return false;
+
+    const Code* code = cx->compartment()->wasm.lookupCode(pc, cs);
+    return code && (*cs)->containsFunctionPC(pc);
+}
+
 // The return value indicates whether the PC was changed, not whether there was
 // a failure.
 static bool
@@ -1447,14 +1485,8 @@ RedirectJitCodeToInterruptCheck(JSContext* cx, CONTEXT* context)
     uint8_t* pc = *ContextToPC(context);
 #endif
 
-    // Only interrupt in function code so that the frame iterators have the
-    // invariant that resumePC always has a function CodeRange and we can't
-    // get into any weird interrupt-during-interrupt-stub cases.
-    if (!cx->compartment())
-        return false;
-    const CodeSegment* codeSegment;
-    const Code* code = cx->compartment()->wasm.lookupCode(pc, &codeSegment);
-    if (!code || !codeSegment->containsFunctionPC(pc))
+    const CodeSegment* codeSegment = nullptr;
+    if (!InInterruptibleCode(cx, pc, &codeSegment))
         return false;
 
     // Only probe cx->activation() via ActivationIfInnermost after we know the
@@ -1679,7 +1711,7 @@ js::InterruptRunningJitCode(JSContext* cx)
     // thread is in the middle of a syscall. Rather than retrying in a loop,
     // just wait for the next request for interrupt.
     HANDLE thread = (HANDLE)cx->threadNative();
-    if (SuspendThread(thread) != -1) {
+    if (SuspendThread(thread) != (DWORD)-1) {
         CONTEXT context;
         context.ContextFlags = CONTEXT_FULL;
         if (GetThreadContext(thread, &context)) {

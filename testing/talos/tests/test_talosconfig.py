@@ -1,8 +1,10 @@
+from __future__ import absolute_import, print_function
+
+import json
+import unittest
+
 from talos import talosconfig
 from talos.configuration import YAML
-import unittest
-import json
-
 
 # globals
 ffox_path = 'test/path/to/firefox'
@@ -150,6 +152,7 @@ class TalosConfigUnitTest(unittest.TestCase):
         # Checking keyerror when calling approot when xperf_providers is missing
         with self.assertRaises(KeyError):
             self.validate(content['approot'], "test/path/to")
+
 
 if __name__ == '__main__':
     unittest.main()

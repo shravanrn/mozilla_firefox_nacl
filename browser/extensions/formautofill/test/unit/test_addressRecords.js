@@ -16,7 +16,7 @@ const TEST_ADDRESS_1 = {
   "address-level1": "MA",
   "postal-code": "02139",
   country: "US",
-  tel: "+1 617 253 5702",
+  tel: "+16172535702",
   email: "timbl@w3.org",
 };
 
@@ -26,6 +26,8 @@ const TEST_ADDRESS_2 = {
 };
 
 const TEST_ADDRESS_3 = {
+  "given-name": "Timothy",
+  "family-name": "Berners-Lee",
   "street-address": "Other Address",
   "postal-code": "12345",
 };
@@ -35,6 +37,11 @@ const TEST_ADDRESS_4 = {
   "additional-name": "John",
   "family-name": "Berners-Lee",
   organization: "World Wide Web Consortium",
+};
+
+const TEST_ADDRESS_FOR_UPDATE = {
+  "name": "Tim Berners",
+  "street-address": "",
 };
 
 const TEST_ADDRESS_WITH_INVALID_FIELD = {
@@ -48,18 +55,18 @@ const MERGE_TESTCASES = [
     addressInStorage: {
       "given-name": "Timothy",
       "street-address": "331 E. Evelyn Avenue",
-      "tel": "1-650-903-0800",
+      "tel": "+16509030800",
     },
     addressToMerge: {
       "given-name": "Timothy",
       "street-address": "331 E. Evelyn Avenue",
-      "tel": "1-650-903-0800",
+      "tel": "+16509030800",
       country: "US",
     },
     expectedAddress: {
       "given-name": "Timothy",
       "street-address": "331 E. Evelyn Avenue",
-      "tel": "1-650-903-0800",
+      "tel": "+16509030800",
       country: "US",
     },
   },
@@ -68,18 +75,18 @@ const MERGE_TESTCASES = [
     addressInStorage: {
       "given-name": "Timothy",
       "street-address": "331 E. Evelyn Avenue",
-      "tel": "1-650-903-0800",
+      "tel": "+16509030800",
       country: "US",
     },
     addressToMerge: {
       "given-name": "Timothy",
       "street-address": "331 E. Evelyn Avenue",
-      "tel": "1-650-903-0800",
+      "tel": "+16509030800",
     },
     expectedAddress: {
       "given-name": "Timothy",
       "street-address": "331 E. Evelyn Avenue",
-      "tel": "1-650-903-0800",
+      "tel": "+16509030800",
       country: "US",
     },
   },
@@ -88,17 +95,112 @@ const MERGE_TESTCASES = [
     addressInStorage: {
       "given-name": "Timothy",
       "street-address": "331 E. Evelyn Avenue",
-      "tel": "1-650-903-0800",
+      "tel": "+16509030800",
     },
     addressToMerge: {
       "street-address": "331 E. Evelyn Avenue",
-      "tel": "1-650-903-0800",
+      "tel": "+16509030800",
       country: "US",
     },
     expectedAddress: {
       "given-name": "Timothy",
       "street-address": "331 E. Evelyn Avenue",
-      "tel": "1-650-903-0800",
+      "tel": "+16509030800",
+      country: "US",
+    },
+  },
+  {
+    description: "Merge an address with multi-line street-address in storage and single-line incoming one",
+    addressInStorage: {
+      "given-name": "Timothy",
+      "street-address": "331 E. Evelyn Avenue\nLine2",
+      "tel": "+16509030800",
+    },
+    addressToMerge: {
+      "street-address": "331 E. Evelyn Avenue Line2",
+      "tel": "+16509030800",
+      country: "US",
+    },
+    expectedAddress: {
+      "given-name": "Timothy",
+      "street-address": "331 E. Evelyn Avenue\nLine2",
+      "tel": "+16509030800",
+      country: "US",
+    },
+  },
+  {
+    description: "Merge an address with 3-line street-address in storage and 2-line incoming one",
+    addressInStorage: {
+      "given-name": "Timothy",
+      "street-address": "331 E. Evelyn Avenue\nLine2\nLine3",
+      "tel": "+16509030800",
+    },
+    addressToMerge: {
+      "street-address": "331 E. Evelyn Avenue\nLine2 Line3",
+      "tel": "+16509030800",
+      country: "US",
+    },
+    expectedAddress: {
+      "given-name": "Timothy",
+      "street-address": "331 E. Evelyn Avenue\nLine2\nLine3",
+      "tel": "+16509030800",
+      country: "US",
+    },
+  },
+  {
+    description: "Merge an address with single-line street-address in storage and multi-line incoming one",
+    addressInStorage: {
+      "given-name": "Timothy",
+      "street-address": "331 E. Evelyn Avenue Line2",
+      "tel": "+16509030800",
+    },
+    addressToMerge: {
+      "street-address": "331 E. Evelyn Avenue\nLine2",
+      "tel": "+16509030800",
+      country: "US",
+    },
+    expectedAddress: {
+      "given-name": "Timothy",
+      "street-address": "331 E. Evelyn Avenue\nLine2",
+      "tel": "+16509030800",
+      country: "US",
+    },
+  },
+  {
+    description: "Merge an address with 2-line street-address in storage and 3-line incoming one",
+    addressInStorage: {
+      "given-name": "Timothy",
+      "street-address": "331 E. Evelyn Avenue\nLine2 Line3",
+      "tel": "+16509030800",
+    },
+    addressToMerge: {
+      "street-address": "331 E. Evelyn Avenue\nLine2\nLine3",
+      "tel": "+16509030800",
+      country: "US",
+    },
+    expectedAddress: {
+      "given-name": "Timothy",
+      "street-address": "331 E. Evelyn Avenue\nLine2\nLine3",
+      "tel": "+16509030800",
+      country: "US",
+    },
+  },
+  {
+    description: "Merge an address with the same amount of lines",
+    addressInStorage: {
+      "given-name": "Timothy",
+      "street-address": "331 E. Evelyn Avenue\nLine2\nLine3",
+      "tel": "+16509030800",
+    },
+    addressToMerge: {
+      "street-address": "331 E. Evelyn\nAvenue Line2\nLine3",
+      "tel": "+16509030800",
+      country: "US",
+    },
+    expectedAddress: {
+      "given-name": "Timothy",
+      "street-address": "331 E. Evelyn Avenue\nLine2\nLine3",
+      "tel": "+16509030800",
       country: "US",
     },
   },
@@ -124,6 +226,10 @@ add_task(async function test_initialize() {
   profileStorage = await initProfileStorage(TEST_STORE_FILE_NAME);
 
   Assert.deepEqual(profileStorage._store.data, data);
+  for (let {_sync} of profileStorage._store.data.addresses) {
+    Assert.ok(_sync);
+    Assert.equal(_sync.changeCounter, 1);
+  }
 });
 
 add_task(async function test_getAll() {
@@ -141,8 +247,8 @@ add_task(async function test_getAll() {
   do_check_eq(addresses[0]["address-line1"], "32 Vassar Street");
   do_check_eq(addresses[0]["address-line2"], "MIT Room 32-G524");
 
-  // Test with noComputedFields set.
-  addresses = profileStorage.addresses.getAll({noComputedFields: true});
+  // Test with rawData set.
+  addresses = profileStorage.addresses.getAll({rawData: true});
   do_check_eq(addresses[0].name, undefined);
   do_check_eq(addresses[0]["address-line1"], undefined);
   do_check_eq(addresses[0]["address-line2"], undefined);
@@ -162,45 +268,17 @@ add_task(async function test_get() {
   let address = profileStorage.addresses.get(guid);
   do_check_record_matches(address, TEST_ADDRESS_1);
 
+  // Test with rawData set.
+  address = profileStorage.addresses.get(guid, {rawData: true});
+  do_check_eq(address.name, undefined);
+  do_check_eq(address["address-line1"], undefined);
+  do_check_eq(address["address-line2"], undefined);
+
   // Modifying output shouldn't affect the storage.
   address.organization = "test";
   do_check_record_matches(profileStorage.addresses.get(guid), TEST_ADDRESS_1);
 
   do_check_eq(profileStorage.addresses.get("INVALID_GUID"), null);
-});
-
-add_task(async function test_getByFilter() {
-  let profileStorage = await initProfileStorage(TEST_STORE_FILE_NAME,
-                                                [TEST_ADDRESS_1, TEST_ADDRESS_2]);
-
-  let filter = {info: {fieldName: "street-address"}, searchString: "Some"};
-  let addresses = profileStorage.addresses.getByFilter(filter);
-  do_check_eq(addresses.length, 1);
-  do_check_record_matches(addresses[0], TEST_ADDRESS_2);
-
-  filter = {info: {fieldName: "country"}, searchString: "u"};
-  addresses = profileStorage.addresses.getByFilter(filter);
-  do_check_eq(addresses.length, 2);
-  do_check_record_matches(addresses[0], TEST_ADDRESS_1);
-  do_check_record_matches(addresses[1], TEST_ADDRESS_2);
-
-  filter = {info: {fieldName: "street-address"}, searchString: "test"};
-  addresses = profileStorage.addresses.getByFilter(filter);
-  do_check_eq(addresses.length, 0);
-
-  filter = {info: {fieldName: "street-address"}, searchString: ""};
-  addresses = profileStorage.addresses.getByFilter(filter);
-  do_check_eq(addresses.length, 2);
-
-  // Check if the filtering logic is free from searching special chars.
-  filter = {info: {fieldName: "street-address"}, searchString: ".*"};
-  addresses = profileStorage.addresses.getByFilter(filter);
-  do_check_eq(addresses.length, 0);
-
-  // Prevent broken while searching the property that does not exist.
-  filter = {info: {fieldName: "tel"}, searchString: "1"};
-  addresses = profileStorage.addresses.getByFilter(filter);
-  do_check_eq(addresses.length, 0);
 });
 
 add_task(async function test_add() {
@@ -233,8 +311,11 @@ add_task(async function test_update() {
   let guid = addresses[1].guid;
   let timeLastModified = addresses[1].timeLastModified;
 
-  let onChanged = TestUtils.topicObserved("formautofill-storage-changed",
-                                          (subject, data) => data == "update");
+  let onChanged = TestUtils.topicObserved(
+    "formautofill-storage-changed",
+    (subject, data) =>
+      data == "update" && subject.QueryInterface(Ci.nsISupportsString).data == guid
+  );
 
   do_check_neq(addresses[1].country, undefined);
 
@@ -242,11 +323,30 @@ add_task(async function test_update() {
   await onChanged;
   await profileStorage._saveImmediately();
 
-  let address = profileStorage.addresses.get(guid);
+  profileStorage.addresses.pullSyncChanges(); // force sync metadata, which we check below.
+
+  let address = profileStorage.addresses.get(guid, {rawData: true});
 
   do_check_eq(address.country, undefined);
   do_check_neq(address.timeLastModified, timeLastModified);
   do_check_record_matches(address, TEST_ADDRESS_3);
+  do_check_eq(getSyncChangeCounter(profileStorage.addresses, guid), 1);
+
+  // Test preserveOldProperties parameter and field with empty string.
+  profileStorage.addresses.update(guid, TEST_ADDRESS_FOR_UPDATE, true);
+  await onChanged;
+  await profileStorage._saveImmediately();
+
+  profileStorage.addresses.pullSyncChanges(); // force sync metadata, which we check below.
+
+  address = profileStorage.addresses.get(guid, {rawData: true});
+
+  do_check_eq(address["given-name"], "Tim");
+  do_check_eq(address["family-name"], "Berners");
+  do_check_eq(address["street-address"], undefined);
+  do_check_eq(address["postal-code"], "12345");
+  do_check_neq(address.timeLastModified, timeLastModified);
+  do_check_eq(getSyncChangeCounter(profileStorage.addresses, guid), 2);
 
   Assert.throws(
     () => profileStorage.addresses.update("INVALID_GUID", TEST_ADDRESS_3),
@@ -268,17 +368,23 @@ add_task(async function test_notifyUsed() {
   let timeLastUsed = addresses[1].timeLastUsed;
   let timesUsed = addresses[1].timesUsed;
 
+  profileStorage.addresses.pullSyncChanges(); // force sync metadata, which we check below.
+  let changeCounter = getSyncChangeCounter(profileStorage.addresses, guid);
+
   let onChanged = TestUtils.topicObserved("formautofill-storage-changed",
                                           (subject, data) => data == "notifyUsed");
 
   profileStorage.addresses.notifyUsed(guid);
   await onChanged;
-  await profileStorage._saveImmediately();
 
   let address = profileStorage.addresses.get(guid);
 
   do_check_eq(address.timesUsed, timesUsed + 1);
   do_check_neq(address.timeLastUsed, timeLastUsed);
+
+  // Using a record should not bump its change counter.
+  do_check_eq(getSyncChangeCounter(profileStorage.addresses, guid),
+    changeCounter);
 
   Assert.throws(() => profileStorage.addresses.notifyUsed("INVALID_GUID"),
     /No matching record\./);
@@ -298,7 +404,6 @@ add_task(async function test_remove() {
 
   profileStorage.addresses.remove(guid);
   await onChanged;
-  await profileStorage._saveImmediately();
 
   addresses = profileStorage.addresses.getAll();
 
@@ -313,31 +418,49 @@ MERGE_TESTCASES.forEach((testcase) => {
     let profileStorage = await initProfileStorage(TEST_STORE_FILE_NAME,
                                                   [testcase.addressInStorage]);
     let addresses = profileStorage.addresses.getAll();
+    let guid = addresses[0].guid;
+    let timeLastModified = addresses[0].timeLastModified;
+
     // Merge address and verify the guid in notifyObservers subject
     let onMerged = TestUtils.topicObserved(
       "formautofill-storage-changed",
       (subject, data) =>
-        data == "merge" && subject.QueryInterface(Ci.nsISupportsString).data == addresses[0].guid
+        data == "update" && subject.QueryInterface(Ci.nsISupportsString).data == guid
     );
-    let timeLastModified = addresses[0].timeLastModified;
-    Assert.equal(
-      profileStorage.addresses.mergeIfPossible(addresses[0].guid, testcase.addressToMerge),
-      true);
+
+    // Force to create sync metadata.
+    profileStorage.addresses.pullSyncChanges();
+    do_check_eq(getSyncChangeCounter(profileStorage.addresses, guid), 1);
+
+    Assert.ok(profileStorage.addresses.mergeIfPossible(guid, testcase.addressToMerge));
     await onMerged;
+
     addresses = profileStorage.addresses.getAll();
     Assert.equal(addresses.length, 1);
     Assert.notEqual(addresses[0].timeLastModified, timeLastModified);
     do_check_record_matches(addresses[0], testcase.expectedAddress);
+
+    // Record merging should bump the change counter.
+    do_check_eq(getSyncChangeCounter(profileStorage.addresses, guid), 2);
   });
 });
 
 add_task(async function test_merge_same_address() {
   let profileStorage = await initProfileStorage(TEST_STORE_FILE_NAME, [TEST_ADDRESS_1]);
   let addresses = profileStorage.addresses.getAll();
+  let guid = addresses[0].guid;
   let timeLastModified = addresses[0].timeLastModified;
+
+  // Force to create sync metadata.
+  profileStorage.addresses.pullSyncChanges();
+  do_check_eq(getSyncChangeCounter(profileStorage.addresses, guid), 1);
+
   // Merge same address will still return true but it won't update timeLastModified.
-  Assert.equal(profileStorage.addresses.mergeIfPossible(addresses[0].guid, TEST_ADDRESS_1), true);
+  Assert.ok(profileStorage.addresses.mergeIfPossible(guid, TEST_ADDRESS_1));
   Assert.equal(addresses[0].timeLastModified, timeLastModified);
+
+  // ... and won't bump the change counter, either.
+  do_check_eq(getSyncChangeCounter(profileStorage.addresses, guid), 1);
 });
 
 add_task(async function test_merge_unable_merge() {
@@ -345,11 +468,20 @@ add_task(async function test_merge_unable_merge() {
                                                 [TEST_ADDRESS_1, TEST_ADDRESS_2]);
 
   let addresses = profileStorage.addresses.getAll();
+  let guid = addresses[1].guid;
+
+  // Force to create sync metadata.
+  profileStorage.addresses.pullSyncChanges();
+  do_check_eq(getSyncChangeCounter(profileStorage.addresses, guid), 1);
+
   // Unable to merge because of conflict
-  do_check_eq(profileStorage.addresses.mergeIfPossible(addresses[1].guid, TEST_ADDRESS_3), false);
+  do_check_eq(profileStorage.addresses.mergeIfPossible(guid, TEST_ADDRESS_3), false);
 
   // Unable to merge because no overlap
-  do_check_eq(profileStorage.addresses.mergeIfPossible(addresses[1].guid, TEST_ADDRESS_4), false);
+  do_check_eq(profileStorage.addresses.mergeIfPossible(guid, TEST_ADDRESS_4), false);
+
+  // Shouldn't bump the change counter
+  do_check_eq(getSyncChangeCounter(profileStorage.addresses, guid), 1);
 });
 
 add_task(async function test_mergeToStorage() {
@@ -359,7 +491,7 @@ add_task(async function test_mergeToStorage() {
   let anotherAddress = profileStorage.addresses._clone(TEST_ADDRESS_2);
   profileStorage.addresses.add(anotherAddress);
   anotherAddress.email = "timbl@w3.org";
-  do_check_eq(profileStorage.addresses.mergeToStorage(anotherAddress), true);
+  do_check_eq(profileStorage.addresses.mergeToStorage(anotherAddress).length, 2);
   do_check_eq(profileStorage.addresses.getAll()[1].email, anotherAddress.email);
   do_check_eq(profileStorage.addresses.getAll()[2].email, anotherAddress.email);
 });

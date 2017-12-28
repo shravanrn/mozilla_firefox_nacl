@@ -17,11 +17,12 @@
 namespace mozilla {
 namespace Telemetry {
 
-struct Accumulation;
-struct KeyedAccumulation;
+struct HistogramAccumulation;
+struct KeyedHistogramAccumulation;
 struct ScalarAction;
 struct KeyedScalarAction;
 struct ChildEventData;
+struct DiscardedData;
 
 }
 
@@ -34,7 +35,7 @@ namespace TelemetryIPC {
  * @param aAccumulations - accumulation actions to perform
  */
 void AccumulateChildHistograms(Telemetry::ProcessID aProcessType,
-                               const nsTArray<Telemetry::Accumulation>& aAccumulations);
+                               const nsTArray<Telemetry::HistogramAccumulation>& aAccumulations);
 
 /**
  * Accumulate child process data into keyed histograms for the given process type.
@@ -43,7 +44,7 @@ void AccumulateChildHistograms(Telemetry::ProcessID aProcessType,
  * @param aAccumulations - accumulation actions to perform
  */
 void AccumulateChildKeyedHistograms(Telemetry::ProcessID aProcessType,
-                                    const nsTArray<Telemetry::KeyedAccumulation>& aAccumulations);
+                                    const nsTArray<Telemetry::KeyedHistogramAccumulation>& aAccumulations);
 
 /**
  * Update scalars for the given process type with the data coming from child process.
@@ -71,6 +72,15 @@ void UpdateChildKeyedScalars(Telemetry::ProcessID aProcessType,
  */
 void RecordChildEvents(Telemetry::ProcessID aProcessType,
                        const nsTArray<Telemetry::ChildEventData>& aEvents);
+
+/**
+ * Record the counts of data the child process had to discard
+ *
+ * @param aProcessType - the process reporting the discarded data
+ * @param aDiscardedData - stats about the discarded data
+ */
+void RecordDiscardedData(Telemetry::ProcessID aProcessType,
+                         const Telemetry::DiscardedData& aDiscardedData);
 
 }
 }

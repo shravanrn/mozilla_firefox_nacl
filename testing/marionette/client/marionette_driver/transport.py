@@ -4,6 +4,7 @@
 
 import json
 import socket
+import sys
 import time
 
 
@@ -135,13 +136,17 @@ class TcpTransport(object):
 
     @property
     def socket_timeout(self):
+        if self.sock:
+            return self.sock.gettimeout()
+
         return self._socket_timeout
 
     @socket_timeout.setter
     def socket_timeout(self, value):
+        self._socket_timeout = value
+
         if self.sock:
             self.sock.settimeout(value)
-        self._socket_timeout = value
 
     def _unmarshal(self, packet):
         msg = None
@@ -227,10 +232,17 @@ class TcpTransport(object):
             self.sock = None
             raise
 
-        with SocketTimeout(self.sock, 2.0):
-            # first packet is always a JSON Object
-            # which we can use to tell which protocol level we are at
-            raw = self.receive(unmarshal=False)
+        try:
+            with SocketTimeout(self.sock, 60.0):
+                # first packet is always a JSON Object
+                # which we can use to tell which protocol level we are at
+                raw = self.receive(unmarshal=False)
+        except socket.timeout:
+            msg = "Connection attempt failed because no data has been received over the socket: {}"
+            exc, val, tb = sys.exc_info()
+
+            raise exc, msg.format(val), tb
+
         hello = json.loads(raw)
         self.protocol = hello.get("marionetteProtocol", 1)
         self.application_type = hello.get("applicationType")
@@ -284,13 +296,21 @@ class TcpTransport(object):
         return self.receive()
 
     def close(self):
-        """Close the socket."""
+        """Close the socket.
+
+        First forces the socket to not send data anymore, and then explicitly
+        close it to free up its resources.
+
+        See: https://docs.python.org/2/howto/sockets.html#disconnecting
+        """
         if self.sock:
             try:
                 self.sock.shutdown(socket.SHUT_RDWR)
             except IOError as exc:
-                # Errno 57 is "socket not connected", which we don't care about here.
-                if exc.errno != 57:
+                # If the socket is already closed, don't care about:
+                #   Errno  57: Socket not connected
+                #   Errno 107: Transport endpoint is not connected
+                if exc.errno not in (57, 107):
                     raise
 
             self.sock.close()

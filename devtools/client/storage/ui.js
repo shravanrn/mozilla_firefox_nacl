@@ -6,7 +6,7 @@
 "use strict";
 
 const {Task} = require("devtools/shared/task");
-const EventEmitter = require("devtools/shared/event-emitter");
+const EventEmitter = require("devtools/shared/old-event-emitter");
 const {LocalizationHelper, ELLIPSIS} = require("devtools/shared/l10n");
 const KeyShortcuts = require("devtools/client/shared/key-shortcuts");
 const JSOL = require("devtools/client/shared/vendor/jsol");
@@ -113,8 +113,8 @@ function StorageUI(front, target, panelWin, toolbox) {
     cellContextMenuId: "storage-table-popup"
   });
 
-  this.displayObjectSidebar = this.displayObjectSidebar.bind(this);
-  this.table.on(TableWidget.EVENTS.ROW_SELECTED, this.displayObjectSidebar);
+  this.updateObjectSidebar = this.updateObjectSidebar.bind(this);
+  this.table.on(TableWidget.EVENTS.ROW_SELECTED, this.updateObjectSidebar);
 
   this.handleScrollEnd = this.handleScrollEnd.bind(this);
   this.table.on(TableWidget.EVENTS.SCROLL_END, this.handleScrollEnd);
@@ -169,11 +169,16 @@ function StorageUI(front, target, panelWin, toolbox) {
   this._tablePopup = this._panelDoc.getElementById("storage-table-popup");
   this._tablePopup.addEventListener("popupshowing", this.onTablePopupShowing);
 
+  this.onRefreshTable = this.onRefreshTable.bind(this);
   this.onAddItem = this.onAddItem.bind(this);
   this.onRemoveItem = this.onRemoveItem.bind(this);
   this.onRemoveAllFrom = this.onRemoveAllFrom.bind(this);
   this.onRemoveAll = this.onRemoveAll.bind(this);
+  this.onRemoveAllSessionCookies = this.onRemoveAllSessionCookies.bind(this);
   this.onRemoveTreeItem = this.onRemoveTreeItem.bind(this);
+
+  this._refreshButton = this._panelDoc.getElementById("refresh-button");
+  this._refreshButton.addEventListener("command", this.onRefreshTable);
 
   this._addButton = this._panelDoc.getElementById("add-button");
   this._addButton.addEventListener("command", this.onAddItem);
@@ -195,9 +200,19 @@ function StorageUI(front, target, panelWin, toolbox) {
     "storage-table-popup-delete-all");
   this._tablePopupDeleteAll.addEventListener("command", this.onRemoveAll);
 
+  this._tablePopupDeleteAllSessionCookies = this._panelDoc.getElementById(
+    "storage-table-popup-delete-all-session-cookies");
+  this._tablePopupDeleteAllSessionCookies.addEventListener("command",
+    this.onRemoveAllSessionCookies);
+
   this._treePopupDeleteAll = this._panelDoc.getElementById(
     "storage-tree-popup-delete-all");
   this._treePopupDeleteAll.addEventListener("command", this.onRemoveAll);
+
+  this._treePopupDeleteAllSessionCookies = this._panelDoc.getElementById(
+    "storage-tree-popup-delete-all-session-cookies");
+  this._treePopupDeleteAllSessionCookies.addEventListener("command",
+    this.onRemoveAllSessionCookies);
 
   this._treePopupDelete = this._panelDoc.getElementById("storage-tree-popup-delete");
   this._treePopupDelete.addEventListener("command", this.onRemoveTreeItem);
@@ -216,7 +231,7 @@ StorageUI.prototype = {
   },
 
   destroy: function () {
-    this.table.off(TableWidget.EVENTS.ROW_SELECTED, this.displayObjectSidebar);
+    this.table.off(TableWidget.EVENTS.ROW_SELECTED, this.updateObjectSidebar);
     this.table.off(TableWidget.EVENTS.SCROLL_END, this.handleScrollEnd);
     this.table.off(TableWidget.EVENTS.CELL_EDIT, this.editItem);
     this.table.destroy();
@@ -231,15 +246,20 @@ StorageUI.prototype = {
     this.sidebarToggleBtn = null;
 
     this._treePopup.removeEventListener("popupshowing", this.onTreePopupShowing);
+    this._refreshButton.removeEventListener("command", this.onRefreshTable);
     this._addButton.removeEventListener("command", this.onAddItem);
     this._tablePopupAddItem.removeEventListener("command", this.onAddItem);
     this._treePopupDeleteAll.removeEventListener("command", this.onRemoveAll);
+    this._treePopupDeleteAllSessionCookies.removeEventListener("command",
+      this.onRemoveAllSessionCookies);
     this._treePopupDelete.removeEventListener("command", this.onRemoveTreeItem);
 
     this._tablePopup.removeEventListener("popupshowing", this.onTablePopupShowing);
     this._tablePopupDelete.removeEventListener("command", this.onRemoveItem);
     this._tablePopupDeleteAllFrom.removeEventListener("command", this.onRemoveAllFrom);
     this._tablePopupDeleteAll.removeEventListener("command", this.onRemoveAll);
+    this._tablePopupDeleteAllSessionCookies.removeEventListener("command",
+      this.onRemoveAllSessionCookies);
   },
 
   setupToolbar: function () {
@@ -319,17 +339,16 @@ StorageUI.prototype = {
    * being removed was selected.
    */
   removeItemFromTable: function (name) {
-    if (this.table.isSelected(name)) {
+    if (this.table.isSelected(name) && this.table.items.size > 1) {
       if (this.table.selectedIndex == 0) {
         this.table.selectNextRow();
       } else {
         this.table.selectPreviousRow();
       }
-      this.table.remove(name);
-      this.displayObjectSidebar();
-    } else {
-      this.table.remove(name);
     }
+
+    this.table.remove(name);
+    this.updateObjectSidebar();
   },
 
   /**
@@ -579,6 +598,8 @@ StorageUI.prototype = {
           yield this._target.actorHasMethod(type, "removeItem");
         this.actorSupportsRemoveAll =
           yield this._target.actorHasMethod(type, "removeAll");
+        this.actorSupportsRemoveAllSessionCookies =
+          yield this._target.actorHasMethod(type, "removeAllSessionCookies");
 
         yield this.resetColumns(type, host, subType);
       }
@@ -666,19 +687,23 @@ StorageUI.prototype = {
    * Populates the selected entry from the table in the sidebar for a more
    * detailed view.
    */
-  displayObjectSidebar: Task.async(function* () {
+  updateObjectSidebar: Task.async(function* () {
     let item = this.table.selectedRow;
-    if (!item) {
-      // Make sure that sidebar is hidden and return
-      this.sidebar.hidden = true;
-      this.updateSidebarToggleButton();
-      return;
-    }
+    let value;
 
     // Get the string value (async action) and the update the UI synchronously.
-    let value;
-    if (item.name && item.valueActor) {
+    if (item && item.name && item.valueActor) {
       value = yield item.valueActor.string();
+    }
+
+    // Bail if the selectedRow is no longer selected, the item doesn't exist or the state
+    // changed in another way during the above yield.
+    if (this.table.items.size === 0 ||
+        !item ||
+        !this.table.selectedRow ||
+        item.uniqueKey !== this.table.selectedRow.uniqueKey) {
+      this.hideSidebar();
+      return;
     }
 
     // Start updating the UI. Everything is sync beyond this point.
@@ -979,7 +1004,7 @@ StorageUI.prototype = {
         case REASON.UPDATE:
           this.table.update(item);
           if (item == this.table.selectedRow && !this.sidebar.hidden) {
-            this.displayObjectSidebar();
+            this.updateObjectSidebar();
           }
           break;
       }
@@ -1111,6 +1136,17 @@ StorageUI.prototype = {
 
       this._treePopupDeleteAll.hidden = !showDeleteAll;
 
+      // The delete all session cookies action is displayed for cookie object stores
+      // (level 2 of tree)
+      let showDeleteAllSessionCookies = false;
+      if (this.actorSupportsRemoveAllSessionCookies) {
+        if (type === "cookies" && selectedItem.length === 2) {
+          showDeleteAllSessionCookies = true;
+        }
+      }
+
+      this._treePopupDeleteAllSessionCookies.hidden = !showDeleteAllSessionCookies;
+
       // The delete action is displayed for:
       // - IndexedDB databases (level 3 of the tree)
       // - Cache objects (level 3 of the tree)
@@ -1129,6 +1165,13 @@ StorageUI.prototype = {
     if (!showMenu) {
       event.preventDefault();
     }
+  },
+
+  /**
+   * Handles refreshing the selected storage
+   */
+  onRefreshTable: function (event) {
+    this.onHostSelect(event, this.tree.selectedItem);
   },
 
   /**
@@ -1170,6 +1213,19 @@ StorageUI.prototype = {
     let front = this.getCurrentFront();
     let name = path.length > 0 ? JSON.stringify(path) : undefined;
     front.removeAll(host, name);
+  },
+
+  /**
+   * Handles removing all session cookies from the storage
+   */
+  onRemoveAllSessionCookies: function () {
+    // Cannot use this.currentActor() if the handler is called from the
+    // tree context menu: it returns the correct value only after the
+    // table data from server is successfully fetched (and that's async).
+    let [, host, ...path] = this.tree.selectedItem;
+    let front = this.getCurrentFront();
+    let name = path.length > 0 ? JSON.stringify(path) : undefined;
+    front.removeAllSessionCookies(host, name);
   },
 
   /**

@@ -32,6 +32,7 @@
 #include "nsDirection.h"
 #include "nsFrameList.h"
 #include "nsFrameState.h"
+#include "mozilla/layers/WebRenderUserData.h"
 #include "mozilla/ReflowOutput.h"
 #include "nsITheme.h"
 #include "nsLayoutUtils.h"
@@ -41,6 +42,9 @@
 #include "nsStyleStruct.h"
 #include "Visibility.h"
 #include "nsChangeHint.h"
+#include "nsStyleContextInlines.h"
+#include "mozilla/gfx/MatrixFwd.h"
+#include "nsDisplayItemTypes.h"
 
 #ifdef ACCESSIBILITY
 #include "mozilla/a11y/AccTypes.h"
@@ -66,7 +70,6 @@
 class nsIAtom;
 class nsPresContext;
 class nsIPresShell;
-class nsRenderingContext;
 class nsView;
 class nsIWidget;
 class nsISelectionController;
@@ -85,6 +88,7 @@ class nsIContent;
 class nsContainerFrame;
 class nsPlaceholderFrame;
 class nsStyleChangeList;
+class nsWindowSizes;
 
 struct nsPeekOffsetStruct;
 struct nsPoint;
@@ -99,7 +103,7 @@ enum class CSSPseudoElementType : uint8_t;
 class EventStates;
 struct ReflowInput;
 class ReflowOutput;
-class ServoStyleSet;
+class ServoRestyleState;
 class DisplayItemData;
 class EffectSet;
 
@@ -107,9 +111,6 @@ namespace layers {
 class Layer;
 } // namespace layers
 
-namespace gfx {
-class Matrix;
-} // namespace gfx
 } // namespace mozilla
 
 /**
@@ -618,6 +619,11 @@ public:
     , mClass(aID)
     , mMayHaveRoundedCorners(false)
     , mHasImageRequest(false)
+    , mHasFirstLetterChild(false)
+    , mParentIsWrapperAnonBox(false)
+    , mIsWrapperBoxNeedingRestyle(false)
+    , mReflowRequestedForCharDataChange(false)
+    , mIsPrimaryFrame(false)
   {
     mozilla::PodZero(&mOverflow);
   }
@@ -667,6 +673,26 @@ public:
     CONTINUE_UNSELECTABLE = 0x4 | CONTINUE,
   };
 
+  /**
+   * Options for PeekOffsetCharacter().
+   */
+  struct MOZ_STACK_CLASS PeekOffsetCharacterOptions
+  {
+    // Whether to restrict result to valid cursor locations (between grapheme
+    // clusters) - if this is included, maintains "normal" behavior, otherwise,
+    // used for selection by "code unit" (instead of "character")
+    bool mRespectClusters;
+    // Whether to check user-select style value - if this is included, checks
+    // if user-select is all, then, it may return CONTINUE_UNSELECTABLE.
+    bool mIgnoreUserStyleAll;
+
+    PeekOffsetCharacterOptions()
+      : mRespectClusters(true)
+      , mIgnoreUserStyleAll(false)
+    {
+    }
+  };
+
 protected:
   /**
    * Return true if the frame is part of a Selection.
@@ -688,6 +714,7 @@ protected:
   friend class nsLineBox;   // needed to pass aDestructRoot through to children
   friend class nsContainerFrame; // needed to pass aDestructRoot through to children
   friend class nsFrame; // need to assign mParent
+  template<class Source> friend class do_QueryFrameHelper; // to read mClass
 public:
 
   /**
@@ -735,9 +762,8 @@ public:
   void SetStyleContext(nsStyleContext* aContext)
   {
     if (aContext != mStyleContext) {
-      nsStyleContext* oldStyleContext = mStyleContext;
+      RefPtr<nsStyleContext> oldStyleContext = mStyleContext.forget();
       mStyleContext = aContext;
-      aContext->AddRef();
 #ifdef DEBUG
       aContext->FrameAddRef();
 #endif
@@ -745,7 +771,6 @@ public:
 #ifdef DEBUG
       oldStyleContext->FrameRelease();
 #endif
-      oldStyleContext->Release();
     }
   }
 
@@ -761,11 +786,9 @@ public:
 #ifdef DEBUG
       mStyleContext->FrameRelease();
 #endif
-      mStyleContext->Release();
       mStyleContext = aContext;
-      aContext->AddRef();
 #ifdef DEBUG
-      aContext->FrameAddRef();
+      mStyleContext->FrameAddRef();
 #endif
     }
   }
@@ -836,6 +859,12 @@ public:
    * out-of-flow frames.
    */
   inline nsContainerFrame* GetInFlowParent();
+
+  /**
+   * Gets the primary frame of the Content's flattened tree
+   * parent, if one exists.
+   */
+  nsIFrame* GetFlattenedTreeParentPrimaryFrame() const;
 
   /**
    * Return the placeholder for this frame (which must be out-of-flow).
@@ -1018,9 +1047,9 @@ public:
   {
     if ((!aWritingMode.IsVertical() && !aWritingMode.IsBidiLTR()) ||
         aWritingMode.IsVerticalRL()) {
-      nscoord oldWidth = mRect.width;
+      nscoord oldWidth = mRect.Width();
       SetSize(aSize.GetPhysicalSize(aWritingMode));
-      mRect.x -= mRect.width - oldWidth;
+      mRect.x -= mRect.Width() - oldWidth;
     } else {
       SetSize(aSize.GetPhysicalSize(aWritingMode));
     }
@@ -1104,6 +1133,9 @@ public:
   typedef AutoTArray<nsIContent*, 2> ContentArray;
   static void DestroyContentArray(ContentArray* aArray);
 
+  typedef mozilla::layers::WebRenderUserData WebRenderUserData;
+  typedef nsRefPtrHashtable<nsUint32HashKey, WebRenderUserData> WebRenderUserDataTable;
+
 #define NS_DECLARE_FRAME_PROPERTY_WITH_DTOR(prop, type, dtor)             \
   static const mozilla::FramePropertyDescriptor<type>* prop() {           \
     /* Use of constexpr caused startup crashes with MSVC2015u1 PGO. */    \
@@ -1138,7 +1170,7 @@ public:
 #define NS_DECLARE_FRAME_PROPERTY_WITH_DTOR_NEVER_CALLED(prop, type)  \
   static void AssertOnDestroyingProperty##prop(type*) {               \
     MOZ_ASSERT_UNREACHABLE("Frame property " #prop " should never "   \
-                           "be destroyed by the FramePropertyTable"); \
+                           "be destroyed by the FrameProperties class");  \
   }                                                                   \
   NS_DECLARE_FRAME_PROPERTY_WITH_DTOR(prop, type,                     \
                                       AssertOnDestroyingProperty##prop)
@@ -1201,6 +1233,9 @@ public:
   NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(BidiDataProperty, mozilla::FrameBidiData)
 
   NS_DECLARE_FRAME_PROPERTY_WITHOUT_DTOR(PlaceholderFrameProperty, nsPlaceholderFrame)
+  NS_DECLARE_FRAME_PROPERTY_WITH_DTOR(WebRenderUserDataProperty, WebRenderUserDataTable, DestroyWebRenderUserDataTable)
+
+  static void DestroyWebRenderUserDataTable(WebRenderUserDataTable* aTable);
 
   mozilla::FrameBidiData GetBidiData() const
   {
@@ -1290,7 +1325,7 @@ public:
    * (nsFieldSetFrame overrides this).
    */
   virtual nsRect VisualBorderRectRelativeToSelf() const {
-    return nsRect(0, 0, mRect.width, mRect.height);
+    return nsRect(0, 0, mRect.Width(), mRect.Height());
   }
 
   /**
@@ -1603,21 +1638,14 @@ public:
    * BuildDisplayListForChild.
    *
    * See nsDisplayList.h for more information about display lists.
-   *
-   * @param aDirtyRect content outside this rectangle can be ignored; the
-   * rectangle is in frame coordinates
    */
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) {}
   /**
    * Displays the caret onto the given display list builder. The caret is
    * painted on top of the rest of the display list items.
-   *
-   * @param aDirtyRect is the dirty rectangle that we're repainting.
    */
   void DisplayCaret(nsDisplayListBuilder* aBuilder,
-                    const nsRect&         aDirtyRect,
                     nsDisplayList*        aList);
 
   /**
@@ -1651,11 +1679,8 @@ public:
   /**
    * Builds a display list for the content represented by this frame,
    * treating this frame as the root of a stacking context.
-   * @param aDirtyRect content outside this rectangle can be ignored; the
-   * rectangle is in frame coordinates
    */
   void BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
-                                          const nsRect&         aDirtyRect,
                                           nsDisplayList*        aList);
 
   enum {
@@ -1674,7 +1699,6 @@ public:
    */
   void BuildDisplayListForChild(nsDisplayListBuilder*   aBuilder,
                                 nsIFrame*               aChild,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists,
                                 uint32_t                aFlags = 0);
 
@@ -1699,6 +1723,12 @@ public:
   bool IsTransformed(mozilla::EffectSet* aEffectSet = nullptr) const {
     return IsTransformed(StyleDisplay(), aEffectSet);
   }
+
+  /**
+   * Same as IsTransformed, except that it doesn't take SVG transforms
+   * into account.
+   */
+  bool IsCSSTransformed(const nsStyleDisplay* aStyleDisplay, mozilla::EffectSet* aEffectSet = nullptr) const;
 
   /**
    * True if this frame has any animation of transform in effect.
@@ -1992,6 +2022,13 @@ public:
   }
 
   /**
+   * Return true if this frame is the primary frame for mContent.
+   */
+  bool IsPrimaryFrame() const { return mIsPrimaryFrame; }
+
+  void SetIsPrimaryFrame(bool aIsPrimary) { mIsPrimaryFrame = aIsPrimary; }
+
+  /**
    * This call is invoked on the primary frame for a character data content
    * node, when it is changed in the content tree.
    */
@@ -2104,7 +2141,7 @@ public:
    *
    * This method must not return a negative value.
    */
-  virtual nscoord GetMinISize(nsRenderingContext *aRenderingContext) = 0;
+  virtual nscoord GetMinISize(gfxContext *aRenderingContext) = 0;
 
   /**
    * Get the max-content intrinsic inline size of the frame.  This must be
@@ -2112,7 +2149,7 @@ public:
    *
    * Otherwise, all the comments for |GetMinISize| above apply.
    */
-  virtual nscoord GetPrefISize(nsRenderingContext *aRenderingContext) = 0;
+  virtual nscoord GetPrefISize(gfxContext *aRenderingContext) = 0;
 
   /**
    * |InlineIntrinsicISize| represents the intrinsic width information
@@ -2271,7 +2308,7 @@ public:
    * which calls |GetMinISize|.
    */
   virtual void
-  AddInlineMinISize(nsRenderingContext *aRenderingContext,
+  AddInlineMinISize(gfxContext *aRenderingContext,
                     InlineMinISizeData *aData) = 0;
 
   /**
@@ -2285,7 +2322,7 @@ public:
    * based on using all *mandatory* breakpoints within the frame.
    */
   virtual void
-  AddInlinePrefISize(nsRenderingContext *aRenderingContext,
+  AddInlinePrefISize(gfxContext *aRenderingContext,
                      InlinePrefISizeData *aData) = 0;
 
   /**
@@ -2397,7 +2434,7 @@ public:
    * @param aFlags   Flags to further customize behavior (definitions above).
    */
   virtual mozilla::LogicalSize
-  ComputeSize(nsRenderingContext *aRenderingContext,
+  ComputeSize(gfxContext *aRenderingContext,
               mozilla::WritingMode aWritingMode,
               const mozilla::LogicalSize& aCBSize,
               nscoord aAvailableISize,
@@ -2437,7 +2474,7 @@ public:
    * @param aXMost  computed intrinsic width of the tight bounding rectangle
    *
    */
-  virtual nsresult GetPrefWidthTightBounds(nsRenderingContext* aContext,
+  virtual nsresult GetPrefWidthTightBounds(gfxContext* aContext,
                                            nscoord* aX,
                                            nscoord* aXMost);
 
@@ -2991,6 +3028,11 @@ public:
   };
   void SchedulePaint(PaintType aType = PAINT_DEFAULT);
 
+  // Similar to SchedulePaint() but without calling
+  // InvalidateRenderingObservers() for SVG.
+  void SchedulePaintWithoutInvalidatingObservers(
+    PaintType aType = PAINT_DEFAULT);
+
   /**
    * Checks if the layer tree includes a dedicated layer for this
    * frame/display item key pair, and invalidates at least aDamageRect
@@ -3011,7 +3053,7 @@ public:
   enum {
     UPDATE_IS_ASYNC = 1 << 0
   };
-  Layer* InvalidateLayer(uint32_t aDisplayItemKey,
+  Layer* InvalidateLayer(DisplayItemType aDisplayItemKey,
                          const nsIntRect* aDamageRect = nullptr,
                          const nsRect* aFrameDamageRect = nullptr,
                          uint32_t aFlags = 0);
@@ -3285,25 +3327,40 @@ public:
 
   /**
    * Called by ServoRestyleManager to update the style contexts of anonymous
-   * boxes directly associtated with this frame.  The passed-in ServoStyleSet
-   * can be used to create new style contexts as needed.
+   * boxes directly associtated with this frame.
+   *
+   * The passed-in ServoRestyleState can be used to create new style contexts
+   * as needed, as well as posting changes to the change list.
+   *
+   * It's guaranteed to already have a change in it for this frame and this
+   * frame's content.
    *
    * This function will be called after this frame's style context has already
    * been updated.  This function will only be called on frames which have the
    * NS_FRAME_OWNS_ANON_BOXES bit set.
-   *
-   * The nsStyleChangeList can be used to append additional changes.  It's
-   * guaranteed to already have a change in it for this frame and this frame's
-   * content and a change hint of aHintForThisFrame.
    */
-  void UpdateStyleOfOwnedAnonBoxes(mozilla::ServoStyleSet& aStyleSet,
-                                   nsStyleChangeList& aChangeList,
-                                   nsChangeHint aHintForThisFrame) {
+  void UpdateStyleOfOwnedAnonBoxes(mozilla::ServoRestyleState& aRestyleState)
+  {
     if (GetStateBits() & NS_FRAME_OWNS_ANON_BOXES) {
-      DoUpdateStyleOfOwnedAnonBoxes(aStyleSet, aChangeList, aHintForThisFrame);
+      DoUpdateStyleOfOwnedAnonBoxes(aRestyleState);
     }
   }
 
+protected:
+  // This does the actual work of UpdateStyleOfOwnedAnonBoxes.  It calls
+  // AppendDirectlyOwnedAnonBoxes to find all of the anonymous boxes
+  // owned by this frame, and then updates styles on each of them.
+  void DoUpdateStyleOfOwnedAnonBoxes(mozilla::ServoRestyleState& aRestyleState);
+
+  // A helper for DoUpdateStyleOfOwnedAnonBoxes for the specific case
+  // of the owned anon box being a child of this frame.
+  void UpdateStyleOfChildAnonBox(nsIFrame* aChildFrame,
+                                 mozilla::ServoRestyleState& aRestyleState);
+
+  // Allow ServoRestyleState to call UpdateStyleOfChildAnonBox.
+  friend class mozilla::ServoRestyleState;
+
+public:
   // A helper both for UpdateStyleOfChildAnonBox, and to update frame-backed
   // pseudo-elements in ServoRestyleManager.
   //
@@ -3311,18 +3368,63 @@ public:
   // `aChildFrame`, and takes care of updating it, calling CalcStyleDifference,
   // and adding to the change list as appropriate.
   //
+  // If aContinuationStyleContext is not Nothing, it should be used for
+  // continuations instead of aNewStyleContext.  In either case, changehints are
+  // only computed based on aNewStyleContext.
+  //
   // Returns the generated change hint for the frame.
-  nsChangeHint UpdateStyleOfOwnedChildFrame(nsIFrame* aChildFrame,
-                                            nsStyleContext* aNewStyleContext,
-                                            nsStyleChangeList& aChangeList);
+  static nsChangeHint UpdateStyleOfOwnedChildFrame(
+    nsIFrame* aChildFrame,
+    nsStyleContext* aNewStyleContext,
+    mozilla::ServoRestyleState& aRestyleState,
+    const Maybe<nsStyleContext*>& aContinuationStyleContext = Nothing());
+
+  struct OwnedAnonBox
+  {
+    typedef void (*UpdateStyleFn)(nsIFrame* aOwningFrame,
+                                  nsIFrame* aAnonBox,
+                                  mozilla::ServoRestyleState& aRestyleState);
+
+    explicit OwnedAnonBox(nsIFrame* aAnonBoxFrame,
+                          UpdateStyleFn aUpdateStyleFn = nullptr)
+      : mAnonBoxFrame(aAnonBoxFrame)
+      , mUpdateStyleFn(aUpdateStyleFn)
+    {}
+
+    nsIFrame* mAnonBoxFrame;
+    UpdateStyleFn mUpdateStyleFn;
+  };
 
   /**
-   * Hook subclasses can override to actually implement updating of style of
-   * owned anon boxes.
+   * Appends information about all of the anonymous boxes owned by this frame,
+   * including other anonymous boxes owned by those which this frame owns
+   * directly.
    */
-  virtual void DoUpdateStyleOfOwnedAnonBoxes(mozilla::ServoStyleSet& aStyleSet,
-                                             nsStyleChangeList& aChangeList,
-                                             nsChangeHint aHintForThisFrame);
+  void AppendOwnedAnonBoxes(nsTArray<OwnedAnonBox>& aResult) {
+    if (GetStateBits() & NS_FRAME_OWNS_ANON_BOXES) {
+      if (IsInlineFrame()) {
+        // See comment in nsIFrame::DoUpdateStyleOfOwnedAnonBoxes for why
+        // we skip nsInlineFrames.
+        return;
+      }
+      DoAppendOwnedAnonBoxes(aResult);
+    }
+  }
+
+protected:
+  // This does the actual work of AppendOwnedAnonBoxes.
+  void DoAppendOwnedAnonBoxes(nsTArray<OwnedAnonBox>& aResult);
+
+public:
+  /**
+   * Hook subclasses can override to return their owned anonymous boxes.
+   *
+   * This function only appends anonymous boxes that are directly owned by
+   * this frame, i.e. direct children or (for certain frames) a wrapper
+   * parent, unlike AppendOwnedAnonBoxes, which will append all anonymous
+   * boxes transitively owned by this frame.
+   */
+  virtual void AppendDirectlyOwnedAnonBoxes(nsTArray<OwnedAnonBox>& aResult);
 
   /**
    * Determines whether a frame is visible for painting;
@@ -3459,8 +3561,10 @@ public:
     mProperties.DeleteAll(this);
   }
 
-  // Reports size of the FrameProperties for this frame and its descendants
-  size_t SizeOfFramePropertiesForTree(mozilla::MallocSizeOf aMallocSizeOf) const;
+  // nsIFrames themselves are in the nsPresArena, and so are not measured here.
+  // Instead, this measures heap-allocated things hanging off the nsIFrame, and
+  // likewise for its descendants.
+  void AddSizeOfExcludingThisForTree(nsWindowSizes& aWindowSizes) const;
 
   /**
    * Return true if and only if this frame obeys visibility:hidden.
@@ -3873,6 +3977,19 @@ public:
   bool IsScrolledOutOfView();
 
   /**
+   * Computes a 2D matrix from the -moz-window-transform and
+   * -moz-window-transform-origin properties on aFrame.
+   * Values that don't result in a 2D matrix will be ignored and an identity
+   * matrix will be returned instead.
+   */
+  Matrix ComputeWidgetTransform();
+
+  /**
+   * Applies the values from the -moz-window-* properties to the widget.
+   */
+  virtual void UpdateWidgetProperties();
+
+  /**
    * @return true iff this frame has one or more associated image requests.
    * @see mozilla::css::ImageLoader.
    */
@@ -3882,6 +3999,32 @@ public:
    * Update this frame's image request state.
    */
   void SetHasImageRequest(bool aHasRequest) { mHasImageRequest = aHasRequest; }
+
+  /**
+   * Whether this frame has a first-letter child.  If it does, the frame is
+   * actually an nsContainerFrame and the first-letter frame can be gotten by
+   * walking up to the nearest ancestor blockframe and getting its first
+   * continuation's nsContainerFrame::FirstLetterProperty() property.  This will
+   * only return true for the first continuation of the first-letter's parent.
+   */
+  bool HasFirstLetterChild() const { return mHasFirstLetterChild; }
+
+  /**
+   * Whether this frame's parent is a wrapper anonymous box.  See documentation
+   * for mParentIsWrapperAnonBox.
+   */
+  bool ParentIsWrapperAnonBox() const { return mParentIsWrapperAnonBox; }
+  void SetParentIsWrapperAnonBox() { mParentIsWrapperAnonBox = true; }
+
+  /**
+   * Whether this is a wrapper anonymous box needing a restyle.
+   */
+  bool IsWrapperAnonBoxNeedingRestyle() const {
+    return mIsWrapperBoxNeedingRestyle;
+  }
+  void SetIsWrapperAnonBoxNeedingRestyle(bool aNeedsRestyle) {
+    mIsWrapperBoxNeedingRestyle = aNeedsRestyle;
+  }
 
   /**
    * If this returns true, the frame it's called on should get the
@@ -3897,7 +4040,7 @@ public:
   /**
    * Helper function - computes the content-box inline size for aCoord.
    */
-  nscoord ComputeISizeValue(nsRenderingContext* aRenderingContext,
+  nscoord ComputeISizeValue(gfxContext*         aRenderingContext,
                             nscoord             aContainingBlockISize,
                             nscoord             aContentEdgeToBoxSizing,
                             nscoord             aBoxSizingToMarginEdge,
@@ -3905,6 +4048,8 @@ public:
                             ComputeSizeFlags    aFlags = eDefault);
 
   DisplayItemArray& DisplayItemData() { return mDisplayItemData; }
+
+  void DestroyAnonymousContent(already_AddRefed<nsIContent> aContent);
 
 protected:
 
@@ -3923,16 +4068,16 @@ protected:
   virtual bool IsLeafDynamic() const { return false; }
 
   // Members
-  nsRect           mRect;
-  nsIContent*      mContent;
-  nsStyleContext*  mStyleContext;
+  nsRect                 mRect;
+  nsCOMPtr<nsIContent>   mContent;
+  RefPtr<nsStyleContext> mStyleContext;
 private:
   nsContainerFrame* mParent;
   nsIFrame*        mNextSibling;  // doubly-linked list of frames
   nsIFrame*        mPrevSibling;  // Do not touch outside SetNextSibling!
   DisplayItemArray mDisplayItemData;
 
-  void MarkAbsoluteFramesForDisplayList(nsDisplayListBuilder* aBuilder, const nsRect& aDirtyRect);
+  void MarkAbsoluteFramesForDisplayList(nsDisplayListBuilder* aBuilder);
 
   static void DestroyPaintedPresShellList(nsTArray<nsWeakPtr>* list) {
     list->Clear();
@@ -3968,7 +4113,7 @@ protected:
     // bug 81268
     NS_ASSERTION(!(mState & NS_FRAME_IN_REFLOW), "frame is already in reflow");
 #endif
-    mState |= NS_FRAME_IN_REFLOW;
+    AddStateBits(NS_FRAME_IN_REFLOW);
   }
 
   nsFrameState     mState;
@@ -4021,7 +4166,60 @@ protected:
    */
   bool mHasImageRequest : 1;
 
-  // There is a 14-bit gap left here.
+  /**
+   * True if this frame has a continuation that has a first-letter frame, or its
+   * placeholder, as a child.  In that case this frame has a blockframe ancestor
+   * that has the first-letter frame hanging off it in the
+   * nsContainerFrame::FirstLetterProperty() property.
+   */
+  bool mHasFirstLetterChild : 1;
+
+  /**
+   * True if this frame's parent is a wrapper anonymous box (e.g. a table
+   * anonymous box as specified at
+   * <https://www.w3.org/TR/CSS21/tables.html#anonymous-boxes>).
+   *
+   * We could compute this information directly when we need it, but it wouldn't
+   * be all that cheap, and since this information is immutable for the lifetime
+   * of the frame we might as well cache it.
+   *
+   * Note that our parent may itself have mParentIsWrapperAnonBox set to true.
+   */
+  bool mParentIsWrapperAnonBox : 1;
+
+  /**
+   * True if this is a wrapper anonymous box needing a restyle.  This is used to
+   * track, during stylo post-traversal, whether we've already recomputed the
+   * style of this anonymous box, if we end up seeing it twice.
+   */
+  bool mIsWrapperBoxNeedingRestyle : 1;
+
+  /**
+   * This bit is used in nsTextFrame::CharacterDataChanged() as an optimization
+   * to skip redundant reflow-requests when the character data changes multiple
+   * times between reflows. If this flag is set, then it implies that the
+   * NS_FRAME_IS_DIRTY state bit is also set (and that intrinsic sizes have
+   * been marked as dirty on our ancestor chain).
+   *
+   * XXXdholbert This bit is *only* used on nsTextFrame, but it lives here on
+   * nsIFrame simply because this is where we've got unused state bits
+   * available in a gap. If bits become more scarce, we should perhaps consider
+   * expanding the range of frame-specific state bits in nsFrameStateBits.h and
+   * moving this to be one of those (e.g. by swapping one of the adjacent
+   * general-purpose bits to take the place of this bool:1 here, so we can grow
+   * that range of frame-specific bits by 1).
+   */
+  bool mReflowRequestedForCharDataChange : 1;
+
+private:
+  /**
+   * True if this is the primary frame for mContent.
+   */
+  bool mIsPrimaryFrame : 1;
+
+protected:
+
+  // There is a 9-bit gap left here.
 
   // Helpers
   /**
@@ -4041,16 +4239,19 @@ protected:
    * @param  aForward [in] Are we moving forward (or backward) in content order.
    * @param  aOffset [in/out] At what offset into the frame to start looking.
    *         on output - what offset was reached (whether or not we found a place to stop).
-   * @param  aRespectClusters [in] Whether to restrict result to valid cursor locations
-   *         (between grapheme clusters) - default TRUE maintains "normal" behavior,
-   *         FALSE is used for selection by "code unit" (instead of "character")
+   * @param  aOptions [in] Options, see the comment in
+   *         PeekOffsetCharacterOptions for the detail.
    * @return STOP: An appropriate offset was found within this frame,
    *         and is given by aOffset.
    *         CONTINUE: Not found within this frame, need to try the next frame.
    *         see enum FrameSearchResult for more details.
    */
-  virtual FrameSearchResult PeekOffsetCharacter(bool aForward, int32_t* aOffset,
-                                     bool aRespectClusters = true) = 0;
+  virtual FrameSearchResult
+  PeekOffsetCharacter(bool aForward, int32_t* aOffset,
+                      PeekOffsetCharacterOptions aOptions =
+                        PeekOffsetCharacterOptions()) = 0;
+  static_assert(sizeof(PeekOffsetCharacterOptions) <= sizeof(intptr_t),
+                "aOptions should be changed to const reference");
 
   /**
    * Search the frame for the next word boundary
@@ -4133,10 +4334,10 @@ private:
     // to cast away the unsigned-ness.
     return nsRect(-(int32_t)mOverflow.mVisualDeltas.mLeft,
                   -(int32_t)mOverflow.mVisualDeltas.mTop,
-                  mRect.width + mOverflow.mVisualDeltas.mRight +
-                                mOverflow.mVisualDeltas.mLeft,
-                  mRect.height + mOverflow.mVisualDeltas.mBottom +
-                                 mOverflow.mVisualDeltas.mTop);
+                  mRect.Width() + mOverflow.mVisualDeltas.mRight +
+                                  mOverflow.mVisualDeltas.mLeft,
+                  mRect.Height() + mOverflow.mVisualDeltas.mBottom +
+                                   mOverflow.mVisualDeltas.mTop);
   }
   /**
    * Returns true if any overflow changed.
@@ -4315,6 +4516,13 @@ private:
   nsIFrame*       mFrame;
 };
 
+// Use nsIFrame's fast-path to avoid QueryFrame:
+inline do_QueryFrameHelper<nsIFrame>
+do_QueryFrame(AutoWeakFrame& s)
+{
+  return do_QueryFrameHelper<nsIFrame>(s.GetFrame());
+}
+
 /**
  * @see AutoWeakFrame
  */
@@ -4371,6 +4579,13 @@ private:
 
   nsIFrame* mFrame;
 };
+
+// Use nsIFrame's fast-path to avoid QueryFrame:
+inline do_QueryFrameHelper<nsIFrame>
+do_QueryFrame(WeakFrame& s)
+{
+  return do_QueryFrameHelper<nsIFrame>(s.GetFrame());
+}
 
 inline bool
 nsFrameList::ContinueRemoveFrame(nsIFrame* aFrame)

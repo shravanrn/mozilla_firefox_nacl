@@ -97,9 +97,19 @@ public:
                              nsIWidget** aActualBelow);
 
   /**
+   * Called when the window will enter or leave the fullscreen state.
+   */
+  virtual void FullscreenWillChange(bool aInFullscreen);
+
+  /**
    * Called when the window entered or left the fullscreen state.
    */
   virtual void FullscreenChanged(bool aInFullscreen);
+
+  /**
+   * Called when the occlusion state is changed.
+   */
+  virtual void OcclusionStateChanged(bool aIsFullyOccluded);
 
   /**
    * Called when the window is activated and focused.

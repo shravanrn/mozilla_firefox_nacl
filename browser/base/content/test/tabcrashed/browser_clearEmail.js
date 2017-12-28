@@ -1,35 +1,14 @@
 "use strict";
 
-const SERVER_URL = "http://example.com/browser/toolkit/crashreporter/test/browser/crashreport.sjs";
 const PAGE = "data:text/html,<html><body>A%20regular,%20everyday,%20normal%20page.";
 const EMAIL = "foo@privacy.com";
 
-/**
- * Sets up the browser to send crash reports to the local crash report
- * testing server.
- */
 add_task(async function setup() {
-  // The test harness sets MOZ_CRASHREPORTER_NO_REPORT, which disables crash
-  // reports.  This test needs them enabled.  The test also needs a mock
-  // report server, and fortunately one is already set up by toolkit/
-  // crashreporter/test/Makefile.in.  Assign its URL to MOZ_CRASHREPORTER_URL,
-  // which CrashSubmit.jsm uses as a server override.
-  let env = Cc["@mozilla.org/process/environment;1"]
-              .getService(Components.interfaces.nsIEnvironment);
-  let noReport = env.get("MOZ_CRASHREPORTER_NO_REPORT");
-  let serverUrl = env.get("MOZ_CRASHREPORTER_URL");
-  env.set("MOZ_CRASHREPORTER_NO_REPORT", "");
-  env.set("MOZ_CRASHREPORTER_URL", SERVER_URL);
-
+  await setupLocalCrashReportServer();
   // By default, requesting the email address of the user is disabled.
   // For the purposes of this test, we turn it back on.
   await SpecialPowers.pushPrefEnv({
     set: [["browser.tabs.crashReporting.requestEmail", true]],
-  });
-
-  registerCleanupFunction(function() {
-    env.set("MOZ_CRASHREPORTER_NO_REPORT", noReport);
-    env.set("MOZ_CRASHREPORTER_URL", serverUrl);
   });
 });
 
@@ -55,7 +34,9 @@ add_task(async function test_clear_email() {
     prefs.setBoolPref("emailMe", true);
 
     let tab = gBrowser.getTabForBrowser(browser);
-    await BrowserTestUtils.crashBrowser(browser);
+    await BrowserTestUtils.crashBrowser(browser,
+                                        /* shouldShowTabCrashPage */ true,
+                                        /* shouldClearMinidumps */ false);
     let doc = browser.contentDocument;
 
     // Since about:tabcrashed will run in the parent process, we can safely

@@ -7,7 +7,7 @@
 #ifndef mozilla_a11y_HandlerProvider_h
 #define mozilla_a11y_HandlerProvider_h
 
-#include "handler/AccessibleHandler.h"
+#include "mozilla/a11y/AccessibleHandler.h"
 #include "mozilla/AlreadyAddRefed.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/mscom/IHandlerProvider.h"
@@ -44,6 +44,8 @@ public:
   STDMETHODIMP GetHandlerPayloadSize(NotNull<DWORD*> aOutPayloadSize) override;
   STDMETHODIMP WriteHandlerPayload(NotNull<IStream*> aStream) override;
   STDMETHODIMP_(REFIID) MarshalAs(REFIID aIid) override;
+  STDMETHODIMP_(REFIID) GetEffectiveOutParamIid(REFIID aCallIid,
+                                                ULONG aCallMethod) override;
   STDMETHODIMP NewInstance(REFIID aIid,
                            mscom::InterceptorTargetPtr<IUnknown> aTarget,
                            NotNull<mscom::IHandlerProvider**> aOutNewPayload) override;
@@ -64,9 +66,10 @@ private:
 
   Atomic<uint32_t>                  mRefCnt;
   Mutex                             mMutex; // Protects mSerializer
-  REFIID                            mTargetUnkIid;
+  const IID                         mTargetUnkIid;
   mscom::InterceptorTargetPtr<IUnknown> mTargetUnk; // Constant, main thread only
   UniquePtr<mscom::StructToStream>  mSerializer;
+  RefPtr<IUnknown>                  mFastMarshalUnk;
 };
 
 } // namespace a11y

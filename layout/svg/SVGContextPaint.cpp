@@ -10,7 +10,7 @@
 #include "mozilla/Preferences.h"
 #include "nsIDocument.h"
 #include "nsSVGPaintServerFrame.h"
-#include "nsSVGEffects.h"
+#include "SVGObserverUtils.h"
 #include "nsSVGPaintServerFrame.h"
 
 using namespace mozilla::gfx;
@@ -64,7 +64,11 @@ SVGContextPaint::IsAllowedForImageFromURI(nsIURI* aURI)
   RefPtr<BasePrincipal> principal = BasePrincipal::CreateCodebasePrincipal(aURI, OriginAttributes());
   nsString addonId;
   if (NS_SUCCEEDED(principal->GetAddonId(addonId))) {
-    return StringEndsWith(addonId, NS_LITERAL_STRING("@mozilla.org"));
+    if (StringEndsWith(addonId, NS_LITERAL_STRING("@mozilla.org"))
+        || StringEndsWith(addonId, NS_LITERAL_STRING("@mozilla.com"))
+        || StringBeginsWith(addonId, NS_LITERAL_STRING("@testpilot-"))) {
+      return true;
+    }
   }
   return false;
 }
@@ -87,12 +91,12 @@ SetupInheritablePaint(const DrawTarget* aDrawTarget,
                       SVGContextPaint* aOuterContextPaint,
                       SVGContextPaintImpl::Paint& aTargetPaint,
                       nsStyleSVGPaint nsStyleSVG::*aFillOrStroke,
-                      nsSVGEffects::PaintingPropertyDescriptor aProperty,
+                      SVGObserverUtils::PaintingPropertyDescriptor aProperty,
                       imgDrawingParams& aImgParams)
 {
   const nsStyleSVG *style = aFrame->StyleSVG();
   nsSVGPaintServerFrame *ps =
-    nsSVGEffects::GetPaintServer(aFrame, aFillOrStroke, aProperty);
+    SVGObserverUtils::GetPaintServer(aFrame, aFillOrStroke, aProperty);
 
   if (ps) {
     RefPtr<gfxPattern> pattern =
@@ -153,7 +157,7 @@ SVGContextPaintImpl::Init(const DrawTarget* aDrawTarget,
 
     SetupInheritablePaint(aDrawTarget, aContextMatrix, aFrame, opacity,
                           aOuterContextPaint, mFillPaint, &nsStyleSVG::mFill,
-                          nsSVGEffects::FillProperty(), aImgParams);
+                          SVGObserverUtils::FillProperty(), aImgParams);
 
     SetFillOpacity(opacity);
 
@@ -170,7 +174,8 @@ SVGContextPaintImpl::Init(const DrawTarget* aDrawTarget,
 
     SetupInheritablePaint(aDrawTarget, aContextMatrix, aFrame, opacity,
                           aOuterContextPaint, mStrokePaint,
-                          &nsStyleSVG::mStroke, nsSVGEffects::StrokeProperty(),
+                          &nsStyleSVG::mStroke,
+                          SVGObserverUtils::StrokeProperty(),
                           aImgParams);
 
     SetStrokeOpacity(opacity);

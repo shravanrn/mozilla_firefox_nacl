@@ -11,7 +11,7 @@
 #include "nsIPipe.h"
 #include "nsMimeTypes.h"
 #include "netCore.h"
-#include "nsXPIDLString.h"
+#include "nsString.h"
 #include "prnetdb.h"
 #include "nsIURI.h"
 #include "nsIURL.h"
@@ -468,7 +468,7 @@ nsBinHexDecoder::OnStartRequest(nsIRequest* request, nsISupports *aCtxt)
 // filename tells us nothing useful, just report an unknown type and let the
 // unknown decoder handle things.
 nsresult nsBinHexDecoder::DetectContentType(nsIRequest* aRequest,
-                                            const nsAFlatCString &aFilename)
+                                            const nsCString& aFilename)
 {
   if (aFilename.IsEmpty()) {
     // Nothing to do here.

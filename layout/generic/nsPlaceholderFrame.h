@@ -40,7 +40,7 @@
 
 nsIFrame* NS_NewPlaceholderFrame(nsIPresShell* aPresShell,
                                  nsStyleContext* aContext,
-                                 nsFrameState aTypeBit);
+                                 nsFrameState aTypeBits);
 
 #define PLACEHOLDER_TYPE_MASK    (PLACEHOLDER_FOR_FLOAT | \
                                   PLACEHOLDER_FOR_ABSPOS | \
@@ -65,18 +65,19 @@ public:
    */
   friend nsIFrame* NS_NewPlaceholderFrame(nsIPresShell* aPresShell,
                                           nsStyleContext* aContext,
-                                          nsFrameState aTypeBit);
-  nsPlaceholderFrame(nsStyleContext* aContext, nsFrameState aTypeBit)
+                                          nsFrameState aTypeBits);
+  nsPlaceholderFrame(nsStyleContext* aContext, nsFrameState aTypeBits)
     : nsFrame(aContext, kClassID)
     , mOutOfFlowFrame(nullptr)
   {
-    NS_PRECONDITION(aTypeBit == PLACEHOLDER_FOR_FLOAT ||
-                    aTypeBit == PLACEHOLDER_FOR_ABSPOS ||
-                    aTypeBit == PLACEHOLDER_FOR_FIXEDPOS ||
-                    aTypeBit == PLACEHOLDER_FOR_POPUP ||
-                    aTypeBit == PLACEHOLDER_FOR_TOPLAYER,
-                    "Unexpected type bit");
-    AddStateBits(aTypeBit);
+    MOZ_ASSERT(aTypeBits == PLACEHOLDER_FOR_FLOAT ||
+               aTypeBits == PLACEHOLDER_FOR_ABSPOS ||
+               aTypeBits == PLACEHOLDER_FOR_FIXEDPOS ||
+               aTypeBits == PLACEHOLDER_FOR_POPUP ||
+               aTypeBits == (PLACEHOLDER_FOR_TOPLAYER | PLACEHOLDER_FOR_ABSPOS) ||
+               aTypeBits == (PLACEHOLDER_FOR_TOPLAYER | PLACEHOLDER_FOR_FIXEDPOS),
+               "Unexpected type bit");
+    AddStateBits(aTypeBits);
   }
 
   // Get/Set the associated out of flow frame
@@ -90,9 +91,9 @@ public:
   // nsIFrame overrides
   // We need to override GetXULMinSize and GetXULPrefSize because XUL uses
   // placeholders not within lines.
-  virtual void AddInlineMinISize(nsRenderingContext* aRenderingContext,
+  virtual void AddInlineMinISize(gfxContext* aRenderingContext,
                                  InlineMinISizeData* aData) override;
-  virtual void AddInlinePrefISize(nsRenderingContext* aRenderingContext,
+  virtual void AddInlinePrefISize(gfxContext* aRenderingContext,
                                   InlinePrefISizeData* aData) override;
   virtual nsSize GetXULMinSize(nsBoxLayoutState& aBoxLayoutState) override;
   virtual nsSize GetXULPrefSize(nsBoxLayoutState& aBoxLayoutState) override;
@@ -107,10 +108,9 @@ public:
 
 #if defined(DEBUG) || (defined(MOZ_REFLOW_PERF_DSP) && defined(MOZ_REFLOW_PERF))
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 #endif // DEBUG || (MOZ_REFLOW_PERF_DSP && MOZ_REFLOW_PERF)
-  
+
 #ifdef DEBUG_FRAME_DUMP
   void List(FILE* out = stderr, const char* aPrefix = "", uint32_t aFlags = 0) const override;
   virtual nsresult GetFrameName(nsAString& aResult) const override;
@@ -146,6 +146,9 @@ public:
 #endif
 
   nsStyleContext* GetParentStyleContextForOutOfFlow(nsIFrame** aProviderFrame) const;
+
+  // Like GetParentStyleContextForOutOfFlow, but ignores display:contents bits.
+  nsStyleContext* GetLayoutParentStyleForOutOfFlow(nsIFrame** aProviderFrame) const;
 
   bool RenumberFrameAndDescendants(int32_t* aOrdinal,
                                    int32_t aDepth,

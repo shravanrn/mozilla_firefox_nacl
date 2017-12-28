@@ -123,7 +123,11 @@ class DestroyWidgetRunnable : public Runnable {
 public:
   NS_DECL_NSIRUNNABLE
 
-  explicit DestroyWidgetRunnable(nsIWidget* aWidget) : mWidget(aWidget) {}
+  explicit DestroyWidgetRunnable(nsIWidget* aWidget)
+    : mozilla::Runnable("DestroyWidgetRunnable")
+    , mWidget(aWidget)
+  {
+  }
 
 private:
   nsCOMPtr<nsIWidget> mWidget;
@@ -712,7 +716,10 @@ nsresult nsView::AttachToTopLevelWidget(nsIWidget* aWidget)
   mWindow = aWidget;
 
   mWindow->SetAttachedWidgetListener(this);
-  mWindow->EnableDragDrop(true);
+  if (mWindow->WindowType() != eWindowType_invisible) {
+    nsresult rv = mWindow->AsyncEnableDragDrop(true);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
   mWidgetIsTopLevel = true;
 
   // Refresh the view bounds

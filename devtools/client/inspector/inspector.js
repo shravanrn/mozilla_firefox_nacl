@@ -8,37 +8,39 @@
 
 "use strict";
 
-var Services = require("Services");
-var promise = require("promise");
-var defer = require("devtools/shared/defer");
-var EventEmitter = require("devtools/shared/event-emitter");
+const Services = require("Services");
+const promise = require("promise");
+const EventEmitter = require("devtools/shared/old-event-emitter");
 const {executeSoon} = require("devtools/shared/DevToolsUtils");
-var KeyShortcuts = require("devtools/client/shared/key-shortcuts");
-var {Task} = require("devtools/shared/task");
-const {initCssProperties} = require("devtools/shared/fronts/css-properties");
-const nodeConstants = require("devtools/shared/dom-node-constants");
+const {Task} = require("devtools/shared/task");
+
+// constructor
 const Telemetry = require("devtools/client/shared/telemetry");
-
-const Menu = require("devtools/client/framework/menu");
-const MenuItem = require("devtools/client/framework/menu-item");
-
-const {HTMLBreadcrumbs} = require("devtools/client/inspector/breadcrumbs");
-const GridInspector = require("devtools/client/inspector/grids/grid-inspector");
-const {InspectorSearch} = require("devtools/client/inspector/inspector-search");
 const HighlightersOverlay = require("devtools/client/inspector/shared/highlighters-overlay");
 const ReflowTracker = require("devtools/client/inspector/shared/reflow-tracker");
-const {ToolSidebar} = require("devtools/client/inspector/toolsidebar");
-const MarkupView = require("devtools/client/inspector/markup/markup");
-const {CommandUtils} = require("devtools/client/shared/developer-toolbar");
-const {ViewHelpers} = require("devtools/client/shared/widgets/view-helpers");
-const clipboardHelper = require("devtools/shared/platform/clipboard");
-
 const Store = require("devtools/client/inspector/store");
+
+loader.lazyRequireGetter(this, "initCssProperties", "devtools/shared/fronts/css-properties", true);
+loader.lazyRequireGetter(this, "HTMLBreadcrumbs", "devtools/client/inspector/breadcrumbs", true);
+loader.lazyRequireGetter(this, "KeyShortcuts", "devtools/client/shared/key-shortcuts");
+loader.lazyRequireGetter(this, "InspectorSearch", "devtools/client/inspector/inspector-search", true);
+loader.lazyRequireGetter(this, "ToolSidebar", "devtools/client/inspector/toolsidebar", true);
+loader.lazyRequireGetter(this, "MarkupView", "devtools/client/inspector/markup/markup");
+
+loader.lazyRequireGetter(this, "nodeConstants", "devtools/shared/dom-node-constants");
+loader.lazyRequireGetter(this, "Menu", "devtools/client/framework/menu");
+loader.lazyRequireGetter(this, "MenuItem", "devtools/client/framework/menu-item");
+loader.lazyRequireGetter(this, "ExtensionSidebar", "devtools/client/inspector/extensions/extension-sidebar");
+loader.lazyRequireGetter(this, "CommandUtils", "devtools/client/shared/developer-toolbar", true);
+loader.lazyRequireGetter(this, "ViewHelpers", "devtools/client/shared/widgets/view-helpers", true);
+loader.lazyRequireGetter(this, "clipboardHelper", "devtools/shared/platform/clipboard");
 
 const {LocalizationHelper, localizeMarkup} = require("devtools/shared/l10n");
 const INSPECTOR_L10N =
       new LocalizationHelper("devtools/client/locales/inspector.properties");
-const TOOLBOX_L10N = new LocalizationHelper("devtools/client/locales/toolbox.properties");
+loader.lazyGetter(this, "TOOLBOX_L10N", function () {
+  return new LocalizationHelper("devtools/client/locales/toolbox.properties");
+});
 
 // Sidebar dimensions
 const INITIAL_SIDEBAR_SIZE = 350;
@@ -101,24 +103,29 @@ function Inspector(toolbox) {
   this.store = Store();
   this.telemetry = new Telemetry();
 
+  // Store the URL of the target page prior to navigation in order to ensure
+  // telemetry counts in the Grid Inspector are not double counted on reload.
+  this.previousURL = this.target.url;
+
   this.nodeMenuTriggerInfo = null;
 
   this._handleRejectionIfNotDestroyed = this._handleRejectionIfNotDestroyed.bind(this);
-  this._onBeforeNavigate = this._onBeforeNavigate.bind(this);
-  this.onNewRoot = this.onNewRoot.bind(this);
   this._onContextMenu = this._onContextMenu.bind(this);
-  this.onTextBoxContextMenu = this.onTextBoxContextMenu.bind(this);
-  this._updateSearchResultsLabel = this._updateSearchResultsLabel.bind(this);
-  this.onNewSelection = this.onNewSelection.bind(this);
-  this.onDetached = this.onDetached.bind(this);
-  this.onPaneToggleButtonClicked = this.onPaneToggleButtonClicked.bind(this);
+  this._onBeforeNavigate = this._onBeforeNavigate.bind(this);
   this._onMarkupFrameLoad = this._onMarkupFrameLoad.bind(this);
+  this._updateSearchResultsLabel = this._updateSearchResultsLabel.bind(this);
+
+  this.onDetached = this.onDetached.bind(this);
+  this.onMarkupLoaded = this.onMarkupLoaded.bind(this);
+  this.onNewSelection = this.onNewSelection.bind(this);
+  this.onNewRoot = this.onNewRoot.bind(this);
+  this.onPaneToggleButtonClicked = this.onPaneToggleButtonClicked.bind(this);
   this.onPanelWindowResize = this.onPanelWindowResize.bind(this);
-  this.onSidebarShown = this.onSidebarShown.bind(this);
-  this.onSidebarHidden = this.onSidebarHidden.bind(this);
-  this.onSidebarSelect = this.onSidebarSelect.bind(this);
   this.onShowBoxModelHighlighterForNode =
     this.onShowBoxModelHighlighterForNode.bind(this);
+  this.onSidebarHidden = this.onSidebarHidden.bind(this);
+  this.onSidebarSelect = this.onSidebarSelect.bind(this);
+  this.onSidebarShown = this.onSidebarShown.bind(this);
 
   this._target.on("will-navigate", this._onBeforeNavigate);
   this._detectingActorFeatures = this._detectActorFeatures();
@@ -181,6 +188,10 @@ Inspector.prototype = {
     return this._target.client.traits.getCssPath;
   },
 
+  get canGetXPath() {
+    return this._target.client.traits.getXPath;
+  },
+
   get canGetUsedFontFaces() {
     return this._target.client.traits.getUsedFontFaces;
   },
@@ -215,20 +226,18 @@ Inspector.prototype = {
       return promise.all([
         this._target.actorHasMethod("domwalker", "duplicateNode").then(value => {
           this._supportsDuplicateNode = value;
-        }).catch(e => console.error(e)),
+        }).catch(console.error),
         this._target.actorHasMethod("domnode", "scrollIntoView").then(value => {
           this._supportsScrollIntoView = value;
-        }).catch(e => console.error(e)),
+        }).catch(console.error),
         this._target.actorHasMethod("inspector", "resolveRelativeURL").then(value => {
           this._supportsResolveRelativeURL = value;
-        }).catch(e => console.error(e)),
+        }).catch(console.error),
       ]);
     });
   },
 
-  _deferredOpen: function (defaultSelection) {
-    let deferred = defer();
-
+  _deferredOpen: async function (defaultSelection) {
     this.breadcrumbs = new HTMLBreadcrumbs(this);
 
     this.walker.on("new-root", this.onNewRoot);
@@ -268,26 +277,35 @@ Inspector.prototype = {
     this._initMarkup();
     this.isReady = false;
 
-    this.once("markuploaded", () => {
-      this.isReady = true;
-
-      // All the components are initialized. Let's select a node.
-      if (defaultSelection) {
-        this.selection.setNodeFront(defaultSelection, "inspector-open");
-        this.markup.expandNode(this.selection.nodeFront);
-      }
-
-      // And setup the toolbar only now because it may depend on the document.
-      this.setupToolbar();
-
-      this.emit("ready");
-      deferred.resolve(this);
-    });
-
     this.setupSearchBox();
-    this.setupSidebar();
 
-    return deferred.promise;
+    // Setup the splitter before the sidebar is displayed so,
+    // we don't miss any events.
+    this.setupSplitter();
+
+    // We can display right panel with: tab bar, markup view and breadbrumb. Right after
+    // the splitter set the right and left panel sizes, in order to avoid resizing it
+    // during load of the inspector.
+    this.panelDoc.getElementById("inspector-main-content").style.visibility = "visible";
+
+    this.setupSidebar();
+    this.setupExtensionSidebars();
+
+    await this.once("markuploaded");
+    this.isReady = true;
+
+    // All the components are initialized. Let's select a node.
+    if (defaultSelection) {
+      let onAllPanelsUpdated = this.once("inspector-updated");
+      this.selection.setNodeFront(defaultSelection, "inspector-open");
+      await onAllPanelsUpdated;
+      await this.markup.expandNode(this.selection.nodeFront);
+    }
+
+    // And setup the toolbar only now because it may depend on the document.
+    await this.setupToolbar();
+    this.emit("ready");
+    return this;
   },
 
   _onBeforeNavigate: function () {
@@ -469,10 +487,11 @@ Inspector.prototype = {
     let SplitBox = this.React.createFactory(this.browserRequire(
       "devtools/client/shared/components/splitter/split-box"));
 
+    let { width, height } = this.getSidebarSize();
     let splitter = SplitBox({
       className: "inspector-sidebar-splitter",
-      initialWidth: INITIAL_SIDEBAR_SIZE,
-      initialHeight: INITIAL_SIDEBAR_SIZE,
+      initialWidth: width,
+      initialHeight: height,
       splitterSize: 1,
       endPanelControl: true,
       startPanel: this.InspectorTabPanel({
@@ -488,11 +507,6 @@ Inspector.prototype = {
       this.panelDoc.getElementById("inspector-splitter-box"));
 
     this.panelWin.addEventListener("resize", this.onPanelWindowResize, true);
-
-    // Persist splitter state in preferences.
-    this.sidebar.on("show", this.onSidebarShown);
-    this.sidebar.on("hide", this.onSidebarHidden);
-    this.sidebar.on("destroy", this.onSidebarHidden);
   },
 
   /**
@@ -516,7 +530,7 @@ Inspector.prototype = {
     });
   },
 
-  onSidebarShown: function () {
+  getSidebarSize: function () {
     let width;
     let height;
 
@@ -532,8 +546,11 @@ Inspector.prototype = {
       width = INITIAL_SIDEBAR_SIZE;
       height = INITIAL_SIDEBAR_SIZE;
     }
+    return { width, height };
+  },
 
-    this._splitter.setState({width, height});
+  onSidebarShown: function () {
+    this._splitter.setState(this.getSidebarSize());
   },
 
   onSidebarHidden: function () {
@@ -550,6 +567,8 @@ Inspector.prototype = {
     // Then forces the panel creation by calling getPanel
     // (This allows lazy loading the panels only once we select them)
     this.getPanel(toolId);
+
+    this.toolbox.emit("inspector-sidebar-select", toolId);
   },
 
   /**
@@ -577,7 +596,7 @@ Inspector.prototype = {
         panel = new BoxModel(this, this.panelWin);
         break;
       case "fontinspector":
-        const {FontInspector} = require("devtools/client/inspector/fonts/fonts");
+        const FontInspector = require("devtools/client/inspector/fonts/fonts");
         panel = new FontInspector(this, this.panelWin);
         break;
       default:
@@ -616,14 +635,28 @@ Inspector.prototype = {
       INSPECTOR_L10N.getStr("inspector.sidebar.computedViewTitle"),
       defaultTab == "computedview");
 
-    if (Services.prefs.getBoolPref("devtools.layoutview.enabled")) {
-      // Grid and layout panels aren't lazy-loaded as their module end up
-      // calling inspector.addSidebarTab
-      this.gridInspector = new GridInspector(this, this.panelWin);
-
-      const LayoutView = this.browserRequire("devtools/client/inspector/layout/layout");
-      this.layoutview = new LayoutView(this, this.panelWin);
-    }
+    // Inject a lazy loaded react tab by exposing a fake React object
+    // with a lazy defined Tab thanks to `panel` being a function
+    let layoutId = "layoutview";
+    let layoutTitle = INSPECTOR_L10N.getStr("inspector.sidebar.layoutViewTitle2");
+    this.sidebar.addTab(
+      layoutId,
+      layoutTitle,
+      {
+        props: {
+          id: layoutId,
+          title: layoutTitle
+        },
+        panel: () => {
+          if (!this.layoutview) {
+            const LayoutView =
+              this.browserRequire("devtools/client/inspector/layout/layout");
+            this.layoutview = new LayoutView(this, this.panelWin);
+          }
+          return this.layoutview.provider;
+        }
+      },
+      defaultTab == layoutId);
 
     if (this.target.form.animationsActor) {
       this.sidebar.addFrameTab(
@@ -635,19 +668,82 @@ Inspector.prototype = {
 
     if (Services.prefs.getBoolPref("devtools.fontinspector.enabled") &&
         this.canGetUsedFontFaces) {
-      this.sidebar.addExistingTab(
-        "fontinspector",
-        INSPECTOR_L10N.getStr("inspector.sidebar.fontInspectorTitle"),
-        defaultTab == "fontinspector");
+      const FontInspector = this.browserRequire("devtools/client/inspector/fonts/fonts");
+      this.fontinspector = new FontInspector(this, this.panelWin);
+      this.fontinspector.init();
 
       this.sidebar.toggleTab(true, "fontinspector");
     }
 
-    // Setup the splitter before the sidebar is displayed so,
-    // we don't miss any events.
-    this.setupSplitter();
+    // Persist splitter state in preferences.
+    this.sidebar.on("show", this.onSidebarShown);
+    this.sidebar.on("hide", this.onSidebarHidden);
+    this.sidebar.on("destroy", this.onSidebarHidden);
 
     this.sidebar.show(defaultTab);
+  },
+
+  /**
+   * Setup any extension sidebar already registered to the toolbox when the inspector.
+   * has been created for the first time.
+   */
+  setupExtensionSidebars() {
+    for (const [sidebarId, {title}] of this.toolbox.inspectorExtensionSidebars) {
+      this.addExtensionSidebar(sidebarId, {title});
+    }
+  },
+
+  /**
+   * Create a side-panel tab controlled by an extension
+   * using the devtools.panels.elements.createSidebarPane and sidebar object API
+   *
+   * @param {String} id
+   *        An unique id for the sidebar tab.
+   * @param {Object} options
+   * @param {String} options.title
+   *        The tab title
+   */
+  addExtensionSidebar: function (id, {title}) {
+    if (this._panels.has(id)) {
+      throw new Error(`Cannot create an extension sidebar for the existent id: ${id}`);
+    }
+
+    const extensionSidebar = new ExtensionSidebar(this, {id, title});
+
+    // TODO(rpl): pass some extension metadata (e.g. extension name and icon) to customize
+    // the render of the extension title (e.g. use the icon in the sidebar and show the
+    // extension name in a tooltip).
+    this.addSidebarTab(id, title, extensionSidebar.provider, false);
+
+    this._panels.set(id, extensionSidebar);
+
+    // Emit the created ExtensionSidebar instance to the listeners registered
+    // on the toolbox by the "devtools.panels.elements" WebExtensions API.
+    this.toolbox.emit(`extension-sidebar-created-${id}`, extensionSidebar);
+  },
+
+  /**
+   * Remove and destroy a side-panel tab controlled by an extension (e.g. when the
+   * extension has been disable/uninstalled while the toolbox and inspector were
+   * still open).
+   *
+   * @param {String} id
+   *        The id of the sidebar tab to destroy.
+   */
+  removeExtensionSidebar: function (id) {
+    if (!this._panels.has(id)) {
+      throw new Error(`Unable to find a sidebar panel with id "${id}"`);
+    }
+
+    const panel = this._panels.get(id);
+
+    if (!(panel instanceof ExtensionSidebar)) {
+      throw new Error(`The sidebar panel with id "${id}" is not an ExtensionSidebar`);
+    }
+
+    this._panels.delete(id);
+    this.sidebar.removeTab(id);
+    panel.destroy();
   },
 
   /**
@@ -774,13 +870,7 @@ Inspector.prototype = {
       this.selection.setNodeFront(defaultNode, "navigateaway");
 
       this._initMarkup();
-      this.once("markuploaded", () => {
-        if (!this.markup) {
-          return;
-        }
-        this.markup.expandNode(this.selection.nodeFront);
-        this.emit("new-root");
-      });
+      this.once("markuploaded", this.onMarkupLoaded);
 
       // Setup the toolbar again, since its content may depend on the current document.
       this.setupToolbar();
@@ -789,6 +879,27 @@ Inspector.prototype = {
     this._getDefaultNodeForSelection()
         .then(onNodeSelected, this._handleRejectionIfNotDestroyed);
   },
+
+  /**
+   * Handler for "markuploaded" event fired on a new root mutation and after the markup
+   * view is initialized. Expands the current selected node and restores the saved
+   * highlighter state.
+   */
+  onMarkupLoaded: Task.async(function* () {
+    if (!this.markup) {
+      return;
+    }
+
+    this.markup.expandNode(this.selection.nodeFront);
+
+    // Restore the highlighter states prior to emitting "new-root".
+    yield Promise.all([
+      this.highlighters.restoreGridState(),
+      this.highlighters.restoreShapeState()
+    ]);
+
+    this.emit("new-root");
+  }),
 
   _selectionCssSelector: null,
 
@@ -967,12 +1078,12 @@ Inspector.prototype = {
     }
     this._panels.clear();
 
-    if (this.gridInspector) {
-      this.gridInspector.destroy();
-    }
-
     if (this.layoutview) {
       this.layoutview.destroy();
+    }
+
+    if (this.fontinspector) {
+      this.fontinspector.destroy();
     }
 
     let cssPropertiesDestroyer = this._cssPropertiesLoaded.then(({front}) => {
@@ -1023,13 +1134,9 @@ Inspector.prototype = {
    * into the current node's outer HTML, otherwise returns null.
    */
   _getClipboardContentForPaste: function () {
-    let flavors = clipboardHelper.getCurrentFlavors();
-    if (flavors.indexOf("text") != -1 ||
-        (flavors.indexOf("html") != -1 && flavors.indexOf("image") == -1)) {
-      let content = clipboardHelper.getData();
-      if (content && content.trim().length > 0) {
-        return content;
-      }
+    let content = clipboardHelper.getText();
+    if (content && content.trim().length > 0) {
+      return content;
     }
     return null;
   },
@@ -1041,17 +1148,6 @@ Inspector.prototype = {
       screenY: e.screenY,
       target: e.target,
     });
-  },
-
-  /**
-   * This is meant to be called by all the search, filter, inplace text boxes in the
-   * inspector, and just calls through to the toolbox openTextBoxContextMenu helper.
-   * @param {DOMEvent} e
-   */
-  onTextBoxContextMenu: function (e) {
-    e.stopPropagation();
-    e.preventDefault();
-    this.toolbox.openTextBoxContextMenu(e.screenX, e.screenY);
   },
 
   _openMenu: function ({ target, screenX = 0, screenY = 0 } = { }) {
@@ -1246,6 +1342,15 @@ Inspector.prototype = {
       click: () => this.copyCssPath(),
     }));
     copySubmenu.append(new MenuItem({
+      id: "node-menu-copyxpath",
+      label: INSPECTOR_L10N.getStr("inspectorCopyXPath.label"),
+      accesskey:
+        INSPECTOR_L10N.getStr("inspectorCopyXPath.accesskey"),
+      disabled: !isSelectionElement,
+      hidden: !this.canGetXPath,
+      click: () => this.copyXPath(),
+    }));
+    copySubmenu.append(new MenuItem({
       id: "node-menu-copyimagedatauri",
       label: INSPECTOR_L10N.getStr("inspectorImageDataUri.label"),
       disabled: !isSelectionElement || !markupContainer ||
@@ -1423,7 +1528,7 @@ Inspector.prototype = {
     this._markupFrame.setAttribute("tooltip", "aHTMLTooltip");
     this._markupFrame.addEventListener("contextmenu", this._onContextMenu);
 
-    this._markupBox.setAttribute("collapsed", true);
+    this._markupBox.style.visibility = "hidden";
     this._markupBox.appendChild(this._markupFrame);
 
     this._markupFrame.addEventListener("load", this._onMarkupFrameLoad, true);
@@ -1437,10 +1542,9 @@ Inspector.prototype = {
 
     this._markupFrame.contentWindow.focus();
 
-    this._markupBox.removeAttribute("collapsed");
-
     this.markup = new MarkupView(this, this._markupFrame, this._toolbox.win);
 
+    this._markupBox.style.visibility = "visible";
     this.emit("markuploaded");
   },
 
@@ -1544,7 +1648,7 @@ Inspector.prototype = {
     this.eyeDropperButton.classList.add("checked");
     this.startEyeDropperListeners();
     return this.inspector.pickColorFromPage(this.toolbox, {copyOnSelect: true})
-                         .catch(e => console.error(e));
+                         .catch(console.error);
   },
 
   /**
@@ -1561,7 +1665,7 @@ Inspector.prototype = {
     this.eyeDropperButton.classList.remove("checked");
     this.stopEyeDropperListeners();
     return this.inspector.cancelPickColorFromPage()
-                         .catch(e => console.error(e));
+                         .catch(console.error);
   },
 
   /**
@@ -1756,7 +1860,7 @@ Inspector.prototype = {
   _copyLongString: function (longStringActorPromise) {
     return this._getLongString(longStringActorPromise).then(string => {
       clipboardHelper.copyString(string);
-    }).catch(e => console.error(e));
+    }).catch(console.error);
   },
 
   /**
@@ -1768,10 +1872,10 @@ Inspector.prototype = {
   _getLongString: function (longStringActorPromise) {
     return longStringActorPromise.then(longStringActor => {
       return longStringActor.string().then(string => {
-        longStringActor.release().catch(e => console.error(e));
+        longStringActor.release().catch(console.error);
         return string;
       });
-    }).catch(e => console.error(e));
+    }).catch(console.error);
   },
 
   /**
@@ -1785,7 +1889,7 @@ Inspector.prototype = {
     this.telemetry.toolOpened("copyuniquecssselector");
     this.selection.nodeFront.getUniqueSelector().then(selector => {
       clipboardHelper.copyString(selector);
-    }).catch(e => console.error);
+    }).catch(console.error);
   },
 
   /**
@@ -1799,7 +1903,21 @@ Inspector.prototype = {
     this.telemetry.toolOpened("copyfullcssselector");
     this.selection.nodeFront.getCssPath().then(path => {
       clipboardHelper.copyString(path);
-    }).catch(e => console.error);
+    }).catch(console.error);
+  },
+
+  /**
+   * Copy the XPath of the selected Node to the clipboard.
+   */
+  copyXPath: function () {
+    if (!this.selection.isNode()) {
+      return;
+    }
+
+    this.telemetry.toolOpened("copyxpath");
+    this.selection.nodeFront.getXPath().then(path => {
+      clipboardHelper.copyString(path);
+    }).catch(console.error);
   },
 
   /**
@@ -1845,7 +1963,7 @@ Inspector.prototype = {
         selection.isPseudoElementNode()) {
       return;
     }
-    this.walker.duplicateNode(selection.nodeFront).catch(e => console.error(e));
+    this.walker.duplicateNode(selection.nodeFront).catch(console.error);
   },
 
   /**
@@ -1946,7 +2064,7 @@ Inspector.prototype = {
             return this.toolbox.viewSourceInDebugger(url);
           }
           return null;
-        }).catch(e => console.error(e));
+        }).catch(console.error);
     } else if (type == "idref") {
       // Select the node in the same document.
       this.walker.document(this.selection.nodeFront).then(doc => {
@@ -1957,7 +2075,7 @@ Inspector.prototype = {
           }
           this.selection.setNodeFront(node);
         });
-      }).catch(e => console.error(e));
+      }).catch(console.error);
     }
   },
 
@@ -2080,6 +2198,10 @@ const buildFakeToolbox = Task.async(function* (
     viewSourceInDebugger: notImplemented,
     viewSourceInStyleEditor: notImplemented,
 
+    get inspectorExtensionSidebars() {
+      notImplemented();
+    },
+
     // For attachThread:
     highlightTool() {},
     unhighlightTool() {},
@@ -2127,7 +2249,7 @@ if (window.location.protocol === "chrome:" && url.search.length > 1) {
     );
     let inspectorUI = new Inspector(fakeToolbox);
     inspectorUI.init();
-  }).then(null, e => {
+  }).catch(e => {
     window.alert("Unable to start the inspector:" + e.message + "\n" + e.stack);
   });
 }

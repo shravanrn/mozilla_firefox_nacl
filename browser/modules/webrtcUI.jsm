@@ -541,6 +541,17 @@ function prompt(aBrowser, aRequest) {
           addDeviceToList(menupopup, device.name, device.deviceIndex);
       }
 
+      function checkDisabledWindowMenuItem() {
+        let list = doc.getElementById("webRTC-selectWindow-menulist");
+        let item = list.selectedItem;
+        let notificationElement = doc.getElementById("webRTC-shareDevices-notification");
+        if (!item || item.hasAttribute("disabled")) {
+          notificationElement.setAttribute("invalidselection", "true");
+        } else {
+          notificationElement.removeAttribute("invalidselection");
+        }
+      }
+
       function listScreenShareDevices(menupopup, devices) {
         while (menupopup.lastChild)
           menupopup.removeChild(menupopup.lastChild);
@@ -555,10 +566,10 @@ function prompt(aBrowser, aRequest) {
         label.setAttribute("accesskey",
                            stringBundle.getString(gumStringId + ".accesskey"));
 
-        // "No <type>" is the default because we can't pick a
+        // "Select <type>" is the default because we can't pick a
         // 'default' window to share.
         addDeviceToList(menupopup,
-                        stringBundle.getString("getUserMedia.no" + typeName + ".label"),
+                        stringBundle.getString("getUserMedia.pick" + typeName + ".label"),
                         "-1");
         menupopup.appendChild(doc.createElement("menuseparator"));
 
@@ -599,7 +610,9 @@ function prompt(aBrowser, aRequest) {
         // Always re-select the "No <type>" item.
         doc.getElementById("webRTC-selectWindow-menulist").removeAttribute("value");
         doc.getElementById("webRTC-all-windows-shared").hidden = true;
+
         menupopup._commandEventListener = event => {
+          checkDisabledWindowMenuItem();
           let video = doc.getElementById("webRTC-previewVideo");
           if (video.stream) {
             video.stream.getTracks().forEach(t => t.stop());
@@ -639,6 +652,7 @@ function prompt(aBrowser, aRequest) {
               string = bundle.getFormattedString("getUserMedia.shareFirefoxWarning.message",
                                                  [brand, learnMore]);
             }
+            // eslint-disable-next-line no-unsanitized/property
             warning.innerHTML = string;
           }
 
@@ -674,6 +688,10 @@ function prompt(aBrowser, aRequest) {
         menuitem.setAttribute("tooltiptext", deviceName);
         if (type)
           menuitem.setAttribute("devicetype", type);
+
+        if (deviceIndex == "-1")
+          menuitem.setAttribute("disabled", true);
+
         menupopup.appendChild(menuitem);
         return menuitem;
       }
@@ -685,10 +703,13 @@ function prompt(aBrowser, aRequest) {
       let camMenupopup = doc.getElementById("webRTC-selectCamera-menupopup");
       let windowMenupopup = doc.getElementById("webRTC-selectWindow-menupopup");
       let micMenupopup = doc.getElementById("webRTC-selectMicrophone-menupopup");
-      if (sharingScreen)
+      if (sharingScreen) {
         listScreenShareDevices(windowMenupopup, videoDevices);
-      else
+        checkDisabledWindowMenuItem();
+      } else {
         listDevices(camMenupopup, videoDevices);
+        doc.getElementById("webRTC-shareDevices-notification").removeAttribute("invalidselection");
+      }
 
       if (!sharingAudio)
         listDevices(micMenupopup, audioDevices);
@@ -1066,10 +1087,15 @@ function updateIndicators(data, target) {
   }
 
   if (webrtcUI.showGlobalIndicator) {
-    if (!gIndicatorWindow)
+    if (!gIndicatorWindow) {
       gIndicatorWindow = getGlobalIndicator();
-    else
-      gIndicatorWindow.updateIndicatorState();
+    } else {
+      try {
+        gIndicatorWindow.updateIndicatorState();
+      } catch (err) {
+        Cu.reportError(`error in gIndicatorWindow.updateIndicatorState(): ${err.message}`);
+      }
+    }
   } else if (gIndicatorWindow) {
     gIndicatorWindow.close();
     gIndicatorWindow = null;

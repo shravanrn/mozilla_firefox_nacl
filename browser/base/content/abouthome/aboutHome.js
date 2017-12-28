@@ -12,8 +12,8 @@
 //   * add an entry here in the proper ordering (based on spans)
 // The <a/> part of the snippet will be linked to the corresponding url.
 const DEFAULT_SNIPPETS_URLS = [
-  "https://www.mozilla.org/firefox/features/?utm_source=snippet&utm_medium=snippet&utm_campaign=default+feature+snippet"
-, "https://addons.mozilla.org/firefox/?utm_source=snippet&utm_medium=snippet&utm_campaign=addons"
+  "https://www.mozilla.org/firefox/features/?utm_source=snippet&utm_medium=snippet&utm_campaign=default+feature+snippet",
+  "https://addons.mozilla.org/firefox/?utm_source=snippet&utm_medium=snippet&utm_campaign=addons"
 ];
 
 const SNIPPETS_UPDATE_INTERVAL_MS = 14400000; // 4 hours.
@@ -47,7 +47,6 @@ window.addEventListener("pageshow", function() {
   // Delay search engine setup, cause browser.js::BrowserOnAboutPageLoad runs
   // later and may use asynchronous getters.
   window.gObserver.observe(document.documentElement, { attributes: true });
-  window.gObserver.observe(document.getElementById("launcher"), { attributes: true });
   fitToWidth();
   setupSearch();
   window.addEventListener("resize", fitToWidth);
@@ -334,6 +333,7 @@ function showSnippets() {
   if (snippets) {
     // Injecting snippets can throw if they're invalid XML.
     try {
+      // eslint-disable-next-line no-unsanitized/property
       snippetsElt.innerHTML = snippets;
       // Scripts injected by innerHTML are inactive, so we have to relocate them
       // through DOM manipulation to activate their contents.

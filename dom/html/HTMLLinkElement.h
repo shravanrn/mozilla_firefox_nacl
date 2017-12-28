@@ -9,7 +9,6 @@
 
 #include "mozilla/Attributes.h"
 #include "mozilla/dom/Link.h"
-#include "ImportManager.h"
 #include "nsGenericHTMLElement.h"
 #include "nsIDOMHTMLLinkElement.h"
 #include "nsStyleLinkElement.h"
@@ -37,13 +36,10 @@ public:
   // nsIDOMHTMLLinkElement
   NS_DECL_NSIDOMHTMLLINKELEMENT
 
-  // DOM memory reporter participant
-  NS_DECL_SIZEOF_EXCLUDING_THIS
+  NS_DECL_ADDSIZEOFEXCLUDINGTHIS
 
   void LinkAdded();
   void LinkRemoved();
-
-  void UpdateImport();
 
   // nsIDOMEventTarget
   virtual nsresult GetEventTargetParent(
@@ -121,6 +117,11 @@ public:
   {
     SetHTMLAttr(nsGkAtoms::hreflang, aHreflang, aRv);
   }
+  void GetAs(nsAString& aResult);
+  void SetAs(const nsAString& aAs, ErrorResult& aRv)
+  {
+    SetAttr(nsGkAtoms::as ,aAs, aRv);
+  }
   nsDOMTokenList* Sizes()
   {
     return GetTokenList(nsGkAtoms::sizes);
@@ -166,12 +167,6 @@ public:
     return GetReferrerPolicyAsEnum();
   }
 
-  already_AddRefed<nsIDocument> GetImport();
-  already_AddRefed<ImportLoader> GetImportLoader()
-  {
-    return RefPtr<ImportLoader>(mImportLoader).forget();
-  }
-
   virtual CORSMode GetCORSMode() const override;
 
   virtual void NodeInfoChanged(nsIDocument* aOldDoc) final override
@@ -192,9 +187,6 @@ protected:
                                  bool* aIsAlternate) override;
 protected:
   RefPtr<nsDOMTokenList> mRelList;
-
-private:
-  RefPtr<ImportLoader> mImportLoader;
 };
 
 } // namespace dom

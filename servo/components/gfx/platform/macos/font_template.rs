@@ -18,13 +18,13 @@ use std::fs::File;
 use std::io::{Read, Error as IoError};
 use std::ops::Deref;
 use std::sync::Mutex;
-use webrender_traits::NativeFontHandle;
+use webrender_api::NativeFontHandle;
 
 /// Platform specific font representation for mac.
 /// The identifier is a PostScript font name. The
 /// CTFont object is cached here for use by the
 /// paint functions that create CGFont references.
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct FontTemplateData {
     /// The `CTFont` object, if present. This is cached here so that we don't have to keep creating
     /// `CTFont` instances over and over. It can always be recreated from the `identifier` and/or
@@ -128,12 +128,12 @@ impl Serialize for CachedCTFont {
     }
 }
 
-impl Deserialize for CachedCTFont {
+impl<'de> Deserialize<'de> for CachedCTFont {
     fn deserialize<D>(deserializer: D) -> Result<CachedCTFont, D::Error>
-                      where D: Deserializer {
+                      where D: Deserializer<'de> {
         struct NoneOptionVisitor;
 
-        impl Visitor for NoneOptionVisitor {
+        impl<'de> Visitor<'de> for NoneOptionVisitor {
             type Value = CachedCTFont;
 
             fn expecting(&self, fmt: &mut fmt::Formatter) -> fmt::Result {

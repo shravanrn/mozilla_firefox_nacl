@@ -20,11 +20,13 @@
 #include "nsError.h"
 #include "mozilla/dom/DOMRect.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/gfx/MatrixFwd.h"
 #include "nsISupportsImpl.h"
 #include "nsStyledElement.h"
 #include "nsSVGClass.h"
 #include "nsIDOMSVGElement.h"
 #include "SVGContentUtils.h"
+#include "gfxMatrix.h"
 
 class nsSVGAngle;
 class nsSVGBoolean;
@@ -42,6 +44,7 @@ class DeclarationBlock;
 
 namespace dom {
 class SVGSVGElement;
+class SVGViewportElement;
 
 static const unsigned short SVG_UNIT_TYPE_UNKNOWN           = 0;
 static const unsigned short SVG_UNIT_TYPE_USERSPACEONUSE    = 1;
@@ -60,13 +63,8 @@ class nsSVGAnimatedTransformList;
 class SVGStringList;
 class DOMSVGStringList;
 
-namespace gfx {
-class Matrix;
-} // namespace gfx
-
 } // namespace mozilla
 
-class gfxMatrix;
 struct nsSVGEnumMapping;
 
 typedef nsStyledElement nsSVGElementBase;
@@ -148,7 +146,7 @@ public:
   // Gets the element that establishes the rectangular viewport against which
   // we should resolve percentage lengths (our "coordinate context"). Returns
   // nullptr for outer <svg> or SVG without an <svg> parent (invalid SVG).
-  mozilla::dom::SVGSVGElement* GetCtx() const;
+  mozilla::dom::SVGViewportElement* GetCtx() const;
 
   /**
    * Returns aMatrix pre-multiplied by (explicit or implicit) transforms that

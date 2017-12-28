@@ -216,9 +216,9 @@ LIRGeneratorARM64::lowerUrshD(MUrsh* mir)
 }
 
 void
-LIRGeneratorARM64::visitAsmJSNeg(MAsmJSNeg* ins)
+LIRGeneratorARM64::visitWasmNeg(MWasmNeg* ins)
 {
-    MOZ_CRASH("visitAsmJSNeg");
+    MOZ_CRASH("visitWasmNeg");
 }
 
 void
@@ -364,6 +364,12 @@ LIRGeneratorARM64::visitCopySign(MCopySign* ins)
 
 void
 LIRGeneratorARM64::visitExtendInt32ToInt64(MExtendInt32ToInt64* ins)
+{
+    MOZ_CRASH("NYI");
+}
+
+void
+LIRGeneratorARM64::visitSignExtendInt64(MSignExtendInt64* ins)
 {
     MOZ_CRASH("NYI");
 }

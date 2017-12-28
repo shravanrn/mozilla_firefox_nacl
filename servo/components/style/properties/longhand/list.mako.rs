@@ -27,14 +27,12 @@ ${helpers.single_keyword("list-style-position", "outside inside", animation_valu
         arabic-indic bengali cambodian cjk-decimal devanagari gujarati gurmukhi kannada khmer lao
         malayalam mongolian myanmar oriya persian telugu thai tibetan cjk-earthly-branch
         cjk-heavenly-stem lower-greek hiragana hiragana-iroha katakana katakana-iroha""",
-        needs_conversion="True",
-        animation_value_type="none",
+        animation_value_type="discrete",
         spec="https://drafts.csswg.org/css-lists/#propdef-list-style-type")}
 % else:
-    <%helpers:longhand name="list-style-type" animation_value_type="none" boxed="True"
+    <%helpers:longhand name="list-style-type" animation_value_type="discrete" boxed="True"
                        spec="https://drafts.csswg.org/css-lists/#propdef-list-style-type">
         use values::CustomIdent;
-        use values::computed::ComputedValueAsSpecified;
         use values::generics::CounterStyleOrNone;
 
         pub use self::computed_value::T as SpecifiedValue;
@@ -43,15 +41,12 @@ ${helpers.single_keyword("list-style-position", "outside inside", animation_valu
             use values::generics::CounterStyleOrNone;
 
             /// <counter-style> | <string> | none
-            #[derive(Debug, Clone, Eq, PartialEq, ToCss)]
+            #[derive(Clone, Debug, Eq, MallocSizeOf, PartialEq, ToComputedValue, ToCss)]
             pub enum T {
                 CounterStyle(CounterStyleOrNone),
                 String(String),
             }
         }
-
-        impl ComputedValueAsSpecified for SpecifiedValue {}
-        no_viewport_percentage!(SpecifiedValue);
 
         #[cfg(feature = "gecko")]
         impl SpecifiedValue {
@@ -63,7 +58,7 @@ ${helpers.single_keyword("list-style-position", "outside inside", animation_valu
             pub fn from_gecko_keyword(value: u32) -> Self {
                 use gecko_bindings::structs;
                 SpecifiedValue::CounterStyle(if value == structs::NS_STYLE_LIST_STYLE_NONE {
-                    CounterStyleOrNone::None_
+                    CounterStyleOrNone::None
                 } else {
                     <%
                         values = """disc circle square decimal lower-roman
@@ -94,30 +89,30 @@ ${helpers.single_keyword("list-style-position", "outside inside", animation_valu
             Ok(if let Ok(style) = input.try(|i| CounterStyleOrNone::parse(context, i)) {
                 SpecifiedValue::CounterStyle(style)
             } else {
-                SpecifiedValue::String(input.expect_string()?.into_owned())
+                SpecifiedValue::String(input.expect_string()?.as_ref().to_owned())
             })
         }
     </%helpers:longhand>
 % endif
 
-<%helpers:longhand name="list-style-image" animation_value_type="none"
+<%helpers:longhand name="list-style-image" animation_value_type="discrete"
                    boxed="${product == 'gecko'}"
                    spec="https://drafts.csswg.org/css-lists/#propdef-list-style-image">
-    use values::computed::ComputedValueAsSpecified;
     use values::specified::UrlOrNone;
     pub use self::computed_value::T as SpecifiedValue;
 
     pub mod computed_value {
         use values::specified::UrlOrNone;
 
+        #[cfg_attr(feature = "gecko", derive(MallocSizeOf))]
         #[cfg_attr(feature = "servo", derive(HeapSizeOf))]
-        #[derive(Debug, Clone, PartialEq, ToCss)]
+        #[derive(Clone, Debug, PartialEq, ToCss)]
         pub struct T(pub UrlOrNone);
+
+        // FIXME(nox): This is wrong, there are different types for specified
+        // and computed URLs in Servo.
+        trivial_to_computed_value!(T);
     }
-
-
-    impl ComputedValueAsSpecified for SpecifiedValue {}
-    no_viewport_percentage!(SpecifiedValue);
 
     #[inline]
     pub fn get_initial_value() -> computed_value::T {
@@ -142,23 +137,20 @@ ${helpers.single_keyword("list-style-position", "outside inside", animation_valu
     }
 </%helpers:longhand>
 
-<%helpers:longhand name="quotes" animation_value_type="none"
+<%helpers:longhand name="quotes" animation_value_type="discrete"
                    spec="https://drafts.csswg.org/css-content/#propdef-quotes">
-    use std::borrow::Cow;
+    use cssparser::serialize_string;
     use std::fmt;
     use style_traits::ToCss;
-    use values::computed::ComputedValueAsSpecified;
 
     pub use self::computed_value::T as SpecifiedValue;
 
     pub mod computed_value {
-        #[derive(Debug, Clone, PartialEq)]
+        #[cfg_attr(feature = "gecko", derive(MallocSizeOf))]
         #[cfg_attr(feature = "servo", derive(HeapSizeOf))]
-        pub struct T(pub Vec<(String,String)>);
+        #[derive(Clone, Debug, PartialEq, ToComputedValue)]
+        pub struct T(pub Vec<(String, String)>);
     }
-
-    impl ComputedValueAsSpecified for SpecifiedValue {}
-    no_viewport_percentage!(SpecifiedValue);
 
     impl ToCss for SpecifiedValue {
         fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
@@ -169,12 +161,12 @@ ${helpers.single_keyword("list-style-position", "outside inside", animation_valu
             let mut first = true;
             for pair in &self.0 {
                 if !first {
-                    try!(dest.write_str(" "));
+                    dest.write_str(" ")?;
                 }
                 first = false;
-                try!(Token::QuotedString(Cow::from(&*pair.0)).to_css(dest));
-                try!(dest.write_str(" "));
-                try!(Token::QuotedString(Cow::from(&*pair.1)).to_css(dest));
+                serialize_string(&*pair.0, dest)?;
+                dest.write_str(" ")?;
+                serialize_string(&*pair.1, dest)?;
             }
             Ok(())
         }
@@ -197,13 +189,13 @@ ${helpers.single_keyword("list-style-position", "outside inside", animation_valu
         let mut quotes = Vec::new();
         loop {
             let first = match input.next() {
-                Ok(Token::QuotedString(value)) => value.into_owned(),
-                Ok(t) => return Err(BasicParseError::UnexpectedToken(t).into()),
+                Ok(&Token::QuotedString(ref value)) => value.as_ref().to_owned(),
+                Ok(t) => return Err(BasicParseError::UnexpectedToken(t.clone()).into()),
                 Err(_) => break,
             };
             let second = match input.next() {
-                Ok(Token::QuotedString(value)) => value.into_owned(),
-                Ok(t) => return Err(BasicParseError::UnexpectedToken(t).into()),
+                Ok(&Token::QuotedString(ref value)) => value.as_ref().to_owned(),
+                Ok(t) => return Err(BasicParseError::UnexpectedToken(t.clone()).into()),
                 Err(e) => return Err(e.into()),
             };
             quotes.push((first, second))

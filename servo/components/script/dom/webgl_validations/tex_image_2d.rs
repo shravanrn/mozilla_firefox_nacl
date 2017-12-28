@@ -2,13 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use canvas_traits::webgl::WebGLError::*;
 use dom::bindings::js::Root;
 use dom::webglrenderingcontext::WebGLRenderingContext;
 use dom::webgltexture::WebGLTexture;
 use std::{self, fmt};
 use super::WebGLValidator;
 use super::types::{TexImageTarget, TexDataType, TexFormat};
-use webrender_traits::WebGLError::*;
 
 /// The errors that the texImage* family of functions can generate.
 #[derive(Debug)]
@@ -285,7 +285,7 @@ impl<'a> WebGLValidator for TexImage2DValidator<'a> {
             width,
             height,
             border,
-        } = try!(self.common_validator.validate());
+        } = self.common_validator.validate()?;
 
         // GL_INVALID_VALUE is generated if target is one of the six cube map 2D
         // image targets and the width and height parameters are not equal.

@@ -53,7 +53,7 @@ public:
   ActorState
   State();
 
-  already_AddRefed<nsIInputStream>
+  already_AddRefed<IPCBlobInputStream>
   CreateStream();
 
   void
@@ -108,7 +108,7 @@ private:
   };
   nsTArray<PendingOperation> mPendingOperations;
 
-  nsCOMPtr<nsIThread> mOwningThread;
+  nsCOMPtr<nsISerialEventTarget> mOwningEventTarget;
 
   UniquePtr<workers::WorkerHolder> mWorkerHolder;
 };

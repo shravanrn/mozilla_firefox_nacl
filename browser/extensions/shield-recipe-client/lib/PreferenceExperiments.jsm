@@ -58,12 +58,12 @@ XPCOMUtils.defineLazyModuleGetter(this, "CleanupManager", "resource://shield-rec
 XPCOMUtils.defineLazyModuleGetter(this, "JSONFile", "resource://gre/modules/JSONFile.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "OS", "resource://gre/modules/osfile.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LogManager", "resource://shield-recipe-client/lib/LogManager.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "Preferences", "resource://gre/modules/Preferences.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TelemetryEnvironment", "resource://gre/modules/TelemetryEnvironment.jsm");
 
 this.EXPORTED_SYMBOLS = ["PreferenceExperiments"];
 
 const EXPERIMENT_FILE = "shield-preference-experiments.json";
+const STARTUP_EXPERIMENT_PREFS_BRANCH = "extensions.shield-recipe-client.startupExperimentPrefs.";
 
 const PREFERENCE_TYPE_MAP = {
   boolean: Services.prefs.PREF_BOOL,
@@ -71,14 +71,15 @@ const PREFERENCE_TYPE_MAP = {
   integer: Services.prefs.PREF_INT,
 };
 
-const DefaultPreferences = new Preferences({defaultBranch: true});
+const UserPreferences = Services.prefs;
+const DefaultPreferences = Services.prefs.getDefaultBranch("");
 
 /**
  * Enum storing Preference modules for each type of preference branch.
  * @enum {Object}
  */
 const PreferenceBranchType = {
-  user: Preferences,
+  user: UserPreferences,
   default: DefaultPreferences,
 };
 
@@ -101,20 +102,82 @@ const log = LogManager.getLogger("preference-experiments");
 let experimentObservers = new Map();
 CleanupManager.addCleanupHandler(() => PreferenceExperiments.stopAllObservers());
 
+function getPref(prefBranch, prefName, prefType) {
+  if (prefBranch.getPrefType(prefName) === 0) {
+    // pref doesn't exist
+    return null;
+  }
+
+  switch (prefType) {
+    case "boolean": {
+      return prefBranch.getBoolPref(prefName);
+    }
+
+    case "string":
+      return prefBranch.getStringPref(prefName);
+
+    case "integer":
+      return prefBranch.getIntPref(prefName);
+
+    default:
+      throw new TypeError(`Unexpected preference type (${prefType}) for ${prefName}.`);
+  }
+}
+
+function setPref(prefBranch, prefName, prefType, prefValue) {
+  switch (prefType) {
+    case "boolean":
+      prefBranch.setBoolPref(prefName, prefValue);
+      break;
+
+    case "string":
+      prefBranch.setStringPref(prefName, prefValue);
+      break;
+
+    case "integer":
+      prefBranch.setIntPref(prefName, prefValue);
+      break;
+
+    default:
+      throw new TypeError(`Unexpected preference type (${prefType}) for ${prefName}.`);
+  }
+}
+
 this.PreferenceExperiments = {
+  /**
+   * Update the the experiment storage with changes that happened during early startup.
+   * @param {object} studyPrefsChanged Map from pref name to previous pref value
+   */
+  async recordOriginalValues(studyPrefsChanged) {
+    const store = await ensureStorage();
+
+    for (const experiment of Object.values(store.data)) {
+      if (studyPrefsChanged.hasOwnProperty(experiment.preferenceName)) {
+        if (experiment.expired) {
+          log.warn("Expired preference experiment changed value during startup");
+        }
+        if (experiment.branch !== "default") {
+          log.warn("Non-default branch preference experiment changed value during startup");
+        }
+        experiment.previousPreferenceValue = studyPrefsChanged[experiment.preferenceName];
+      }
+    }
+
+    // not calling store.saveSoon() because if the data doesn't get
+    // written, it will get updated with fresher data next time the
+    // browser starts.
+  },
+
   /**
    * Set the default preference value for active experiments that use the
    * default preference branch.
    */
   async init() {
-    for (const experiment of await this.getAllActive()) {
-      // Set experiment default preferences, since they don't persist between restarts
-      if (experiment.preferenceBranchType === "default") {
-        DefaultPreferences.set(experiment.preferenceName, experiment.preferenceValue);
-      }
+    CleanupManager.addCleanupHandler(this.saveStartupPrefs.bind(this));
 
+    for (const experiment of await this.getAllActive()) {
       // Check that the current value of the preference is still what we set it to
-      if (Preferences.get(experiment.preferenceName, undefined) !== experiment.preferenceValue) {
+      if (getPref(UserPreferences, experiment.preferenceName, experiment.preferenceType) !== experiment.preferenceValue) {
         // if not, stop the experiment, and skip the remaining steps
         log.info(`Stopping experiment "${experiment.name}" because its value changed`);
         await this.stop(experiment.name, false);
@@ -122,10 +185,45 @@ this.PreferenceExperiments = {
       }
 
       // Notify Telemetry of experiments we're running, since they don't persist between restarts
-      TelemetryEnvironment.setExperimentActive(experiment.name, experiment.branch);
+      TelemetryEnvironment.setExperimentActive(
+        experiment.name,
+        experiment.branch,
+        {type: "normandy-preference-experiment"}
+      );
 
       // Watch for changes to the experiment's preference
-      this.startObserver(experiment.name, experiment.preferenceName, experiment.preferenceValue);
+      this.startObserver(experiment.name, experiment.preferenceName, experiment.preferenceType, experiment.preferenceValue);
+    }
+  },
+
+  /**
+   * Save in-progress preference experiments in a sub-branch of the shield
+   * prefs. On startup, we read these to set the experimental values.
+   */
+  async saveStartupPrefs() {
+    const prefBranch = Services.prefs.getBranch(STARTUP_EXPERIMENT_PREFS_BRANCH);
+    prefBranch.deleteBranch("");
+
+    for (const experiment of await this.getAllActive()) {
+      const name = experiment.preferenceName;
+      const value = experiment.preferenceValue;
+
+      switch (typeof value) {
+        case "string":
+          prefBranch.setCharPref(name, value);
+          break;
+
+        case "number":
+          prefBranch.setIntPref(name, value);
+          break;
+
+        case "boolean":
+          prefBranch.setBoolPref(name, value);
+          break;
+
+        default:
+          throw new Error(`Invalid preference type ${typeof value}`);
+      }
     }
   },
 
@@ -207,7 +305,7 @@ this.PreferenceExperiments = {
       preferenceName,
       preferenceValue,
       preferenceType,
-      previousPreferenceValue: preferences.get(preferenceName, undefined),
+      previousPreferenceValue: getPref(preferences, preferenceName, preferenceType),
       preferenceBranchType,
     };
 
@@ -225,12 +323,13 @@ this.PreferenceExperiments = {
       );
     }
 
-    preferences.set(preferenceName, preferenceValue);
-    PreferenceExperiments.startObserver(name, preferenceName, preferenceValue);
+    setPref(preferences, preferenceName, preferenceType, preferenceValue);
+    PreferenceExperiments.startObserver(name, preferenceName, preferenceType, preferenceValue);
     store.data[name] = experiment;
     store.saveSoon();
 
-    TelemetryEnvironment.setExperimentActive(name, branch);
+    TelemetryEnvironment.setExperimentActive(name, branch, {type: "normandy-preference-experiment"});
+    await this.saveStartupPrefs();
   },
 
   /**
@@ -242,7 +341,7 @@ this.PreferenceExperiments = {
    * @throws {Error}
    *   If an observer for the named experiment is already active.
    */
-  startObserver(experimentName, preferenceName, preferenceValue) {
+  startObserver(experimentName, preferenceName, preferenceType, preferenceValue) {
     log.debug(`PreferenceExperiments.startObserver(${experimentName})`);
 
     if (experimentObservers.has(experimentName)) {
@@ -253,7 +352,8 @@ this.PreferenceExperiments = {
 
     const observerInfo = {
       preferenceName,
-      observer(newValue) {
+      observer() {
+        const newValue = getPref(UserPreferences, preferenceName, preferenceType);
         if (newValue !== preferenceValue) {
           PreferenceExperiments.stop(experimentName, false)
                                .catch(Cu.reportError);
@@ -261,7 +361,7 @@ this.PreferenceExperiments = {
       },
     };
     experimentObservers.set(experimentName, observerInfo);
-    Preferences.observe(preferenceName, observerInfo.observer);
+    Services.prefs.addObserver(preferenceName, observerInfo.observer);
   },
 
   /**
@@ -288,7 +388,7 @@ this.PreferenceExperiments = {
     }
 
     const {preferenceName, observer} = experimentObservers.get(experimentName);
-    Preferences.ignore(preferenceName, observer);
+    Services.prefs.removeObserver(preferenceName, observer);
     experimentObservers.delete(experimentName);
   },
 
@@ -298,7 +398,7 @@ this.PreferenceExperiments = {
   stopAllObservers() {
     log.debug("PreferenceExperiments.stopAllObservers()");
     for (const {preferenceName, observer} of experimentObservers.values()) {
-      Preferences.ignore(preferenceName, observer);
+      Services.prefs.removeObserver(preferenceName, observer);
     }
     experimentObservers.clear();
   },
@@ -352,15 +452,21 @@ this.PreferenceExperiments = {
     }
 
     if (resetValue) {
-      const {preferenceName, previousPreferenceValue, preferenceBranchType} = experiment;
+      const {preferenceName, preferenceType, previousPreferenceValue, preferenceBranchType} = experiment;
       const preferences = PreferenceBranchType[preferenceBranchType];
-      if (previousPreferenceValue !== undefined) {
-        preferences.set(preferenceName, previousPreferenceValue);
+
+      if (previousPreferenceValue !== null) {
+        setPref(preferences, preferenceName, preferenceType, previousPreferenceValue);
+      } else if (preferenceBranchType === "user") {
+        // Remove the "user set" value (which Shield set), but leave the default intact.
+        preferences.clearUserPref(preferenceName);
       } else {
-        // This does nothing if we're on the default branch, which is fine. The
-        // preference will be reset on next restart, and most preferences should
-        // have had a default value set before the experiment anyway.
-        preferences.reset(preferenceName);
+        // Remove both the user and default branch preference. This
+        // is ok because we only do this when studies expire, not
+        // when users actively leave a study by changing the
+        // preference, so there should not be a user branch value at
+        // this point.
+        Services.prefs.getDefaultBranch("").deleteBranch(preferenceName);
       }
     }
 
@@ -368,6 +474,7 @@ this.PreferenceExperiments = {
     store.saveSoon();
 
     TelemetryEnvironment.setExperimentInactive(experimentName, experiment.branch);
+    await this.saveStartupPrefs();
   },
 
   /**

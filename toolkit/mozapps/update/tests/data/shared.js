@@ -31,9 +31,6 @@ const PREF_APP_UPDATE_URL                        = "app.update.url";
 const PREF_APP_UPDATE_URL_DETAILS                = "app.update.url.details";
 const PREF_APP_UPDATE_URL_MANUAL                 = "app.update.url.manual";
 
-
-const PREFBRANCH_APP_UPDATE_NEVER = "app.update.never.";
-
 const PREFBRANCH_APP_PARTNER         = "app.partner.";
 const PREF_DISTRIBUTION_ID           = "distribution.id";
 const PREF_DISTRIBUTION_VERSION      = "distribution.version";
@@ -72,8 +69,6 @@ const UPDATE_SETTINGS_CONTENTS = "[Settings]\n" +
 const PR_RDWR        = 0x04;
 const PR_CREATE_FILE = 0x08;
 const PR_TRUNCATE    = 0x20;
-
-const DEFAULT_UPDATE_VERSION = "999999.0";
 
 var gChannel;
 
@@ -124,11 +119,6 @@ XPCOMUtils.defineLazyGetter(this, "gPrefRoot", function test_gPR() {
 XPCOMUtils.defineLazyServiceGetter(this, "gEnv",
                                    "@mozilla.org/process/environment;1",
                                    "nsIEnvironment");
-
-XPCOMUtils.defineLazyGetter(this, "gZipW", function test_gZipW() {
-  return Cc["@mozilla.org/zipwriter;1"].
-         createInstance(Ci.nsIZipWriter);
-});
 
 /* Triggers post-update processing */
 function testPostUpdateProcessing() {
@@ -285,7 +275,7 @@ function writeFile(aFile, aText) {
   let fos = Cc["@mozilla.org/network/file-output-stream;1"].
             createInstance(Ci.nsIFileOutputStream);
   if (!aFile.exists()) {
-    aFile.create(Ci.nsILocalFile.NORMAL_FILE_TYPE, PERMS_FILE);
+    aFile.create(Ci.nsIFile.NORMAL_FILE_TYPE, PERMS_FILE);
   }
   fos.init(aFile, MODE_WRONLY | MODE_CREATE | MODE_TRUNCATE, PERMS_FILE, 0);
   fos.write(aText, aText.length);

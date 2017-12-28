@@ -9,8 +9,10 @@ test talos results parsing
 
 http://hg.mozilla.org/build/talos/file/tip/talos/results.py
 """
+from __future__ import absolute_import
 
 import unittest
+
 import talos.filter
 import talos.results
 
@@ -74,6 +76,7 @@ class TestPageloaderResults(unittest.TestCase):
         filtered = results.filter(*filters)
         self.assertEqual(filtered[0][0], 68.)
         self.assertEqual(filtered[-1][0], 1623.)
+
 
 if __name__ == '__main__':
     unittest.main()

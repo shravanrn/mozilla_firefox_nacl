@@ -14,6 +14,7 @@
 #include "mozilla/dom/SVGTests.h"
 #include "nsContentUtils.h"
 #include "nsICSSDeclaration.h"
+#include "nsIContentInlines.h"
 #include "nsIDocument.h"
 #include "nsIDOMMutationEvent.h"
 #include "mozilla/InternalMutationEvent.h"
@@ -128,6 +129,17 @@ nsSVGElement::GetStyle(nsIDOMCSSStyleDeclaration** aStyle)
 void
 nsSVGElement::DidAnimateClass()
 {
+  // For Servo, snapshot the element before we change it.
+  nsIPresShell* shell = OwnerDoc()->GetShell();
+  if (shell) {
+    nsPresContext* presContext = shell->GetPresContext();
+    if (presContext && presContext->RestyleManager()->IsServo()) {
+      presContext->RestyleManager()
+                 ->AsServo()
+                 ->ClassAttributeWillBeChangedBySMIL(this);
+    }
+  }
+
   nsAutoString src;
   mClassAttribute.GetAnimValue(src, this);
   if (!mClassAnimAttr) {
@@ -135,7 +147,6 @@ nsSVGElement::DidAnimateClass()
   }
   mClassAnimAttr->ParseAtomArray(src);
 
-  nsIPresShell* shell = OwnerDoc()->GetShell();
   if (shell) {
     shell->RestyleForAnimation(this, eRestyle_Self);
   }
@@ -685,7 +696,7 @@ nsSVGElement::UnsetAttrInternal(int32_t aNamespaceID, nsIAtom* aName,
       }
       return;
     }
-    
+
     // Check if this is a length attribute going away
     LengthAttributesInfo lenInfo = GetLengthInfo();
 
@@ -1012,7 +1023,7 @@ nsSVGElement::sFontSpecificationMap[] = {
   { &nsGkAtoms::font_stretch },
   { &nsGkAtoms::font_style },
   { &nsGkAtoms::font_variant },
-  { &nsGkAtoms::fontWeight },  
+  { &nsGkAtoms::fontWeight },
   { nullptr }
 };
 
@@ -1096,7 +1107,20 @@ nsSVGElement::GetOwnerSVGElement(nsIDOMSVGElement * *aOwnerSVGElement)
 SVGSVGElement*
 nsSVGElement::GetOwnerSVGElement()
 {
-  return GetCtx(); // this may return nullptr
+  nsIContent* ancestor = GetFlattenedTreeParent();
+
+  while (ancestor && ancestor->IsSVGElement()) {
+    if (ancestor->IsSVGElement(nsGkAtoms::foreignObject)) {
+      return nullptr;
+    }
+    if (ancestor->IsSVGElement(nsGkAtoms::svg)) {
+      return static_cast<SVGSVGElement*>(ancestor);
+    }
+    ancestor = ancestor->GetFlattenedTreeParent();
+  }
+
+  // we don't have an ancestor <svg> element...
+  return nullptr;
 }
 
 NS_IMETHODIMP
@@ -1182,6 +1206,7 @@ private:
   // MEMBER DATA
   // -----------
   nsCSSParser       mParser;
+  css::Loader*      mLoader;
 
   // Arguments for nsCSSParser::ParseProperty
   nsIURI*           mDocURI;
@@ -1201,7 +1226,7 @@ MappedAttrParser::MappedAttrParser(css::Loader* aLoader,
                                    already_AddRefed<nsIURI> aBaseURI,
                                    nsSVGElement* aElement,
                                    StyleBackendType aBackend)
-  : mParser(aLoader), mDocURI(aDocURI), mBaseURI(aBaseURI),
+  : mParser(aLoader), mLoader(aLoader), mDocURI(aDocURI), mBaseURI(aBaseURI),
     mElement(aElement), mBackend(aBackend)
 {
 }
@@ -1242,7 +1267,7 @@ MappedAttrParser::ParseMappedAttrValue(nsIAtom* aMappedAttrName,
                                                    mElement->NodePrincipal());
       changed = Servo_DeclarationBlock_SetPropertyById(
         mDecl->AsServo()->Raw(), propertyID, &value, false, data,
-        ParsingMode::AllowUnitlessLength, mElement->OwnerDoc()->GetCompatibilityMode());
+        ParsingMode::AllowUnitlessLength, mElement->OwnerDoc()->GetCompatibilityMode(), mLoader);
     }
 
     if (changed) {
@@ -1531,23 +1556,10 @@ nsIAtom* nsSVGElement::GetEventNameForAttr(nsIAtom* aAttr)
   return aAttr;
 }
 
-SVGSVGElement *
+SVGViewportElement *
 nsSVGElement::GetCtx() const
 {
-  nsIContent* ancestor = GetFlattenedTreeParent();
-
-  while (ancestor && ancestor->IsSVGElement()) {
-    if (ancestor->IsSVGElement(nsGkAtoms::foreignObject)) {
-      return nullptr;
-    }
-    if (ancestor->IsSVGElement(nsGkAtoms::svg)) {
-      return static_cast<SVGSVGElement*>(ancestor);
-    }
-    ancestor = ancestor->GetFlattenedTreeParent();
-  }
-
-  // we don't have an ancestor <svg> element...
-  return nullptr;
+  return SVGContentUtils::GetNearestViewportElement(this);
 }
 
 /* virtual */ gfxMatrix
@@ -1646,7 +1658,7 @@ nsSVGElement::GetAnimatedLengthValues(float *aFirst, ...)
   NS_ASSERTION(info.mLengthCount > 0,
                "GetAnimatedLengthValues on element with no length attribs");
 
-  SVGSVGElement *ctx = nullptr;
+  SVGViewportElement *ctx = nullptr;
 
   float *f = aFirst;
   uint32_t i = 0;
@@ -2050,7 +2062,7 @@ void
 nsSVGElement::DidAnimateInteger(uint8_t aAttrEnum)
 {
   nsIFrame* frame = GetPrimaryFrame();
-  
+
   if (frame) {
     IntegerAttributesInfo info = GetIntegerInfo();
     frame->AttributeChanged(kNameSpaceID_None,
@@ -2121,7 +2133,7 @@ void
 nsSVGElement::DidAnimateIntegerPair(uint8_t aAttrEnum)
 {
   nsIFrame* frame = GetPrimaryFrame();
-  
+
   if (frame) {
     IntegerPairAttributesInfo info = GetIntegerPairInfo();
     frame->AttributeChanged(kNameSpaceID_None,
@@ -2138,7 +2150,7 @@ nsSVGElement::GetAngleInfo()
 
 void nsSVGElement::AngleAttributesInfo::Reset(uint8_t aAttrEnum)
 {
-  mAngles[aAttrEnum].Init(aAttrEnum, 
+  mAngles[aAttrEnum].Init(aAttrEnum,
                           mAngleInfo[aAttrEnum].mDefaultValue,
                           mAngleInfo[aAttrEnum].mDefaultUnitType);
 }
@@ -2208,7 +2220,7 @@ void
 nsSVGElement::DidAnimateBoolean(uint8_t aAttrEnum)
 {
   nsIFrame* frame = GetPrimaryFrame();
-  
+
   if (frame) {
     BooleanAttributesInfo info = GetBooleanInfo();
     frame->AttributeChanged(kNameSpaceID_None,
@@ -2285,7 +2297,7 @@ void
 nsSVGElement::DidAnimateViewBox()
 {
   nsIFrame* frame = GetPrimaryFrame();
-  
+
   if (frame) {
     frame->AttributeChanged(kNameSpaceID_None,
                             nsGkAtoms::viewBox,
@@ -2325,7 +2337,7 @@ void
 nsSVGElement::DidAnimatePreserveAspectRatio()
 {
   nsIFrame* frame = GetPrimaryFrame();
-  
+
   if (frame) {
     frame->AttributeChanged(kNameSpaceID_None,
                             nsGkAtoms::preserveAspectRatio,
@@ -2494,7 +2506,7 @@ nsSVGElement::ReportAttributeParseFailure(nsIDocument* aDocument,
                                           nsIAtom* aAttribute,
                                           const nsAString& aValue)
 {
-  const nsAFlatString& attributeValue = PromiseFlatString(aValue);
+  const nsString& attributeValue = PromiseFlatString(aValue);
   const char16_t *strings[] = { aAttribute->GetUTF16String(),
                                  attributeValue.get() };
   return SVGContentUtils::ReportToConsole(aDocument,

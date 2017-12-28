@@ -828,6 +828,10 @@ function makeDReportMap(aJSONReports) {
     path = path.replace(/jar:file:\\\\\\(.+)\\omni.ja!/,
                         "jar:file:\\\\\\...\\omni.ja!");
 
+    // Normalize script source counts.
+    path = path.replace(/source\(scripts=(\d+), /,
+                        "source\(scripts=NNN, ");
+
     let processPath = process + kProcessPathSep + path;
     let rOld = dreportMap[processPath];
     if (rOld === undefined) {
@@ -1025,8 +1029,8 @@ function appendAboutMemoryMain(aProcessReports, aHasMozMallocUsableSize) {
       }
 
       // Then sort by resident size.
-      let nodeA = pcollsByProcess[aProcessA]._degenerates["resident"];
-      let nodeB = pcollsByProcess[aProcessB]._degenerates["resident"];
+      let nodeA = pcollsByProcess[aProcessA]._degenerates.resident;
+      let nodeB = pcollsByProcess[aProcessB]._degenerates.resident;
       let residentA = nodeA ? nodeA._amount : -1;
       let residentB = nodeB ? nodeB._amount : -1;
 

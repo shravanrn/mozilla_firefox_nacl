@@ -7,7 +7,7 @@
 
 const { Cc, Ci, Cu, Cr } = require("chrome");
 const promise = require("promise");
-const EventEmitter = require("devtools/shared/event-emitter");
+const EventEmitter = require("devtools/shared/old-event-emitter");
 const { CanvasFront } = require("devtools/shared/fronts/canvas");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
@@ -50,7 +50,7 @@ CanvasDebuggerPanel.prototype = {
         this.emit("ready");
         return this;
       })
-      .then(null, function onError(aReason) {
+      .catch(function onError(aReason) {
         DevToolsUtils.reportException("CanvasDebuggerPanel.prototype.open", aReason);
       });
   },

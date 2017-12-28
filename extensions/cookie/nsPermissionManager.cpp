@@ -328,7 +328,7 @@ NS_IMPL_ISUPPORTS(ClearOriginDataObserver, nsIObserver)
 
 class MOZ_STACK_CLASS UpgradeHostToOriginHelper {
 public:
-  virtual nsresult Insert(const nsACString& aOrigin, const nsAFlatCString& aType,
+  virtual nsresult Insert(const nsACString& aOrigin, const nsCString& aType,
                           uint32_t aPermission, uint32_t aExpireType, int64_t aExpireTime,
                           int64_t aModificationTime) = 0;
 };
@@ -345,7 +345,7 @@ public:
   }
 
   nsresult
-  Insert(const nsACString& aOrigin, const nsAFlatCString& aType,
+  Insert(const nsACString& aOrigin, const nsCString& aType,
          uint32_t aPermission, uint32_t aExpireType, int64_t aExpireTime,
          int64_t aModificationTime) final
   {
@@ -395,7 +395,7 @@ public:
   {}
 
   nsresult
-  Insert(const nsACString& aOrigin, const nsAFlatCString& aType,
+  Insert(const nsACString& aOrigin, const nsCString& aType,
          uint32_t aPermission, uint32_t aExpireType, int64_t aExpireTime,
          int64_t aModificationTime) final
   {
@@ -430,7 +430,7 @@ public:
   }
 
   nsresult
-  Insert(const nsACString& aOrigin, const nsAFlatCString& aType,
+  Insert(const nsACString& aOrigin, const nsCString& aType,
          uint32_t aPermission, uint32_t aExpireType, int64_t aExpireTime,
          int64_t aModificationTime) final
   {
@@ -502,7 +502,7 @@ private:
 
 
 nsresult
-UpgradeHostToOriginAndInsert(const nsACString& aHost, const nsAFlatCString& aType,
+UpgradeHostToOriginAndInsert(const nsACString& aHost, const nsCString& aType,
                              uint32_t aPermission, uint32_t aExpireType, int64_t aExpireTime,
                              int64_t aModificationTime, uint32_t aAppId, bool aIsInIsolatedMozBrowserElement,
                              UpgradeHostToOriginHelper* aHelper)
@@ -1684,7 +1684,7 @@ nsPermissionManager::AddFromPrincipal(nsIPrincipal* aPrincipal,
 
 nsresult
 nsPermissionManager::AddInternal(nsIPrincipal* aPrincipal,
-                                 const nsAFlatCString &aType,
+                                 const nsCString& aType,
                                  uint32_t              aPermission,
                                  int64_t               aID,
                                  uint32_t              aExpireType,
@@ -1801,18 +1801,6 @@ nsPermissionManager::AddInternal(nsIPrincipal* aPrincipal,
         // we're reading from the database - use the id already assigned
         id = aID;
       }
-
-#ifdef MOZ_B2G
-      // When we do the initial addition of the permissions we don't want to
-      // inherit session specific permissions from other tabs or apps
-      // so we ignore them and set the permission to PROMPT_ACTION if it was
-      // previously allowed or denied by the user.
-      if (aIgnoreSessionPermissions &&
-          aExpireType == nsIPermissionManager::EXPIRE_SESSION) {
-        aPermission = nsIPermissionManager::PROMPT_ACTION;
-        aExpireType = nsIPermissionManager::EXPIRE_NEVER;
-      }
-#endif // MOZ_B2G
 
       entry->GetPermissions().AppendElement(PermissionEntry(id, typeIndex, aPermission,
                                                             aExpireType, aExpireTime,
@@ -2857,7 +2845,8 @@ nsPermissionManager::Import()
 nsresult
 nsPermissionManager::ImportDefaults()
 {
-  nsCString defaultsURL = mozilla::Preferences::GetCString(kDefaultsUrlPrefName);
+  nsAutoCString defaultsURL;
+  mozilla::Preferences::GetCString(kDefaultsUrlPrefName, defaultsURL);
   if (defaultsURL.IsEmpty()) { // == Don't use built-in permissions.
     return NS_OK;
   }

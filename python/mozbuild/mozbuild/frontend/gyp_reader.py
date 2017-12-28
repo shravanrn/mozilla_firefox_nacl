@@ -10,6 +10,8 @@ import sys
 import os
 import time
 import types
+import warnings
+
 import mozpack.path as mozpath
 from mozpack.files import FileFinder
 from .sandbox import alphabetical_sorted
@@ -324,7 +326,8 @@ def process_gyp_result(gyp_result, gyp_dir_attrs, path, config, output,
           if config.substs['OS_TARGET'] == 'WINNT':
               context['DEFINES']['UNICODE'] = True
               context['DEFINES']['_UNICODE'] = True
-        context['DISABLE_STL_WRAPPING'] = True
+        context['COMPILE_FLAGS']['STL'] = []
+        context['COMPILE_FLAGS']['OS_INCLUDES'] = []
 
         for key, value in gyp_dir_attrs.sandbox_vars.items():
             if context.get(key) and isinstance(context[key], list):
@@ -332,6 +335,8 @@ def process_gyp_result(gyp_result, gyp_dir_attrs, path, config, output,
                 # populated here we use the value from sandbox_vars as our
                 # basis rather than overriding outright.
                 context[key] = value + context[key]
+            elif context.get(key) and isinstance(context[key], dict):
+                context[key].update(value)
             else:
                 context[key] = value
 
@@ -372,7 +377,14 @@ class GypProcessor(object):
             # This isn't actually used anywhere in this generator, but it's needed
             # to override the registry detection of VC++ in gyp.
             os.environ['GYP_MSVS_OVERRIDE_PATH'] = 'fake_path'
-            os.environ['GYP_MSVS_VERSION'] = config.substs['MSVS_VERSION']
+
+            # TODO bug 1371485 upgrade vendored version of GYP to something that
+            # doesn't barf when MSVS_VERSION==2017.
+            msvs_version = config.substs['MSVS_VERSION']
+            if msvs_version == '2017':
+                warnings.warn('MSVS_VERSION being set to 2015 to appease GYP')
+                msvs_version = '2015'
+            os.environ['GYP_MSVS_VERSION'] = msvs_version
 
         params = {
             b'parallel': False,

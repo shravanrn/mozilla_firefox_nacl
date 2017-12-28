@@ -14,8 +14,6 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/Timer.jsm");
 Cu.import("resource://gre/modules/LoginManagerContent.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "Promise",
-                                  "resource://gre/modules/Promise.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "BrowserUtils",
                                   "resource://gre/modules/BrowserUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
@@ -364,7 +362,7 @@ LoginManager.prototype = {
     while (enumerator.hasMoreElements()) {
       let perm = enumerator.getNext();
       if (perm.type == PERMISSION_SAVE_LOGINS && perm.capability == Services.perms.DENY_ACTION) {
-        disabledHosts.push(perm.principal.URI.prePath);
+        disabledHosts.push(perm.principal.URI.displayPrePath);
       }
     }
 
@@ -527,7 +525,7 @@ LoginManager.prototype = {
       LoginManagerContent._autoCompleteSearchAsync(aSearchString, previousResult,
                                                    aElement, rect);
     acLookupPromise.then(completeSearch.bind(this, acLookupPromise))
-                             .then(null, Cu.reportError);
+                             .catch(Cu.reportError);
   },
 
   stopSearch() {

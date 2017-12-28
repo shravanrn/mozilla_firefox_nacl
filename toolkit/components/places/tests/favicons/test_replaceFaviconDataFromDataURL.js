@@ -6,7 +6,6 @@
  */
 
 var iconsvc = PlacesUtils.favicons;
-var histsvc = PlacesUtils.history;
 
 var originalFavicon = {
   file: do_get_file("favicon-normal16.png"),
@@ -17,7 +16,7 @@ var originalFavicon = {
 
 var uniqueFaviconId = 0;
 function createFavicon(fileName) {
-  let tempdir = Services.dirsvc.get("TmpD", Ci.nsILocalFile);
+  let tempdir = Services.dirsvc.get("TmpD", Ci.nsIFile);
 
   // remove any existing file at the path we're about to copy to
   let outfile = tempdir.clone();

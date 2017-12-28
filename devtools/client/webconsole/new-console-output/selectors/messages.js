@@ -30,7 +30,11 @@ function getCurrentGroup(state) {
 }
 
 function getVisibleMessages(state) {
-  return state.messages.visibleMessages.map(id => getMessage(state, id));
+  return state.messages.visibleMessages;
+}
+
+function getFilteredMessagesCount(state) {
+  return state.messages.filteredMessagesCount;
 }
 
 function getAllRepeatById(state) {
@@ -49,6 +53,7 @@ module.exports = {
   getAllGroupsById,
   getCurrentGroup,
   getVisibleMessages,
+  getFilteredMessagesCount,
   getAllRepeatById,
   getAllNetworkMessagesUpdateById,
 };

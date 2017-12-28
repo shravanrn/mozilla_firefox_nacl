@@ -24,6 +24,7 @@ interface IID;
 interface nsIBrowserDOMWindow;
 interface nsIMessageBroadcaster;
 interface nsIDOMCrypto;
+interface XULControllers;
 
 // http://www.whatwg.org/specs/web-apps/current-work/
 [PrimaryGlobal, LegacyUnenumerableNamedProperties, NeedResolve]
@@ -79,9 +80,6 @@ interface nsIDOMCrypto;
   [Throws, UnsafeInPrerendering, NeedsSubjectPrincipal] boolean confirm(optional DOMString message = "");
   [Throws, UnsafeInPrerendering, NeedsSubjectPrincipal] DOMString? prompt(optional DOMString message = "", optional DOMString default = "");
   [Throws, UnsafeInPrerendering] void print();
-  //[Throws] any showModalDialog(DOMString url, optional any argument);
-  [Throws, Func="nsGlobalWindow::IsShowModalDialogEnabled", UnsafeInPrerendering, NeedsSubjectPrincipal]
-  any showModalDialog(DOMString url, optional any argument, optional DOMString options = "");
 
   [Throws, CrossOriginCallable, NeedsSubjectPrincipal]
   void postMessage(any message, DOMString targetOrigin, optional sequence<object> transfer = []);
@@ -230,17 +228,6 @@ interface SpeechSynthesisGetter {
 Window implements SpeechSynthesisGetter;
 #endif
 
-// http://www.whatwg.org/specs/web-apps/current-work/
-[NoInterfaceObject]
-interface WindowModal {
-  [Throws, Func="nsGlobalWindow::IsModalContentWindow", NeedsSubjectPrincipal]
-  readonly attribute any dialogArguments;
-
-  [Throws, Func="nsGlobalWindow::IsModalContentWindow", NeedsSubjectPrincipal]
-  attribute any returnValue;
-};
-Window implements WindowModal;
-
 // Mozilla-specific stuff
 partial interface Window {
   //[NewObject, Throws] CSSStyleDeclaration getDefaultComputedStyle(Element elt, optional DOMString pseudoElt = "");
@@ -263,7 +250,7 @@ partial interface Window {
   [Throws, UnsafeInPrerendering, NeedsCallerType] void sizeToContent();
 
   // XXX Shouldn't this be in nsIDOMChromeWindow?
-  [ChromeOnly, Replaceable, Throws] readonly attribute MozControllers controllers;
+  [ChromeOnly, Replaceable, Throws] readonly attribute XULControllers controllers;
 
   [ChromeOnly, Throws] readonly attribute Element? realFrameElement;
 
@@ -323,21 +310,12 @@ partial interface Window {
    */
   [ChromeOnly, Throws] readonly attribute MozSelfSupport MozSelfSupport;
 
-  [Pure]
-           attribute EventHandler onwheel;
-
            attribute EventHandler ondevicemotion;
            attribute EventHandler ondeviceorientation;
            attribute EventHandler onabsolutedeviceorientation;
            attribute EventHandler ondeviceproximity;
            attribute EventHandler onuserproximity;
            attribute EventHandler ondevicelight;
-
-#ifdef MOZ_B2G
-           attribute EventHandler onmoztimechange;
-           attribute EventHandler onmoznetworkupload;
-           attribute EventHandler onmoznetworkdownload;
-#endif
 
   void                      dump(DOMString str);
 
@@ -358,9 +336,12 @@ partial interface Window {
                                                                    optional DOMString options = "",
                                                                    any... extraArguments);
 
-  [Replaceable, Throws, NeedsCallerType] readonly attribute object? content;
-
-  [ChromeOnly, Throws, NeedsCallerType] readonly attribute object? __content;
+  [
+#ifdef NIGHTLY_BUILD
+   ChromeOnly,
+#endif
+   NonEnumerable, Replaceable, Throws, NeedsCallerType]
+  readonly attribute object? content;
 
   [Throws, ChromeOnly] any getInterface(IID iid);
 
@@ -375,7 +356,7 @@ Window implements TouchEventHandlers;
 
 Window implements OnErrorEventHandlerForWindow;
 
-#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+#if defined(MOZ_WIDGET_ANDROID)
 // https://compat.spec.whatwg.org/#windoworientation-interface
 partial interface Window {
   [NeedsCallerType]
@@ -394,6 +375,7 @@ partial interface Window {
 
 [Func="IsChromeOrXBL"]
 interface ChromeWindow {
+  // The STATE_* constants need to match the corresponding enum in nsGlobalWindow.cpp.
   [Func="nsGlobalWindow::IsPrivilegedChromeWindow"]
   const unsigned short STATE_MAXIMIZED = 1;
   [Func="nsGlobalWindow::IsPrivilegedChromeWindow"]
@@ -405,6 +387,9 @@ interface ChromeWindow {
 
   [Func="nsGlobalWindow::IsPrivilegedChromeWindow"]
   readonly attribute unsigned short windowState;
+
+  [Func="nsGlobalWindow::IsPrivilegedChromeWindow"]
+  readonly attribute boolean isFullyOccluded;
 
   /**
    * browserDOMWindow provides access to yet another layer of
@@ -518,7 +503,12 @@ partial interface Window {
 
 partial interface Window {
   /**
-   * Returns a list of locales that the application should be localized to.
+   * Returns a list of locales that the internationalization components
+   * should be localized to.
+   *
+   * The function name refers to Regional Preferences which can be either
+   * fetched from the internal internationalization database (CLDR), or
+   * from the host environment.
    *
    * The result is a sorted list of valid locale IDs and it should be
    * used for all APIs that accept list of locales, like ECMA402 and L10n APIs.
@@ -528,7 +518,7 @@ partial interface Window {
    * Example: ["en-US", "de", "pl", "sr-Cyrl", "zh-Hans-HK"]
    */
   [Func="IsChromeOrXBL"]
-  sequence<DOMString> getAppLocalesAsBCP47();
+  sequence<DOMString> getRegionalPrefsLocales();
 
 #ifdef ENABLE_INTL_API
   /**

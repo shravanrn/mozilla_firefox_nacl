@@ -191,7 +191,7 @@ XPC_MSG_DEF(NS_ERROR_STORAGE_CONSTRAINT             , "SQLite database operation
 /* plugin related codes (from nsPluginError.h) */
 XPC_MSG_DEF(NS_ERROR_PLUGIN_TIME_RANGE_NOT_SUPPORTED, "Clearing site data by time range not supported by plugin")
 
-/* character converter related codes (from nsIUnicodeDecoder.h) */
+/* character converter related codes */
 XPC_MSG_DEF(NS_ERROR_ILLEGAL_INPUT                  , "The input characters have illegal sequences")
 
 /* Codes related to signd jars */
@@ -233,3 +233,4 @@ XPC_MSG_DEF(NS_ERROR_PHISHING_URI                     , "The URI is phishing")
 XPC_MSG_DEF(NS_ERROR_TRACKING_URI                     , "The URI is tracking")
 XPC_MSG_DEF(NS_ERROR_UNWANTED_URI                     , "The URI is unwanted")
 XPC_MSG_DEF(NS_ERROR_BLOCKED_URI                      , "The URI is blocked")
+XPC_MSG_DEF(NS_ERROR_HARMFUL_URI                      , "The URI is harmful")

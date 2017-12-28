@@ -47,7 +47,6 @@ public:
                       nsReflowStatus&          aStatus) override;
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 
   virtual bool IsFrameOfType(uint32_t aFlags) const override
@@ -82,12 +81,8 @@ public:
 
   nsRect GetInvalidRegion();
 
-  /**
-   * Update the style of our ::-moz-svg-foreign-content anonymous box.
-   */
-  void DoUpdateStyleOfOwnedAnonBoxes(mozilla::ServoStyleSet& aStyleSet,
-                                     nsStyleChangeList& aChangeList,
-                                     nsChangeHint aHintForThisFrame) override;
+  // Return our ::-moz-svg-foreign-content anonymous box.
+  void AppendDirectlyOwnedAnonBoxes(nsTArray<OwnedAnonBox>& aResult) override;
 
 protected:
   // implementation helpers:

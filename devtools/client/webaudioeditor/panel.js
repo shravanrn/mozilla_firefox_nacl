@@ -6,9 +6,8 @@
 "use strict";
 
 const { Cc, Ci, Cu, Cr } = require("chrome");
-const EventEmitter = require("devtools/shared/event-emitter");
+const EventEmitter = require("devtools/shared/old-event-emitter");
 const { WebAudioFront } = require("devtools/shared/fronts/webaudio");
-var Promise = require("promise");
 
 function WebAudioEditorPanel(iframeWindow, toolbox) {
   this.panelWin = iframeWindow;
@@ -44,7 +43,7 @@ WebAudioEditorPanel.prototype = {
         this.emit("ready");
         return this;
       })
-      .then(null, function onError(aReason) {
+      .catch(function onError(aReason) {
         console.error("WebAudioEditorPanel open failed. " +
                       aReason.error + ": " + aReason.message);
       });

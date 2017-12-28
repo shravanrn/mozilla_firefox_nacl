@@ -21,7 +21,6 @@
 #include "nsMenuFrame.h"
 #include "prlink.h"
 #include "nsIDOMHTMLInputElement.h"
-#include "nsRenderingContext.h"
 #include "nsGkAtoms.h"
 #include "nsAttrValueInlines.h"
 
@@ -989,19 +988,11 @@ DrawThemeWithCairo(gfxContext* aContext, DrawTarget* aDrawTarget,
       dataSurface->Unmap();
 
       if (cr) {
-        if (!aSnapped || aTransparency != nsITheme::eOpaque) {
-          // The widget either needs to be masked or has transparency, so use the slower drawing path.
-          aDrawTarget->DrawSurface(dataSurface,
-                                   Rect(aSnapped ? drawOffset - aDrawTarget->GetTransform().GetTranslation() : drawOffset,
-                                        Size(aDrawSize)),
-                                   Rect(0, 0, aDrawSize.width, aDrawSize.height));
-        } else {
-          // The widget is a simple opaque rectangle, so just copy it out.
-          aDrawTarget->CopySurface(dataSurface,
-                                   IntRect(0, 0, aDrawSize.width, aDrawSize.height),
-                                   TruncatedToInt(drawOffset));
-        }
-
+        // The widget either needs to be masked or has transparency, so use the slower drawing path.
+        aDrawTarget->DrawSurface(dataSurface,
+                                 Rect(aSnapped ? drawOffset - aDrawTarget->GetTransform().GetTranslation() : drawOffset,
+                                      Size(aDrawSize)),
+                                 Rect(0, 0, aDrawSize.width, aDrawSize.height));
         cairo_destroy(cr);
       }
 
@@ -1102,7 +1093,7 @@ nsNativeThemeGTK::GetExtraSizeForWidget(nsIFrame* aFrame, uint8_t aWidgetType,
 }
 
 NS_IMETHODIMP
-nsNativeThemeGTK::DrawWidgetBackground(nsRenderingContext* aContext,
+nsNativeThemeGTK::DrawWidgetBackground(gfxContext* aContext,
                                        nsIFrame* aFrame,
                                        uint8_t aWidgetType,
                                        const nsRect& aRect,
@@ -1116,7 +1107,7 @@ nsNativeThemeGTK::DrawWidgetBackground(nsRenderingContext* aContext,
                             &flags))
     return NS_OK;
 
-  gfxContext* ctx = aContext->ThebesContext();
+  gfxContext* ctx = aContext;
   nsPresContext *presContext = aFrame->PresContext();
 
   gfxRect rect = presContext->AppUnitsToGfxUnits(aRect);

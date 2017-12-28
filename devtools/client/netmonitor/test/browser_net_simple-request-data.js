@@ -7,6 +7,15 @@
  * Tests if requests render correct information in the menu UI.
  */
 
+// The following intermittent rejections should not be left uncaught. This test
+// has been whitelisted until the issue is fixed.
+//
+// NOTE: Whitelisting a class of rejections should be limited. Normally you
+//       should use "expectUncaughtRejection" to flag individual failures.
+Cu.import("resource://testing-common/PromiseTestUtils.jsm", this);
+PromiseTestUtils.whitelistRejectionsGlobally(/cookies is undefined/);
+PromiseTestUtils.whitelistRejectionsGlobally(/requestItem is undefined/);
+
 function test() {
   // Disable tcp fast open, because it is setting a response header indicator
   // (bug 1352274). TCP Fast Open is not present on all platforms therefore the
@@ -247,7 +256,7 @@ function test() {
 
       let requestItem = getSortedRequests(store.getState()).get(0);
 
-      is(requestItem.transferredSize, "12",
+      is(requestItem.transferredSize, "342",
         "The transferredSize data has an incorrect value.");
       is(requestItem.contentSize, "12",
         "The contentSize data has an incorrect value.");
@@ -278,7 +287,7 @@ function test() {
         {
           type: "plain",
           fullMimeType: "text/plain; charset=utf-8",
-          transferred: L10N.getFormatStrWithNumbers("networkMenu.sizeB", 12),
+          transferred: L10N.getFormatStrWithNumbers("networkMenu.sizeB", 342),
           size: L10N.getFormatStrWithNumbers("networkMenu.sizeB", 12),
         }
       );
@@ -318,6 +327,8 @@ function test() {
         "The eventTimings data has an incorrect |timings.blocked| property.");
       is(typeof requestItem.eventTimings.timings.dns, "number",
         "The eventTimings data has an incorrect |timings.dns| property.");
+      is(typeof requestItem.eventTimings.timings.ssl, "number",
+        "The eventTimings data has an incorrect |timings.ssl| property.");
       is(typeof requestItem.eventTimings.timings.connect, "number",
         "The eventTimings data has an incorrect |timings.connect| property.");
       is(typeof requestItem.eventTimings.timings.send, "number",

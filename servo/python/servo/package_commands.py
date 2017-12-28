@@ -26,6 +26,8 @@ from mach.decorators import (
 )
 from mach.registrar import Registrar
 # Note: mako cannot be imported at the top level because it breaks mach bootstrap
+sys.path.append(path.join(path.dirname(__file__), "..", "..",
+                          "components", "style", "properties", "Mako-0.9.1.zip"))
 
 from servo.command_base import (
     archive_deterministically,
@@ -41,7 +43,7 @@ from servo.util import delete
 
 PACKAGES = {
     'android': [
-        'target/arm-linux-androideabi/release/servo.apk',
+        'target/armv7-linux-androideabi/release/servo.apk',
     ],
     'linux': [
         'target/release/servo-tech-demo.tar.gz',

@@ -35,7 +35,7 @@ registerCleanupFunction(() => {
 function addJsonViewTab(url, timeout = -1) {
   info("Adding a new JSON tab with URL: '" + url + "'");
 
-  let deferred = promise.defer();
+  let deferred = defer();
   addTab(url).then(tab => {
     let browser = tab.linkedBrowser;
 
@@ -49,7 +49,7 @@ function addJsonViewTab(url, timeout = -1) {
 
     // Resolve if the JSONView is fully loaded or wait
     // for an initialization event.
-    if (content.window.wrappedJSObject.jsonViewInitialized) {
+    if (content.window.wrappedJSObject.JSONView.initialized) {
       deferred.resolve(tab);
     } else {
       waitForContentMessage("Test:JsonView:JSONViewInitialized").then(() => {
@@ -151,7 +151,7 @@ function sendString(str, selector) {
 }
 
 function waitForTime(delay) {
-  let deferred = promise.defer();
+  let deferred = defer();
   setTimeout(deferred.resolve, delay);
   return deferred.promise;
 }

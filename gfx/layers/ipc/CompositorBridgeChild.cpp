@@ -13,11 +13,13 @@
 #include "base/task.h"                  // for NewRunnableMethod, etc
 #include "gfxPrefs.h"
 #include "mozilla/dom/TabGroup.h"
+#include "mozilla/layers/CompositorManagerChild.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/APZChild.h"
 #include "mozilla/layers/IAPZCTreeManager.h"
 #include "mozilla/layers/APZCTreeManagerChild.h"
 #include "mozilla/layers/LayerTransactionChild.h"
+#include "mozilla/layers/PaintThread.h"
 #include "mozilla/layers/PLayerTransactionChild.h"
 #include "mozilla/layers/PTextureChild.h"
 #include "mozilla/layers/TextureClient.h"// for TextureClient
@@ -77,17 +79,22 @@ static StaticRefPtr<CompositorBridgeChild> sCompositorBridge;
 
 Atomic<int32_t> KnowsCompositor::sSerialCounter(0);
 
-CompositorBridgeChild::CompositorBridgeChild(LayerManager *aLayerManager, uint32_t aNamespace)
-  : mLayerManager(aLayerManager)
-  , mIdNamespace(aNamespace)
+CompositorBridgeChild::CompositorBridgeChild(CompositorManagerChild *aManager)
+  : mCompositorManager(aManager)
+  , mIdNamespace(0)
   , mResourceId(0)
   , mCanSend(false)
+  , mActorDestroyed(false)
   , mFwdTransactionId(0)
   , mDeviceResetSequenceNumber(0)
   , mMessageLoop(MessageLoop::current())
+  , mProcessToken(0)
   , mSectionAllocator(nullptr)
+  , mPaintLock("CompositorBridgeChild.mPaintLock")
+  , mOutstandingAsyncPaints(0)
+  , mOutstandingAsyncEndTransaction(false)
+  , mIsWaitingForPaint(false)
 {
-  MOZ_ASSERT(mIdNamespace);
   MOZ_ASSERT(NS_IsMainThread());
 }
 
@@ -104,12 +111,19 @@ CompositorBridgeChild::IsSameProcess() const
   return OtherPid() == base::GetCurrentProcId();
 }
 
-static void DeferredDestroyCompositor(RefPtr<CompositorBridgeParent> aCompositorBridgeParent,
-                                      RefPtr<CompositorBridgeChild> aCompositorBridgeChild)
+void
+CompositorBridgeChild::AfterDestroy()
 {
-  aCompositorBridgeChild->Close();
+  // Note that we cannot rely upon mCanSend here because we already set that to
+  // false to prevent normal IPDL calls from being made after SendWillClose.
+  // The only time we should not issue Send__delete__ is if the actor is already
+  // destroyed, e.g. the compositor process crashed.
+  if (!mActorDestroyed) {
+    Send__delete__(this);
+    mActorDestroyed = true;
+  }
 
-  if (sCompositorBridge == aCompositorBridgeChild) {
+  if (sCompositorBridge == this) {
     sCompositorBridge = nullptr;
   }
 }
@@ -120,9 +134,10 @@ CompositorBridgeChild::Destroy()
   // This must not be called from the destructor!
   mTexturesWaitingRecycled.Clear();
 
-  if (!mCanSend) {
-    return;
-  }
+  // Destroying the layer manager may cause all sorts of things to happen, so
+  // let's make sure there is still a reference to keep this alive whatever
+  // happens.
+  RefPtr<CompositorBridgeChild> selfRef = this;
 
   for (size_t i = 0; i < mTexturePools.Length(); i++) {
     mTexturePools[i]->Destroy();
@@ -133,14 +148,19 @@ CompositorBridgeChild::Destroy()
     mSectionAllocator = nullptr;
   }
 
-  // Destroying the layer manager may cause all sorts of things to happen, so
-  // let's make sure there is still a reference to keep this alive whatever
-  // happens.
-  RefPtr<CompositorBridgeChild> selfRef = this;
-
   if (mLayerManager) {
     mLayerManager->Destroy();
     mLayerManager = nullptr;
+  }
+
+  if (!mCanSend) {
+    // We may have already called destroy but still have lingering references
+    // or CompositorBridgeChild::ActorDestroy was called. Ensure that we do our
+    // post destroy clean up no matter what. It is safe to call multiple times.
+    MessageLoop::current()->PostTask(NewRunnableMethod(
+      "CompositorBridgeChild::AfterDestroy",
+      selfRef, &CompositorBridgeChild::AfterDestroy));
+    return;
   }
 
   AutoTArray<PLayerTransactionChild*, 16> transactions;
@@ -151,13 +171,16 @@ CompositorBridgeChild::Destroy()
     layers->Destroy();
   }
 
-  AutoTArray<PWebRenderBridgeChild*, 16> wRBridges;
-  ManagedPWebRenderBridgeChild(wRBridges);
-  for (int i = wRBridges.Length() - 1; i >= 0; --i) {
-    RefPtr<WebRenderBridgeChild> wRBridge =
-      static_cast<WebRenderBridgeChild*>(wRBridges[i]);
-    wRBridge->Destroy();
+  AutoTArray<PWebRenderBridgeChild*, 16> wrBridges;
+  ManagedPWebRenderBridgeChild(wrBridges);
+  for (int i = wrBridges.Length() - 1; i >= 0; --i) {
+    RefPtr<WebRenderBridgeChild> wrBridge =
+      static_cast<WebRenderBridgeChild*>(wrBridges[i]);
+    wrBridge->Destroy(/* aIsSync */ false);
   }
+
+  // Flush async paints before we destroy texture data.
+  FlushAsyncPaints();
 
   const ManagedContainer<PTextureChild>& textures = ManagedPTextureChild();
   for (auto iter = textures.ConstIter(); !iter.Done(); iter.Next()) {
@@ -180,11 +203,12 @@ CompositorBridgeChild::Destroy()
   // CompositorBridgeChild before it gets destroyed. It suffices to ensure that
   // events already in the MessageLoop get processed before the
   // CompositorBridgeChild is destroyed, so we add a task to the MessageLoop to
-  // handle compositor desctruction.
+  // handle compositor destruction.
 
   // From now on we can't send any message message.
-  MessageLoop::current()->PostTask(
-             NewRunnableFunction(DeferredDestroyCompositor, mCompositorBridgeParent, selfRef));
+  MessageLoop::current()->PostTask(NewRunnableMethod(
+    "CompositorBridgeChild::AfterDestroy",
+    selfRef, &CompositorBridgeChild::AfterDestroy));
 }
 
 // static
@@ -209,28 +233,11 @@ CompositorBridgeChild::LookupCompositorFrameMetrics(const FrameMetrics::ViewID a
   return false;
 }
 
-/* static */ bool
-CompositorBridgeChild::InitForContent(Endpoint<PCompositorBridgeChild>&& aEndpoint, uint32_t aNamespace)
-{
-  // There's only one compositor per child process.
-  MOZ_ASSERT(!sCompositorBridge);
-
-  RefPtr<CompositorBridgeChild> child(new CompositorBridgeChild(nullptr, aNamespace));
-  if (!aEndpoint.Bind(child)) {
-    NS_RUNTIMEABORT("Couldn't Open() Compositor channel.");
-    return false;
-  }
-  child->InitIPDL();
-
-  // We release this ref in DeferredDestroyCompositor.
-  sCompositorBridge = child;
-  return true;
-}
-
-/* static */ bool
-CompositorBridgeChild::ReinitForContent(Endpoint<PCompositorBridgeChild>&& aEndpoint, uint32_t aNamespace)
+void
+CompositorBridgeChild::InitForContent(uint32_t aNamespace)
 {
   MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(aNamespace);
 
   if (RefPtr<CompositorBridgeChild> old = sCompositorBridge.forget()) {
     // Note that at this point, ActorDestroy may not have been called yet,
@@ -240,59 +247,25 @@ CompositorBridgeChild::ReinitForContent(Endpoint<PCompositorBridgeChild>&& aEndp
     old->Destroy();
   }
 
-  return InitForContent(Move(aEndpoint), aNamespace);
-}
-
-CompositorBridgeParent*
-CompositorBridgeChild::InitSameProcess(widget::CompositorWidget* aWidget,
-                                       const uint64_t& aLayerTreeId,
-                                       CSSToLayoutDeviceScale aScale,
-                                       const CompositorOptions& aOptions,
-                                       bool aUseExternalSurface,
-                                       const gfx::IntSize& aSurfaceSize)
-{
-  TimeDuration vsyncRate =
-    gfxPlatform::GetPlatform()->GetHardwareVsync()->GetGlobalDisplay().GetVsyncRate();
-
-  mCompositorBridgeParent =
-    new CompositorBridgeParent(aScale, vsyncRate, aOptions, aUseExternalSurface, aSurfaceSize);
-
-  bool ok = Open(mCompositorBridgeParent->GetIPCChannel(),
-                 CompositorThreadHolder::Loop(),
-                 ipc::ChildSide);
-  MOZ_RELEASE_ASSERT(ok);
-
-  InitIPDL();
-  mCompositorBridgeParent->InitSameProcess(aWidget, aLayerTreeId);
-  return mCompositorBridgeParent;
-}
-
-/* static */ RefPtr<CompositorBridgeChild>
-CompositorBridgeChild::CreateRemote(const uint64_t& aProcessToken,
-                                    LayerManager* aLayerManager,
-                                    Endpoint<PCompositorBridgeChild>&& aEndpoint,
-                                    uint32_t aNamespace)
-{
-  RefPtr<CompositorBridgeChild> child = new CompositorBridgeChild(aLayerManager, aNamespace);
-  if (!aEndpoint.Bind(child)) {
-    return nullptr;
-  }
-  child->InitIPDL();
-  child->mProcessToken = aProcessToken;
-  return child;
-}
-
-void
-CompositorBridgeChild::InitIPDL()
-{
   mCanSend = true;
-  AddRef();
+  mIdNamespace = aNamespace;
+  sCompositorBridge = this;
 }
 
 void
-CompositorBridgeChild::DeallocPCompositorBridgeChild()
+CompositorBridgeChild::InitForWidget(uint64_t aProcessToken,
+                                     LayerManager* aLayerManager,
+                                     uint32_t aNamespace)
 {
-  Release();
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(aProcessToken);
+  MOZ_ASSERT(aLayerManager);
+  MOZ_ASSERT(aNamespace);
+
+  mCanSend = true;
+  mProcessToken = aProcessToken;
+  mLayerManager = aLayerManager;
+  mIdNamespace = aNamespace;
 }
 
 /*static*/ CompositorBridgeChild*
@@ -465,7 +438,7 @@ CompositorBridgeChild::RecvUpdatePluginConfigurations(const LayoutDeviceIntPoint
         // our OnPaint handler and forwarded over to the plugin process async.
         widget->Resize(aContentOffset.x + bounds.x,
                        aContentOffset.y + bounds.y,
-                       bounds.width, bounds.height, true);
+                       bounds.Width(), bounds.Height(), true);
       }
 
       widget->Enable(isVisible);
@@ -505,6 +478,7 @@ static void
 ScheduleSendAllPluginsCaptured(CompositorBridgeChild* aThis, MessageLoop* aLoop)
 {
   aLoop->PostTask(NewNonOwningRunnableMethod(
+    "CompositorBridgeChild::SendAllPluginsCaptured",
     aThis, &CompositorBridgeChild::SendAllPluginsCaptured));
 }
 #endif
@@ -549,10 +523,14 @@ CompositorBridgeChild::RecvHideAllPlugins(const uintptr_t& aParentWidget)
 }
 
 mozilla::ipc::IPCResult
-CompositorBridgeChild::RecvDidComposite(const uint64_t& aId, const uint64_t& aTransactionId,
+CompositorBridgeChild::RecvDidComposite(const uint64_t& aId,
+                                        const uint64_t& aTransactionId,
                                         const TimeStamp& aCompositeStart,
                                         const TimeStamp& aCompositeEnd)
 {
+  // Hold a reference to keep texture pools alive.  See bug 1387799
+  AutoTArray<RefPtr<TextureClientPool>,2> texturePools = mTexturePools;
+
   if (mLayerManager) {
     MOZ_ASSERT(aId == 0);
     MOZ_ASSERT(mLayerManager->GetBackendType() == LayersBackend::LAYERS_CLIENT ||
@@ -567,12 +545,13 @@ CompositorBridgeChild::RecvDidComposite(const uint64_t& aId, const uint64_t& aTr
     }
   }
 
-  for (size_t i = 0; i < mTexturePools.Length(); i++) {
-    mTexturePools[i]->ReturnDeferredClients();
+  for (size_t i = 0; i < texturePools.Length(); i++) {
+    texturePools[i]->ReturnDeferredClients();
   }
 
   return IPC_OK();
 }
+
 
 void
 CompositorBridgeChild::ActorDestroy(ActorDestroyReason aWhy)
@@ -583,7 +562,20 @@ CompositorBridgeChild::ActorDestroy(ActorDestroyReason aWhy)
     gfxCriticalNote << "Receive IPC close with reason=AbnormalShutdown";
   }
 
-  mCanSend = false;
+  {
+    // We take the lock to update these fields, since they are read from the
+    // paint thread. We don't need the lock to init them, since that happens
+    // on the main thread before the paint thread can ever grab a reference
+    // to the CompositorBridge object.
+    //
+    // Note that it is useful to take this lock for one other reason: It also
+    // tells us whether GetIPCChannel is safe to call. If we access the IPC
+    // channel within this lock, when mCanSend is true, then we know it has not
+    // been zapped by IPDL.
+    MonitorAutoLock lock(mPaintLock);
+    mCanSend = false;
+    mActorDestroyed = true;
+  }
 
   if (mProcessToken && XRE_IsParentProcess()) {
     GPUProcessManager::Get()->NotifyRemoteActorDestroyed(mProcessToken);
@@ -608,12 +600,13 @@ CompositorBridgeChild::RecvReleaseSharedCompositorFrameMetrics(
     const ViewID& aId,
     const uint32_t& aAPZCId)
 {
-  SharedFrameMetricsData* data = mFrameMetricsTable.Get(aId);
-  // The SharedFrameMetricsData may have been removed previously if
-  // a SharedFrameMetricsData with the same ViewID but later APZCId had
-  // been store and over wrote it.
-  if (data && (data->GetAPZCId() == aAPZCId)) {
-    mFrameMetricsTable.Remove(aId);
+  if (auto entry = mFrameMetricsTable.Lookup(aId)) {
+    // The SharedFrameMetricsData may have been removed previously if
+    // a SharedFrameMetricsData with the same ViewID but later APZCId had
+    // been store and over wrote it.
+    if (entry.Data()->GetAPZCId() == aAPZCId) {
+      entry.Remove();
+    }
   }
   return IPC_OK();
 }
@@ -907,25 +900,12 @@ CompositorBridgeChild::RecvObserveLayerUpdate(const uint64_t& aLayersId,
   return IPC_OK();
 }
 
-already_AddRefed<nsIEventTarget>
-CompositorBridgeChild::GetSpecificMessageEventTarget(const Message& aMsg)
+mozilla::ipc::IPCResult
+CompositorBridgeChild::RecvNotifyWebRenderError(const WebRenderError& aError)
 {
-  if (aMsg.type() != PCompositorBridge::Msg_DidComposite__ID) {
-    return nullptr;
-  }
-
-  uint64_t layersId;
-  PickleIterator iter(aMsg);
-  if (!IPC::ReadParam(&aMsg, &iter, &layersId)) {
-    return nullptr;
-  }
-
-  TabChild* tabChild = TabChild::GetFrom(layersId);
-  if (!tabChild) {
-    return nullptr;
-  }
-
-  return do_AddRef(tabChild->TabGroup()->EventTargetFor(TaskCategory::Other));
+  MOZ_ASSERT(XRE_IsParentProcess());
+  GPUProcessManager::Get()->NotifyWebRenderError(aError);
+  return IPC_OK();
 }
 
 void
@@ -946,24 +926,18 @@ CompositorBridgeChild::HoldUntilCompositableRefReleasedIfNecessary(TextureClient
 void
 CompositorBridgeChild::NotifyNotUsed(uint64_t aTextureId, uint64_t aFwdTransactionId)
 {
-  RefPtr<TextureClient> client = mTexturesWaitingRecycled.Get(aTextureId);
-  if (!client) {
-    return;
+  if (auto entry = mTexturesWaitingRecycled.Lookup(aTextureId)) {
+    if (aFwdTransactionId < entry.Data()->GetLastFwdTransactionId()) {
+      // Released on host side, but client already requested newer use texture.
+      return;
+    }
+    entry.Remove();
   }
-  if (aFwdTransactionId < client->GetLastFwdTransactionId()) {
-    // Released on host side, but client already requested newer use texture.
-    return;
-  }
-  mTexturesWaitingRecycled.Remove(aTextureId);
 }
 
 void
 CompositorBridgeChild::CancelWaitForRecycle(uint64_t aTextureId)
 {
-  RefPtr<TextureClient> client = mTexturesWaitingRecycled.Get(aTextureId);
-  if (!client) {
-    return;
-  }
   mTexturesWaitingRecycled.Remove(aTextureId);
 }
 
@@ -1132,30 +1106,16 @@ CompositorBridgeChild::DeallocPAPZCTreeManagerChild(PAPZCTreeManagerChild* aActo
 }
 
 void
-CompositorBridgeChild::ProcessingError(Result aCode, const char* aReason)
-{
-  if (aCode != MsgDropped) {
-    gfxDevCrash(gfx::LogReason::ProcessingError) << "Processing error in CompositorBridgeChild: " << int(aCode);
-  }
-}
-
-void
 CompositorBridgeChild::WillEndTransaction()
 {
   ResetShmemCounter();
-}
-
-void
-CompositorBridgeChild::HandleFatalError(const char* aName, const char* aMsg) const
-{
-  dom::ContentChild::FatalErrorIfNotUsingGPUProcess(aName, aMsg, OtherPid());
 }
 
 PWebRenderBridgeChild*
 CompositorBridgeChild::AllocPWebRenderBridgeChild(const wr::PipelineId& aPipelineId,
                                                   const LayoutDeviceIntSize&,
                                                   TextureFactoryIdentifier*,
-                                                  uint32_t *aIdNamespace)
+                                                  wr::IdNamespace *aIdNamespace)
 {
   WebRenderBridgeChild* child = new WebRenderBridgeChild(aPipelineId);
   child->AddIPDLReference();
@@ -1194,6 +1154,145 @@ CompositorBridgeChild::GetNextPipelineId()
   return wr::AsPipelineId(GetNextResourceId());
 }
 
+void
+CompositorBridgeChild::FlushAsyncPaints()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  MonitorAutoLock lock(mPaintLock);
+  while (mIsWaitingForPaint) {
+    lock.Wait();
+  }
+
+  // It's now safe to free any TextureClients that were used during painting.
+  mTextureClientsForAsyncPaint.Clear();
+}
+
+void
+CompositorBridgeChild::NotifyBeginAsyncPaint(CapturedPaintState* aState)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  MonitorAutoLock lock(mPaintLock);
+
+  // We must not be waiting for paints to complete yet. This would imply we
+  // started a new paint without waiting for a previous one, which could lead to
+  // incorrect rendering or IPDL deadlocks.
+  MOZ_ASSERT(!mIsWaitingForPaint);
+
+  mOutstandingAsyncPaints++;
+
+  // Mark texture clients that they are being used for async painting, and
+  // make sure we hold them alive on the main thread.
+  aState->mTextureClient->AddPaintThreadRef();
+  mTextureClientsForAsyncPaint.AppendElement(aState->mTextureClient);
+  if (aState->mTextureClientOnWhite) {
+    aState->mTextureClientOnWhite->AddPaintThreadRef();
+    mTextureClientsForAsyncPaint.AppendElement(aState->mTextureClientOnWhite);
+  }
+}
+
+void
+CompositorBridgeChild::NotifyFinishedAsyncPaint(CapturedPaintState* aState)
+{
+  MOZ_ASSERT(PaintThread::IsOnPaintThread());
+
+  MonitorAutoLock lock(mPaintLock);
+
+  mOutstandingAsyncPaints--;
+
+  // These textures should be held alive on the main thread. The ref we
+  // captured should not be the final ref.
+  MOZ_RELEASE_ASSERT(!aState->mTextureClient->HasOneRef());
+
+  // It's now safe to drop the paint thread ref we're holding, since we've
+  // flushed writes to the underlying TextureData. Note that we keep the
+  // main thread ref around until FlushAsyncPaints is called, lazily ensuring
+  // the Release occurs on the main thread (versus a message in the event
+  // loop).
+  //
+  // Note that we zap our ref immediately after. Otherwise, the main thread
+  // could wake up when we drop the lock, and we could still be holding a ref
+  // on the paint thread. If this causes TextureClient to destroy then it will
+  // be destroyed on the wrong thread.
+  aState->mTextureClient->DropPaintThreadRef();
+  aState->mTextureClient = nullptr;
+  if (aState->mTextureClientOnWhite) {
+    aState->mTextureClientOnWhite->DropPaintThreadRef();
+    aState->mTextureClientOnWhite = nullptr;
+  }
+}
+
+void
+CompositorBridgeChild::NotifyBeginAsyncEndLayerTransaction()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  MonitorAutoLock lock(mPaintLock);
+
+  MOZ_ASSERT(!mOutstandingAsyncEndTransaction);
+  mOutstandingAsyncEndTransaction = true;
+}
+
+void
+CompositorBridgeChild::NotifyFinishedAsyncEndLayerTransaction()
+{
+  MOZ_ASSERT(PaintThread::IsOnPaintThread());
+  MonitorAutoLock lock(mPaintLock);
+
+  // Since this should happen after ALL paints are done and
+  // at the end of a transaction, this should always be true.
+  MOZ_RELEASE_ASSERT(mOutstandingAsyncPaints == 0);
+  MOZ_ASSERT(mOutstandingAsyncEndTransaction);
+
+  mOutstandingAsyncEndTransaction = false;
+
+  // It's possible that we painted so fast that the main thread never reached
+  // the code that starts delaying messages. If so, mIsWaitingForPaint will be
+  // false, and we can safely return.
+  if (mIsWaitingForPaint) {
+    ResumeIPCAfterAsyncPaint();
+
+    // Notify the main thread in case it's blocking. We do this unconditionally
+    // to avoid deadlocking.
+    lock.Notify();
+  }
+}
+
+void
+CompositorBridgeChild::ResumeIPCAfterAsyncPaint()
+{
+  // Note: the caller is responsible for holding the lock.
+  mPaintLock.AssertCurrentThreadOwns();
+  MOZ_ASSERT(PaintThread::IsOnPaintThread());
+  MOZ_ASSERT(mOutstandingAsyncPaints == 0);
+  MOZ_ASSERT(mIsWaitingForPaint);
+
+  mIsWaitingForPaint = false;
+
+  // It's also possible that the channel has shut down already.
+  if (!mCanSend || mActorDestroyed) {
+    return;
+  }
+
+  GetIPCChannel()->StopPostponingSends();
+}
+
+void
+CompositorBridgeChild::PostponeMessagesIfAsyncPainting()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  MonitorAutoLock lock(mPaintLock);
+
+  MOZ_ASSERT(!mIsWaitingForPaint);
+
+  // We need to wait for async paints and the async end transaction as
+  // it will do texture synchronization
+  if (mOutstandingAsyncPaints > 0 || mOutstandingAsyncEndTransaction) {
+    mIsWaitingForPaint = true;
+    GetIPCChannel()->BeginPostponingSends();
+  }
+}
+
 } // namespace layers
 } // namespace mozilla
-

@@ -12,6 +12,7 @@ const {
 const { connect } = require("devtools/client/shared/vendor/react-redux");
 
 const {
+  getAllMessagesById,
   getAllMessagesUiById,
   getAllMessagesTableDataById,
   getAllNetworkMessagesUpdateById,
@@ -19,12 +20,16 @@ const {
   getAllRepeatById,
 } = require("devtools/client/webconsole/new-console-output/selectors/messages");
 const MessageContainer = createFactory(require("devtools/client/webconsole/new-console-output/components/message-container").MessageContainer);
+const {
+  MESSAGE_TYPE,
+} = require("devtools/client/webconsole/new-console-output/constants");
 
 const ConsoleOutput = createClass({
 
   displayName: "ConsoleOutput",
 
   propTypes: {
+    messages: PropTypes.object.isRequired,
     messagesUi: PropTypes.object.isRequired,
     serviceContainer: PropTypes.shape({
       attachRefToHud: PropTypes.func.isRequired,
@@ -37,6 +42,7 @@ const ConsoleOutput = createClass({
     messagesRepeat: PropTypes.object.isRequired,
     networkMessagesUpdate: PropTypes.object.isRequired,
     visibleMessages: PropTypes.array.isRequired,
+    networkMessageActiveTabId: PropTypes.string.isRequired,
   },
 
   componentDidMount() {
@@ -54,11 +60,20 @@ const ConsoleOutput = createClass({
       return;
     }
 
-    // Figure out if we are at the bottom. If so, then any new message should be scrolled
-    // into view.
     const lastChild = outputNode.lastChild;
-    const delta = nextProps.visibleMessages.length - this.props.visibleMessages.length;
-    this.shouldScrollBottom = delta > 0 && isScrolledToBottom(lastChild, outputNode);
+    const visibleMessagesDelta =
+      nextProps.visibleMessages.length - this.props.visibleMessages.length;
+    const messagesDelta =
+      nextProps.messages.size - this.props.messages.size;
+
+    // We need to scroll to the bottom if:
+    // - the number of messages displayed changed
+    //   and we are already scrolled to the bottom
+    // - the number of messages in the store changed
+    //   and the new message is an evaluation result.
+    this.shouldScrollBottom =
+      (messagesDelta > 0 && nextProps.messages.last().type === MESSAGE_TYPE.RESULT) ||
+      (visibleMessagesDelta > 0 && isScrolledToBottom(lastChild, outputNode));
   },
 
   componentDidUpdate() {
@@ -77,30 +92,29 @@ const ConsoleOutput = createClass({
     let {
       dispatch,
       visibleMessages,
+      messages,
       messagesUi,
       messagesTableData,
       messagesRepeat,
       networkMessagesUpdate,
+      networkMessageActiveTabId,
       serviceContainer,
       timestampsVisible,
     } = this.props;
 
-    let messageNodes = visibleMessages.map((message) => {
-      return (
-        MessageContainer({
-          dispatch,
-          message,
-          key: message.id,
-          serviceContainer,
-          open: messagesUi.includes(message.id),
-          tableData: messagesTableData.get(message.id),
-          indent: message.indent,
-          timestampsVisible,
-          repeat: messagesRepeat[message.id],
-          networkMessageUpdate: networkMessagesUpdate[message.id],
-        })
-      );
-    });
+    let messageNodes = visibleMessages.map((messageId) => MessageContainer({
+      dispatch,
+      key: messageId,
+      messageId,
+      serviceContainer,
+      open: messagesUi.includes(messageId),
+      tableData: messagesTableData.get(messageId),
+      timestampsVisible,
+      repeat: messagesRepeat[messageId],
+      networkMessageUpdate: networkMessagesUpdate[messageId],
+      networkMessageActiveTabId,
+      getMessage: () => messages.get(messageId),
+    }));
 
     return (
       dom.div({
@@ -128,12 +142,14 @@ function isScrolledToBottom(outputNode, scrollNode) {
 
 function mapStateToProps(state, props) {
   return {
+    messages: getAllMessagesById(state),
     visibleMessages: getVisibleMessages(state),
     messagesUi: getAllMessagesUiById(state),
     messagesTableData: getAllMessagesTableDataById(state),
     messagesRepeat: getAllRepeatById(state),
     networkMessagesUpdate: getAllNetworkMessagesUpdateById(state),
     timestampsVisible: state.ui.timestampsVisible,
+    networkMessageActiveTabId: state.ui.networkMessageActiveTabId,
   };
 }
 

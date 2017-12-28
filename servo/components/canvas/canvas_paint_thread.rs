@@ -8,19 +8,16 @@ use azure::azure_hl::{BackendType, DrawOptions, DrawTarget, Pattern, StrokeOptio
 use azure::azure_hl::{Color, ColorPattern, DrawSurfaceOptions, Filter, PathBuilder};
 use azure::azure_hl::{ExtendMode, GradientStop, LinearGradientPattern, RadialGradientPattern};
 use azure::azure_hl::SurfacePattern;
-use canvas_traits::*;
+use canvas_traits::canvas::*;
 use cssparser::RGBA;
-use euclid::matrix2d::Matrix2D;
-use euclid::point::Point2D;
-use euclid::rect::Rect;
-use euclid::size::Size2D;
+use euclid::{Transform2D, Point2D, Vector2D, Rect, Size2D};
 use ipc_channel::ipc::{self, IpcSender};
 use num_traits::ToPrimitive;
 use std::borrow::ToOwned;
 use std::mem;
 use std::sync::Arc;
 use std::thread;
-use webrender_traits;
+use webrender_api;
 
 impl<'a> CanvasPaintThread<'a> {
     /// It reads image data from the canvas
@@ -60,8 +57,12 @@ pub struct CanvasPaintThread<'a> {
     path_builder: PathBuilder,
     state: CanvasPaintState<'a>,
     saved_states: Vec<CanvasPaintState<'a>>,
-    webrender_api: webrender_traits::RenderApi,
-    image_key: Option<webrender_traits::ImageKey>,
+    webrender_api: webrender_api::RenderApi,
+    image_key: Option<webrender_api::ImageKey>,
+    /// An old webrender image key that can be deleted when the next epoch ends.
+    old_image_key: Option<webrender_api::ImageKey>,
+    /// An old webrender image key that can be deleted when the current epoch ends.
+    very_old_image_key: Option<webrender_api::ImageKey>,
 }
 
 #[derive(Clone)]
@@ -71,7 +72,7 @@ struct CanvasPaintState<'a> {
     stroke_style: Pattern,
     stroke_opts: StrokeOptions<'a>,
     /// The current 2D transform matrix.
-    transform: Matrix2D<f32>,
+    transform: Transform2D<f32>,
     shadow_offset_x: f64,
     shadow_offset_y: f64,
     shadow_blur: f64,
@@ -79,19 +80,13 @@ struct CanvasPaintState<'a> {
 }
 
 impl<'a> CanvasPaintState<'a> {
-    fn new(antialias: bool) -> CanvasPaintState<'a> {
-        let antialias = if antialias {
-            AntialiasMode::Default
-        } else {
-            AntialiasMode::None
-        };
-
+    fn new(antialias: AntialiasMode) -> CanvasPaintState<'a> {
         CanvasPaintState {
             draw_options: DrawOptions::new(1.0, CompositionOp::Over, antialias),
             fill_style: Pattern::Color(ColorPattern::new(Color::black())),
             stroke_style: Pattern::Color(ColorPattern::new(Color::black())),
             stroke_opts: StrokeOptions::new(1.0, JoinStyle::MiterOrBevel, CapStyle::Butt, 10.0, &[]),
-            transform: Matrix2D::identity(),
+            transform: Transform2D::identity(),
             shadow_offset_x: 0.0,
             shadow_offset_y: 0.0,
             shadow_blur: 0.0,
@@ -102,8 +97,8 @@ impl<'a> CanvasPaintState<'a> {
 
 impl<'a> CanvasPaintThread<'a> {
     fn new(size: Size2D<i32>,
-           webrender_api_sender: webrender_traits::RenderApiSender,
-           antialias: bool) -> CanvasPaintThread<'a> {
+           webrender_api_sender: webrender_api::RenderApiSender,
+           antialias: AntialiasMode) -> CanvasPaintThread<'a> {
         let draw_target = CanvasPaintThread::create(size);
         let path_builder = draw_target.create_path_builder();
         let webrender_api = webrender_api_sender.create_api();
@@ -114,16 +109,23 @@ impl<'a> CanvasPaintThread<'a> {
             saved_states: vec![],
             webrender_api: webrender_api,
             image_key: None,
+            old_image_key: None,
+            very_old_image_key: None,
         }
     }
 
     /// Creates a new `CanvasPaintThread` and returns an `IpcSender` to
     /// communicate with it.
     pub fn start(size: Size2D<i32>,
-                 webrender_api_sender: webrender_traits::RenderApiSender,
+                 webrender_api_sender: webrender_api::RenderApiSender,
                  antialias: bool)
                  -> IpcSender<CanvasMsg> {
         let (sender, receiver) = ipc::channel::<CanvasMsg>().unwrap();
+        let antialias = if antialias {
+            AntialiasMode::Default
+        } else {
+            AntialiasMode::None
+        };
         thread::Builder::new().name("CanvasThread".to_owned()).spawn(move || {
             let mut painter = CanvasPaintThread::new(size, webrender_api_sender, antialias);
             loop {
@@ -131,6 +133,7 @@ impl<'a> CanvasPaintThread<'a> {
                 match msg.unwrap() {
                     CanvasMsg::Canvas2d(message) => {
                         match message {
+                            Canvas2dMsg::FillText(text, x, y, max_width) => painter.fill_text(text, x, y, max_width),
                             Canvas2dMsg::FillRect(ref rect) => painter.fill_rect(rect),
                             Canvas2dMsg::StrokeRect(ref rect) => painter.stroke_rect(rect),
                             Canvas2dMsg::ClearRect(ref rect) => painter.clear_rect(rect),
@@ -170,6 +173,9 @@ impl<'a> CanvasPaintThread<'a> {
                             Canvas2dMsg::ArcTo(ref cp1, ref cp2, radius) => {
                                 painter.arc_to(cp1, cp2, radius)
                             }
+                            Canvas2dMsg::Ellipse(ref center, radius_x, radius_y, rotation, start, end, ccw) => {
+                                painter.ellipse(center, radius_x, radius_y, rotation, start, end, ccw)
+                            }
                             Canvas2dMsg::RestoreContext => painter.restore_context_state(),
                             Canvas2dMsg::SaveContext => painter.save_context_state(),
                             Canvas2dMsg::SetFillStyle(style) => painter.set_fill_style(style),
@@ -191,12 +197,8 @@ impl<'a> CanvasPaintThread<'a> {
                             Canvas2dMsg::SetShadowColor(ref color) => painter.set_shadow_color(color.to_azure_style()),
                         }
                     },
-                    CanvasMsg::Common(message) => {
-                        match message {
-                            CanvasCommonMsg::Close => break,
-                            CanvasCommonMsg::Recreate(size) => painter.recreate(size),
-                        }
-                    },
+                    CanvasMsg::Close => break,
+                    CanvasMsg::Recreate(size) => painter.recreate(size),
                     CanvasMsg::FromScript(message) => {
                         match message {
                             FromScriptMsg::SendPixels(chan) => {
@@ -211,8 +213,6 @@ impl<'a> CanvasPaintThread<'a> {
                             }
                         }
                     }
-                    CanvasMsg::WebGL(_) => panic!("Wrong WebGL message sent to Canvas2D thread"),
-                    CanvasMsg::WebVR(_) => panic!("Wrong WebVR message sent to Canvas2D thread"),
                 }
             }
         }).expect("Thread spawning failed");
@@ -230,6 +230,10 @@ impl<'a> CanvasPaintThread<'a> {
             self.drawtarget.set_transform(&self.state.transform);
             self.drawtarget.pop_clip();
         }
+    }
+
+    fn fill_text(&self, text: String, x: f64, y: f64, max_width: Option<f64>) {
+        error!("Unimplemented canvas2d.fillText. Values received: {}, {}, {}, {:?}.", text, x, y, max_width);
     }
 
     fn fill_rect(&self, rect: &Rect<f32>) {
@@ -500,6 +504,17 @@ impl<'a> CanvasPaintThread<'a> {
         }
     }
 
+    fn ellipse(&mut self,
+           center: &Point2D<AzFloat>,
+           radius_x: AzFloat,
+           radius_y: AzFloat,
+           rotation_angle: AzFloat,
+           start_angle: AzFloat,
+           end_angle: AzFloat,
+           ccw: bool) {
+        self.path_builder.ellipse(*center, radius_x, radius_y, rotation_angle, start_angle, end_angle, ccw);
+    }
+
     fn set_fill_style(&mut self, style: FillOrStrokeStyle) {
         if let Some(pattern) = style.to_azure_pattern(&self.drawtarget) {
             self.state.fill_style = pattern
@@ -528,7 +543,7 @@ impl<'a> CanvasPaintThread<'a> {
         self.state.stroke_opts.miter_limit = limit;
     }
 
-    fn set_transform(&mut self, transform: &Matrix2D<f32>) {
+    fn set_transform(&mut self, transform: &Transform2D<f32>) {
         self.state.transform = transform.clone();
         self.drawtarget.set_transform(transform)
     }
@@ -546,7 +561,21 @@ impl<'a> CanvasPaintThread<'a> {
     }
 
     fn recreate(&mut self, size: Size2D<i32>) {
+        // TODO: clear the thread state. https://github.com/servo/servo/issues/17533
         self.drawtarget = CanvasPaintThread::create(size);
+        self.state = CanvasPaintState::new(self.state.draw_options.antialias);
+        self.saved_states.clear();
+        // Webrender doesn't let images change size, so we clear the webrender image key.
+        // TODO: there is an annying race condition here: the display list builder
+        // might still be using the old image key. Really, we should be scheduling the image
+        // for later deletion, not deleting it immediately.
+        // https://github.com/servo/servo/issues/17534
+        if let Some(image_key) = self.image_key.take() {
+            // If this executes, then we are in a new epoch since we last recreated the canvas,
+            // so `old_image_key` must be `None`.
+            debug_assert!(self.old_image_key.is_none());
+            self.old_image_key = Some(image_key);
+        }
     }
 
     fn send_pixels(&mut self, chan: IpcSender<Option<Vec<u8>>>) {
@@ -555,40 +584,50 @@ impl<'a> CanvasPaintThread<'a> {
         })
     }
 
-    fn send_data(&mut self, chan: IpcSender<CanvasData>) {
+    fn send_data(&mut self, chan: IpcSender<CanvasImageData>) {
         self.drawtarget.snapshot().get_data_surface().with_data(|element| {
             let size = self.drawtarget.get_size();
 
-            let descriptor = webrender_traits::ImageDescriptor {
+            let descriptor = webrender_api::ImageDescriptor {
                 width: size.width as u32,
                 height: size.height as u32,
                 stride: None,
-                format: webrender_traits::ImageFormat::RGBA8,
+                format: webrender_api::ImageFormat::BGRA8,
                 offset: 0,
                 is_opaque: false,
             };
-            let data = webrender_traits::ImageData::Raw(Arc::new(element.into()));
+            let data = webrender_api::ImageData::Raw(Arc::new(element.into()));
+
+            let mut updates = webrender_api::ResourceUpdates::new();
 
             match self.image_key {
                 Some(image_key) => {
-                    self.webrender_api.update_image(image_key,
-                                                    descriptor,
-                                                    data,
-                                                    None);
+                    debug!("Updating image {:?}.", image_key);
+                    updates.update_image(image_key,
+                                         descriptor,
+                                         data,
+                                         None);
                 }
                 None => {
                     self.image_key = Some(self.webrender_api.generate_image_key());
-                    self.webrender_api.add_image(self.image_key.unwrap(),
-                                                 descriptor,
-                                                 data,
-                                                 None);
+                    debug!("New image {:?}.", self.image_key);
+                    updates.add_image(self.image_key.unwrap(),
+                                      descriptor,
+                                      data,
+                                      None);
                 }
             }
+
+            if let Some(image_key) = mem::replace(&mut self.very_old_image_key, self.old_image_key.take()) {
+                updates.delete_image(image_key);
+            }
+
+            self.webrender_api.update_resources(updates);
 
             let data = CanvasImageData {
                 image_key: self.image_key.unwrap(),
             };
-            chan.send(CanvasData::Image(data)).unwrap();
+            chan.send(data).unwrap();
         })
     }
 
@@ -602,7 +641,7 @@ impl<'a> CanvasPaintThread<'a> {
 
     // https://html.spec.whatwg.org/multipage/#dom-context-2d-putimagedata
     fn put_image_data(&mut self, imagedata: Vec<u8>,
-                      offset: Point2D<f64>,
+                      offset: Vector2D<f64>,
                       image_data_size: Size2D<f64>,
                       mut dirty_rect: Rect<f64>) {
         if image_data_size.width <= 0.0 || image_data_size.height <= 0.0 {
@@ -716,9 +755,8 @@ impl<'a> CanvasPaintThread<'a> {
         let draw_target = self.drawtarget.create_similar_draw_target(&Size2D::new(source_rect.size.width as i32,
                                                                                   source_rect.size.height as i32),
                                                                      self.drawtarget.get_format());
-        let matrix = Matrix2D::identity()
-            .pre_translated(-source_rect.origin.x as AzFloat,
-                            -source_rect.origin.y as AzFloat)
+        let matrix = Transform2D::identity()
+            .pre_translate(-source_rect.origin.to_vector().cast().unwrap())
             .pre_mul(&self.state.transform);
         draw_target.set_transform(&matrix);
         draw_target
@@ -734,8 +772,8 @@ impl<'a> CanvasPaintThread<'a> {
                                                  &Point2D::new(shadow_src_rect.origin.x as AzFloat,
                                                                shadow_src_rect.origin.y as AzFloat),
                                                  &self.state.shadow_color,
-                                                 &Point2D::new(self.state.shadow_offset_x as AzFloat,
-                                                               self.state.shadow_offset_y as AzFloat),
+                                                 &Vector2D::new(self.state.shadow_offset_x as AzFloat,
+                                                                self.state.shadow_offset_y as AzFloat),
                                                  (self.state.shadow_blur / 2.0f64) as AzFloat,
                                                  self.state.draw_options.composition);
     }
@@ -743,9 +781,16 @@ impl<'a> CanvasPaintThread<'a> {
 
 impl<'a> Drop for CanvasPaintThread<'a> {
     fn drop(&mut self) {
-        if let Some(image_key) = self.image_key {
-            self.webrender_api.delete_image(image_key);
+        let mut updates = webrender_api::ResourceUpdates::new();
+
+        if let Some(image_key) = self.old_image_key.take() {
+            updates.delete_image(image_key);
         }
+        if let Some(image_key) = self.very_old_image_key.take() {
+            updates.delete_image(image_key);
+        }
+
+        self.webrender_api.update_resources(updates);
     }
 }
 
@@ -997,7 +1042,7 @@ impl ToAzurePattern for FillOrStrokeStyle {
                     &Point2D::new(linear_gradient_style.x0 as AzFloat, linear_gradient_style.y0 as AzFloat),
                     &Point2D::new(linear_gradient_style.x1 as AzFloat, linear_gradient_style.y1 as AzFloat),
                     drawtarget.create_gradient_stops(&gradient_stops, ExtendMode::Clamp),
-                    &Matrix2D::identity())))
+                    &Transform2D::identity())))
             },
             FillOrStrokeStyle::RadialGradient(ref radial_gradient_style) => {
                 let gradient_stops: Vec<GradientStop> = radial_gradient_style.stops.iter().map(|s| {
@@ -1012,7 +1057,7 @@ impl ToAzurePattern for FillOrStrokeStyle {
                     &Point2D::new(radial_gradient_style.x1 as AzFloat, radial_gradient_style.y1 as AzFloat),
                     radial_gradient_style.r0 as AzFloat, radial_gradient_style.r1 as AzFloat,
                     drawtarget.create_gradient_stops(&gradient_stops, ExtendMode::Clamp),
-                    &Matrix2D::identity())))
+                    &Transform2D::identity())))
             },
             FillOrStrokeStyle::Surface(ref surface_style) => {
                 drawtarget.create_source_surface_from_data(&surface_style.surface_data,
@@ -1024,7 +1069,7 @@ impl ToAzurePattern for FillOrStrokeStyle {
                         source_surface.azure_source_surface,
                         surface_style.repeat_x,
                         surface_style.repeat_y,
-                        &Matrix2D::identity()))
+                        &Transform2D::identity()))
                     })
             }
         }

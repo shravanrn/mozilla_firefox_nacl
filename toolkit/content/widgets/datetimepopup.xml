@@ -75,7 +75,6 @@
           this.dateTimePopupFrame.removeEventListener("load", this, true);
           this.dateTimePopupFrame.contentDocument.removeEventListener("message", this);
           this.dateTimePopupFrame.setAttribute("src", "");
-          this.hidePopup();
           this.hidden = true;
         ]]></body>
       </method>
@@ -109,7 +108,9 @@
       <method name="initPicker">
         <parameter name="detail"/>
         <body><![CDATA[
-          const locale = Services.locale.getAppLocaleAsBCP47();
+          // TODO: When bug 1376616 lands, replace this.setGregorian with
+          //       mozIntl.Locale for setting calendar to Gregorian
+          const locale = this.setGregorian(Services.locale.getAppLocaleAsBCP47());
           const dir = this.mozIntl.getLocaleInfo(locale).direction;
 
           switch (this.type) {
@@ -176,6 +177,8 @@
                   dir,
                   min: detail.min,
                   max: detail.max,
+                  step: detail.step,
+                  stepBase: detail.stepBase,
                 }
               });
               break;
@@ -277,6 +280,15 @@
           return keys.map(key => displayNames.values[key]);
         ]]></body>
       </method>
+      <method name="setGregorian">
+        <parameter name="locale"/>
+        <body><![CDATA[
+          if (locale.match(/u-ca-/)) {
+            return locale.replace(/u-ca-[^-]+/, "u-ca-gregory");
+          }
+          return locale + "-u-ca-gregory";
+        ]]></body>
+      </method>
       <method name="handleEvent">
         <parameter name="aEvent"/>
         <body><![CDATA[
@@ -307,6 +319,7 @@
               break;
             }
             case "ClosePopup": {
+              this.hidePopup();
               this.closePicker();
               break;
             }

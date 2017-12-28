@@ -27,11 +27,8 @@
 #include "mozilla/net/StunAddrsRequestChild.h"
 #endif
 
-#ifdef NECKO_PROTOCOL_rtsp
-#include "mozilla/net/RtspControllerChild.h"
-#include "mozilla/net/RtspChannelChild.h"
-#endif
 #include "SerializedLoadContext.h"
+#include "nsGlobalWindow.h"
 #include "nsIOService.h"
 #include "nsINetworkPredictor.h"
 #include "nsINetworkPredictorVerifier.h"
@@ -63,13 +60,13 @@ void NeckoChild::InitNeckoChild()
   MOZ_ASSERT(IsNeckoChild(), "InitNeckoChild called by non-child!");
 
   if (!gNeckoChild) {
-    mozilla::dom::ContentChild * cpc = 
+    mozilla::dom::ContentChild * cpc =
       mozilla::dom::ContentChild::GetSingleton();
     NS_ASSERTION(cpc, "Content Protocol is NULL!");
     if (NS_WARN_IF(cpc->IsShuttingDown())) {
       return;
     }
-    gNeckoChild = cpc->SendPNeckoConstructor(); 
+    gNeckoChild = cpc->SendPNeckoConstructor();
     NS_ASSERTION(gNeckoChild, "PNecko Protocol init failed!");
   }
 }
@@ -85,7 +82,7 @@ NeckoChild::AllocPHttpChannelChild(const PBrowserOrId& browser,
   return nullptr;
 }
 
-bool 
+bool
 NeckoChild::DeallocPHttpChannelChild(PHttpChannelChild* channel)
 {
   MOZ_ASSERT(IsNeckoChild(), "DeallocPHttpChannelChild called by non-child!");
@@ -119,9 +116,9 @@ NeckoChild::AllocPAltDataOutputStreamChild(
         const nsCString& type,
         PHttpChannelChild* channel)
 {
-  AltDataOutputStreamChild* stream = new AltDataOutputStreamChild();
-  stream->AddIPDLReference();
-  return stream;
+  // We don't allocate here: see HttpChannelChild::OpenAlternativeOutputStream()
+  NS_NOTREACHED("AllocPAltDataOutputStreamChild should not be called");
+  return nullptr;
 }
 
 bool
@@ -173,9 +170,9 @@ NeckoChild::DeallocPCookieServiceChild(PCookieServiceChild* cs)
 PWyciwygChannelChild*
 NeckoChild::AllocPWyciwygChannelChild()
 {
-  WyciwygChannelChild *p = new WyciwygChannelChild();
-  p->AddIPDLReference();
-  return p;
+  // We don't allocate here: see nsWyciwygProtocolHandler::NewChannel2()
+  NS_NOTREACHED("AllocPWyciwygChannelChild should not be called");
+  return nullptr;
 }
 
 bool
@@ -208,8 +205,18 @@ NeckoChild::DeallocPWebSocketChild(PWebSocketChild* child)
 PWebSocketEventListenerChild*
 NeckoChild::AllocPWebSocketEventListenerChild(const uint64_t& aInnerWindowID)
 {
+  nsCOMPtr<nsIEventTarget> target;
+  if (nsGlobalWindow* win = nsGlobalWindow::GetInnerWindowWithId(aInnerWindowID)) {
+    target = win->EventTargetFor(TaskCategory::Other);
+  }
+
   RefPtr<WebSocketEventListenerChild> c =
-    new WebSocketEventListenerChild(aInnerWindowID);
+    new WebSocketEventListenerChild(aInnerWindowID, target);
+
+  if (target) {
+    gNeckoChild->SetEventTargetForActor(c, target);
+  }
+
   return c.forget().take();
 }
 
@@ -250,37 +257,17 @@ NeckoChild::DeallocPFileChannelChild(PFileChannelChild* child)
   return true;
 }
 
-PRtspControllerChild*
-NeckoChild::AllocPRtspControllerChild()
+PSimpleChannelChild*
+NeckoChild::AllocPSimpleChannelChild(const uint32_t& channelId)
 {
-  NS_NOTREACHED("AllocPRtspController should not be called");
+  MOZ_ASSERT_UNREACHABLE("Should never get here");
   return nullptr;
 }
 
 bool
-NeckoChild::DeallocPRtspControllerChild(PRtspControllerChild* child)
+NeckoChild::DeallocPSimpleChannelChild(PSimpleChannelChild* child)
 {
-#ifdef NECKO_PROTOCOL_rtsp
-  RtspControllerChild* p = static_cast<RtspControllerChild*>(child);
-  p->ReleaseIPDLReference();
-#endif
-  return true;
-}
-
-PRtspChannelChild*
-NeckoChild::AllocPRtspChannelChild(const RtspChannelConnectArgs& aArgs)
-{
-  NS_NOTREACHED("AllocPRtspController should not be called");
-  return nullptr;
-}
-
-bool
-NeckoChild::DeallocPRtspChannelChild(PRtspChannelChild* child)
-{
-#ifdef NECKO_PROTOCOL_rtsp
-  RtspChannelChild* p = static_cast<RtspChannelChild*>(child);
-  p->ReleaseIPDLReference();
-#endif
+  // NB: See SimpleChannelChild::ActorDestroy.
   return true;
 }
 
@@ -288,7 +275,7 @@ PTCPSocketChild*
 NeckoChild::AllocPTCPSocketChild(const nsString& host,
                                  const uint16_t& port)
 {
-  TCPSocketChild* p = new TCPSocketChild(host, port);
+  TCPSocketChild* p = new TCPSocketChild(host, port, nullptr);
   p->AddIPDLReference();
   return p;
 }

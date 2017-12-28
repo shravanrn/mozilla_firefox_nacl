@@ -14,13 +14,13 @@
 #include "nsCOMPtr.h"
 #include "nsGkAtoms.h"
 #include "nsPresContext.h"
-#include "nsRenderingContext.h"
+#include "gfxContext.h"
 #include "nsStyleContext.h"
 #include "nsIContent.h"
 #include "nsNameSpaceManager.h"
 #include "nsBoxLayoutState.h"
 #include "nsMenuBarListener.h"
-#include "nsXPIDLString.h"
+#include "nsString.h"
 #include "nsIServiceManager.h"
 #include "nsIDOMElement.h"
 #include "nsIDOMXULLabelElement.h"
@@ -141,12 +141,13 @@ nsTextBoxFrame::DestroyFrom(nsIFrame* aDestructRoot)
 bool
 nsTextBoxFrame::AlwaysAppendAccessKey()
 {
-  if (!gAccessKeyPrefInitialized) 
+  if (!gAccessKeyPrefInitialized)
   {
     gAccessKeyPrefInitialized = true;
 
     const char* prefName = "intl.menuitems.alwaysappendaccesskeys";
-    nsAdoptingString val = Preferences::GetLocalizedString(prefName);
+    nsAutoString val;
+    Preferences::GetLocalizedString(prefName, val);
     gAlwaysAppendAccessKey = val.EqualsLiteral("true");
   }
   return gAlwaysAppendAccessKey;
@@ -160,7 +161,8 @@ nsTextBoxFrame::InsertSeparatorBeforeAccessKey()
     gInsertSeparatorPrefInitialized = true;
 
     const char* prefName = "intl.menuitems.insertseparatorbeforeaccesskeys";
-    nsAdoptingString val = Preferences::GetLocalizedString(prefName);
+    nsAutoString val;
+    Preferences::GetLocalizedString(prefName, val);
     gInsertSeparatorBeforeAccessKey = val.EqualsLiteral("true");
   }
   return gInsertSeparatorBeforeAccessKey;
@@ -283,10 +285,8 @@ nsTextBoxFrame::UpdateAttributes(nsIAtom*         aAttribute,
 class nsDisplayXULTextBox final : public nsDisplayItem
 {
 public:
-  nsDisplayXULTextBox(nsDisplayListBuilder* aBuilder,
-                      nsTextBoxFrame* aFrame) :
-    nsDisplayItem(aBuilder, aFrame),
-    mDisableSubpixelAA(false)
+  nsDisplayXULTextBox(nsDisplayListBuilder* aBuilder, nsTextBoxFrame* aFrame)
+    : nsDisplayItem(aBuilder, aFrame)
   {
     MOZ_COUNT_CTOR(nsDisplayXULTextBox);
   }
@@ -297,26 +297,20 @@ public:
 #endif
 
   virtual void Paint(nsDisplayListBuilder* aBuilder,
-                     nsRenderingContext* aCtx) override;
+                     gfxContext* aCtx) override;
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder,
-                           bool* aSnap) override;
+                           bool* aSnap) const override;
   NS_DISPLAY_DECL_NAME("XULTextBox", TYPE_XUL_TEXT_BOX)
 
-  virtual nsRect GetComponentAlphaBounds(nsDisplayListBuilder* aBuilder) override;
+  virtual nsRect GetComponentAlphaBounds(nsDisplayListBuilder* aBuilder) const override;
 
-  virtual void DisableComponentAlpha() override {
-    mDisableSubpixelAA = true;
-  }
-
-  void PaintTextToContext(nsRenderingContext* aCtx,
+  void PaintTextToContext(gfxContext* aCtx,
                           nsPoint aOffset,
                           const nscolor* aColor);
-
-  bool mDisableSubpixelAA;
 };
 
 static void
-PaintTextShadowCallback(nsRenderingContext* aCtx,
+PaintTextShadowCallback(gfxContext* aCtx,
                         nsPoint aShadowOffset,
                         const nscolor& aShadowColor,
                         void* aData)
@@ -327,7 +321,7 @@ PaintTextShadowCallback(nsRenderingContext* aCtx,
 
 void
 nsDisplayXULTextBox::Paint(nsDisplayListBuilder* aBuilder,
-                           nsRenderingContext* aCtx)
+                           gfxContext* aCtx)
 {
   DrawTargetAutoDisableSubpixelAntialiasing disable(aCtx->GetDrawTarget(),
                                                     mDisableSubpixelAA);
@@ -345,7 +339,7 @@ nsDisplayXULTextBox::Paint(nsDisplayListBuilder* aBuilder,
 }
 
 void
-nsDisplayXULTextBox::PaintTextToContext(nsRenderingContext* aCtx,
+nsDisplayXULTextBox::PaintTextToContext(gfxContext* aCtx,
                                         nsPoint aOffset,
                                         const nscolor* aColor)
 {
@@ -354,13 +348,15 @@ nsDisplayXULTextBox::PaintTextToContext(nsRenderingContext* aCtx,
 }
 
 nsRect
-nsDisplayXULTextBox::GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap) {
+nsDisplayXULTextBox::GetBounds(nsDisplayListBuilder* aBuilder,
+                               bool* aSnap) const
+{
   *aSnap = false;
   return mFrame->GetVisualOverflowRectRelativeToSelf() + ToReferenceFrame();
 }
 
 nsRect
-nsDisplayXULTextBox::GetComponentAlphaBounds(nsDisplayListBuilder* aBuilder)
+nsDisplayXULTextBox::GetComponentAlphaBounds(nsDisplayListBuilder* aBuilder) const
 {
   return static_cast<nsTextBoxFrame*>(mFrame)->GetComponentAlphaBounds() +
       ToReferenceFrame();
@@ -368,20 +364,19 @@ nsDisplayXULTextBox::GetComponentAlphaBounds(nsDisplayListBuilder* aBuilder)
 
 void
 nsTextBoxFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                 const nsRect&           aDirtyRect,
                                  const nsDisplayListSet& aLists)
 {
     if (!IsVisibleForPainting(aBuilder))
         return;
 
-    nsLeafBoxFrame::BuildDisplayList(aBuilder, aDirtyRect, aLists);
-    
+    nsLeafBoxFrame::BuildDisplayList(aBuilder, aLists);
+
     aLists.Content()->AppendNewToTop(new (aBuilder)
         nsDisplayXULTextBox(aBuilder, this));
 }
 
 void
-nsTextBoxFrame::PaintTitle(nsRenderingContext& aRenderingContext,
+nsTextBoxFrame::PaintTitle(gfxContext&          aRenderingContext,
                            const nsRect&        aDirtyRect,
                            nsPoint              aPt,
                            const nscolor*       aOverrideColor)
@@ -393,7 +388,7 @@ nsTextBoxFrame::PaintTitle(nsRenderingContext& aRenderingContext,
 }
 
 void
-nsTextBoxFrame::DrawText(nsRenderingContext& aRenderingContext,
+nsTextBoxFrame::DrawText(gfxContext&         aRenderingContext,
                          const nsRect&       aDirtyRect,
                          const nsRect&       aTextRect,
                          const nscolor*      aOverrideColor)
@@ -522,15 +517,17 @@ nsTextBoxFrame::DrawText(nsRenderingContext& aRenderingContext,
       }
     }
 
-    nsRenderingContext refContext(
-        PresContext()->PresShell()->CreateReferenceRenderingContext());
-    DrawTarget* refDrawTarget = refContext.GetDrawTarget();
+    RefPtr<gfxContext> refContext =
+        PresContext()->PresShell()->CreateReferenceRenderingContext();
+    DrawTarget* refDrawTarget = refContext->GetDrawTarget();
 
     CalculateUnderline(refDrawTarget, *fontMet);
 
     nscolor c = aOverrideColor ? *aOverrideColor : StyleColor()->mColor;
     ColorPattern color(ToDeviceColor(c));
-    aRenderingContext.ThebesContext()->SetColor(Color::FromABGR(c));
+    aRenderingContext.SetColor(Color::FromABGR(c));
+    aRenderingContext.SetFontSmoothingBackgroundColor(
+        Color::FromABGR(StyleUserInterface()->mFontSmoothingBackgroundColor));
 
     nsresult rv = NS_ERROR_FAILURE;
 
@@ -602,6 +599,8 @@ nsTextBoxFrame::DrawText(nsRenderingContext& aRenderingContext,
       params.style = strikeStyle;
       nsCSSRendering::PaintDecorationLine(this, *drawTarget, params);
     }
+
+    aRenderingContext.SetFontSmoothingBackgroundColor(Color());
 }
 
 void
@@ -625,7 +624,7 @@ nsTextBoxFrame::CalculateUnderline(DrawTarget* aDrawTarget,
 }
 
 nscoord
-nsTextBoxFrame::CalculateTitleForWidth(nsRenderingContext& aRenderingContext,
+nsTextBoxFrame::CalculateTitleForWidth(gfxContext&          aRenderingContext,
                                        nscoord              aWidth)
 {
     DrawTarget* drawTarget = aRenderingContext.GetDrawTarget();
@@ -646,7 +645,7 @@ nsTextBoxFrame::CalculateTitleForWidth(nsRenderingContext& aRenderingContext,
         mCroppedTitle = mTitle;
         if (HasRTLChars(mTitle) ||
             StyleVisibility()->mDirection == NS_STYLE_DIRECTION_RTL) {
-            mState |= NS_FRAME_IS_BIDI;
+            AddStateBits(NS_FRAME_IS_BIDI);
         }
         return titleWidth;  // fits, done.
     }
@@ -705,7 +704,7 @@ nsTextBoxFrame::CalculateTitleForWidth(nsRenderingContext& aRenderingContext,
                 }
 
                 if (UCS2_CHAR_IS_BIDI(*pos)) {
-                    mState |= NS_FRAME_IS_BIDI;
+                    AddStateBits(NS_FRAME_IS_BIDI);
                 }
                 pos = nextPos;
                 totalWidth += charWidth;
@@ -742,7 +741,7 @@ nsTextBoxFrame::CalculateTitleForWidth(nsRenderingContext& aRenderingContext,
                 }
 
                 if (UCS2_CHAR_IS_BIDI(*pos)) {
-                    mState |= NS_FRAME_IS_BIDI;
+                    AddStateBits(NS_FRAME_IS_BIDI);
                 }
                 prevPos = pos;
                 totalWidth += charWidth;
@@ -794,7 +793,7 @@ nsTextBoxFrame::CalculateTitleForWidth(nsRenderingContext& aRenderingContext,
                 }
 
                 if (UCS2_CHAR_IS_BIDI(*leftPos)) {
-                    mState |= NS_FRAME_IS_BIDI;
+                    AddStateBits(NS_FRAME_IS_BIDI);
                 }
 
                 leftString.Append(leftPos, length);
@@ -816,7 +815,7 @@ nsTextBoxFrame::CalculateTitleForWidth(nsRenderingContext& aRenderingContext,
                 }
 
                 if (UCS2_CHAR_IS_BIDI(*pos)) {
-                    mState |= NS_FRAME_IS_BIDI;
+                    AddStateBits(NS_FRAME_IS_BIDI);
                 }
 
                 rightString.Insert(pos, 0, length);
@@ -909,10 +908,10 @@ nsTextBoxFrame::UpdateAccessIndex()
             }
 
             nsAString::const_iterator start, end;
-                
+
             mCroppedTitle.BeginReading(start);
             mCroppedTitle.EndReading(end);
-            
+
             // remember the beginning of the string
             nsAString::const_iterator originalStart = start;
 
@@ -931,7 +930,7 @@ nsTextBoxFrame::UpdateAccessIndex()
                 found = RFindInReadable(mAccessKey, start, end,
                                         nsCaseInsensitiveStringComparator());
             }
-            
+
             if (found)
                 mAccessKeyInfo->mAccesskeyIndex = Distance(originalStart, start);
             else
@@ -993,13 +992,13 @@ nsTextBoxFrame::DoXULLayout(nsBoxLayoutState& aBoxLayoutState)
     CalcDrawRect(*aBoxLayoutState.GetRenderingContext());
 
     const nsStyleText* textStyle = StyleText();
-    
+
     nsRect scrollBounds(nsPoint(0, 0), GetSize());
     nsRect textRect = mTextDrawRect;
-    
+
     RefPtr<nsFontMetrics> fontMet =
       nsLayoutUtils::GetFontMetricsForFrame(this, 1.0f);
-    nsBoundingMetrics metrics = 
+    nsBoundingMetrics metrics =
       fontMet->GetInkBoundsForVisualOverflow(mCroppedTitle.get(),
                                              mCroppedTitle.Length(),
                                              aBoxLayoutState.GetRenderingContext()->GetDrawTarget());
@@ -1009,7 +1008,7 @@ nsTextBoxFrame::DoXULLayout(nsBoxLayoutState& aBoxLayoutState)
 
     tr.IStart(wm) -= metrics.leftBearing;
     tr.ISize(wm) = metrics.width;
-    // In DrawText() we always draw with the baseline at MaxAscent() (relative to mTextDrawRect), 
+    // In DrawText() we always draw with the baseline at MaxAscent() (relative to mTextDrawRect),
     tr.BStart(wm) += fontMet->MaxAscent() - metrics.ascent;
     tr.BSize(wm) = metrics.ascent + metrics.descent;
 
@@ -1032,7 +1031,7 @@ nsTextBoxFrame::DoXULLayout(nsBoxLayoutState& aBoxLayoutState)
 }
 
 nsRect
-nsTextBoxFrame::GetComponentAlphaBounds()
+nsTextBoxFrame::GetComponentAlphaBounds() const
 {
   if (StyleText()->mTextShadow) {
     return GetVisualOverflowRectRelativeToSelf();
@@ -1054,7 +1053,7 @@ nsTextBoxFrame::MarkIntrinsicISizesDirty()
 }
 
 void
-nsTextBoxFrame::GetTextSize(nsRenderingContext& aRenderingContext,
+nsTextBoxFrame::GetTextSize(gfxContext& aRenderingContext,
                             const nsString& aString,
                             nsSize& aSize, nscoord& aAscent)
 {
@@ -1072,7 +1071,7 @@ nsTextBoxFrame::CalcTextSize(nsBoxLayoutState& aBoxLayoutState)
 {
     if (mNeedsRecalc) {
         nsSize size;
-        nsRenderingContext* rendContext = aBoxLayoutState.GetRenderingContext();
+        gfxContext* rendContext = aBoxLayoutState.GetRenderingContext();
         if (rendContext) {
             GetTextSize(*rendContext, mTitle, size, mAscent);
             if (GetWritingMode().IsVertical()) {
@@ -1085,7 +1084,7 @@ nsTextBoxFrame::CalcTextSize(nsBoxLayoutState& aBoxLayoutState)
 }
 
 void
-nsTextBoxFrame::CalcDrawRect(nsRenderingContext &aRenderingContext)
+nsTextBoxFrame::CalcDrawRect(gfxContext &aRenderingContext)
 {
     WritingMode wm = GetWritingMode();
 
@@ -1204,7 +1203,7 @@ nsTextBoxFrame::GetFrameName(nsAString& aResult) const
 }
 #endif
 
-// If you make changes to this function, check its counterparts 
+// If you make changes to this function, check its counterparts
 // in nsBoxFrame and nsXULLabelFrame
 nsresult
 nsTextBoxFrame::RegUnregAccessKey(bool aDoReg)
@@ -1231,7 +1230,7 @@ nsTextBoxFrame::RegUnregAccessKey(bool aDoReg)
     if (accessKey.IsEmpty())
         return NS_OK;
 
-    // With a valid PresContext we can get the ESM 
+    // With a valid PresContext we can get the ESM
     // and (un)register the access key
     EventStateManager* esm = PresContext()->EventStateManager();
 

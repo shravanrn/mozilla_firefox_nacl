@@ -10,14 +10,15 @@ add_task(async function() {
   extraTab.linkedBrowser.loadURI(TEST_URL);
   let tabLoaded = BrowserTestUtils.browserLoaded(extraTab.linkedBrowser);
   let expectedFavicon = "http://example.org/one-icon";
-  let haveChanged = new Promise.defer();
+  let haveChanged = PromiseUtils.defer();
   let observer = new MutationObserver(function(mutations) {
     for (let mut of mutations) {
       if (mut.attributeName != "image") {
         continue;
       }
       let imageVal = extraTab.getAttribute("image").replace(/#.*$/, "");
-      if (!imageVal) {
+      // Ignore chrome favicons set on the tab before the actual page load.
+      if (!imageVal || !imageVal.startsWith("http://example.org/")) {
         // The value gets removed because it doesn't load.
         continue;
       }
@@ -28,7 +29,7 @@ add_task(async function() {
   observer.observe(extraTab, {attributes: true});
   await tabLoaded;
   await haveChanged.promise;
-  haveChanged = new Promise.defer();
+  haveChanged = PromiseUtils.defer();
   expectedFavicon = "http://example.org/other-icon";
   ContentTask.spawn(extraTab.linkedBrowser, null, function() {
     let ev = new content.CustomEvent("PleaseChangeFavicon", {});

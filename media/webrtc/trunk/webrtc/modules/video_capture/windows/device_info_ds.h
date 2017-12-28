@@ -15,7 +15,7 @@
 #include "webrtc/modules/video_capture/video_capture_impl.h"
 #include "base/singleton.h"
 
-#include <Dshow.h>
+#include <dshow.h>
 #include <windows.h>
 
 namespace webrtc
@@ -37,9 +37,9 @@ class DeviceInfoDS: public DeviceInfoImpl
 {
 public:
     // Factory function.
-    static DeviceInfoDS* Create(const int32_t id);
+    static DeviceInfoDS* Create();
 
-    DeviceInfoDS(const int32_t id);
+    DeviceInfoDS();
     virtual ~DeviceInfoDS();
 
     int32_t Init();

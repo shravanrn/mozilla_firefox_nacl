@@ -606,12 +606,6 @@ class WasmTokenStream
             return token.name();
         return AstName();
     }
-    AstName getIfText() {
-        WasmToken token;
-        if (getIf(WasmToken::Text, &token))
-            return token.text();
-        return AstName();
-    }
     bool getIfRef(AstRef* ref) {
         WasmToken token = peek();
         if (token.kind() == WasmToken::Name || token.kind() == WasmToken::Index)
@@ -1129,6 +1123,12 @@ WasmTokenStream::next()
                     return WasmToken(WasmToken::UnaryOpcode, Op::I32Eqz, begin, cur_);
                 if (consume(u"eq"))
                     return WasmToken(WasmToken::ComparisonOpcode, Op::I32Eq, begin, cur_);
+#ifdef ENABLE_WASM_THREAD_OPS
+                if (consume(u"extend8_s"))
+                    return WasmToken(WasmToken::ConversionOpcode, Op::I32Extend8S, begin, cur_);
+                if (consume(u"extend16_s"))
+                    return WasmToken(WasmToken::ConversionOpcode, Op::I32Extend16S, begin, cur_);
+#endif
                 break;
               case 'g':
                 if (consume(u"ge_s"))
@@ -1273,6 +1273,14 @@ WasmTokenStream::next()
                 if (consume(u"extend_u/i32"))
                     return WasmToken(WasmToken::ConversionOpcode, Op::I64ExtendUI32,
                                      begin, cur_);
+#ifdef ENABLE_WASM_THREAD_OPS
+                if (consume(u"extend8_s"))
+                    return WasmToken(WasmToken::ConversionOpcode, Op::I64Extend8S, begin, cur_);
+                if (consume(u"extend16_s"))
+                    return WasmToken(WasmToken::ConversionOpcode, Op::I64Extend16S, begin, cur_);
+                if (consume(u"extend32_s"))
+                    return WasmToken(WasmToken::ConversionOpcode, Op::I64Extend32S, begin, cur_);
+#endif
                 break;
               case 'g':
                 if (consume(u"ge_s"))
@@ -1483,10 +1491,6 @@ struct WasmParseContext
         dtoaState(NewDtoaState())
     {}
 
-    bool fail(const char* message) {
-        error->reset(js_strdup(message));
-        return false;
-    }
     ~WasmParseContext() {
         DestroyDtoaState(dtoaState);
     }
@@ -3391,14 +3395,6 @@ class Resolver
         }
         return true;
     }
-    bool resolveName(AstNameMap& map, AstName name, size_t* index) {
-        AstNameMap::Ptr p = map.lookup(name);
-        if (p) {
-            *index = p->value();
-            return true;
-        }
-        return false;
-    }
     bool resolveRef(AstNameMap& map, AstRef& ref) {
         AstNameMap::Ptr p = map.lookup(ref.name());
         if (p) {
@@ -3447,7 +3443,6 @@ class Resolver
 
     REGISTER(Sig, sigMap_)
     REGISTER(Func, funcMap_)
-    REGISTER(Import, importMap_)
     REGISTER(Var, varMap_)
     REGISTER(Global, globalMap_)
     REGISTER(Table, tableMap_)
@@ -3473,7 +3468,6 @@ class Resolver
 
     RESOLVE(sigMap_, Signature)
     RESOLVE(funcMap_, Function)
-    RESOLVE(importMap_, Import)
     RESOLVE(varMap_, Local)
     RESOLVE(globalMap_, Global)
     RESOLVE(tableMap_, Table)

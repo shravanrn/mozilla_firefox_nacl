@@ -7,6 +7,7 @@
 #ifndef COMPATIBILITY_MANAGER_H
 #define COMPATIBILITY_MANAGER_H
 
+#include "nsString.h"
 #include <stdint.h>
 
 namespace mozilla {
@@ -20,14 +21,14 @@ class Compatibility
 {
 public:
   /**
-   * Return true if IAccessible2 disabled.
-   */
-  static bool IsIA2Off() { return !!(sConsumers & OLDJAWS); }
-
-  /**
    * Return true if JAWS mode is enabled.
    */
   static bool IsJAWS() { return !!(sConsumers & (JAWS | OLDJAWS)); }
+
+  /**
+   * Return true if using an e10s incompatible Jaws.
+   */
+  static bool IsOldJAWS() { return !!(sConsumers & OLDJAWS); }
 
   /**
    * Return true if WE mode is enabled.
@@ -39,17 +40,34 @@ public:
    */
   static bool IsDolphin() { return !!(sConsumers & DOLPHIN); }
 
+  /**
+   * @return ID of a11y manifest resource to be passed to
+   * mscom::ActivationContext
+   */
+  static uint16_t GetActCtxResourceId();
+
+  /**
+   * Return a string describing sConsumers suitable for about:support.
+   * Exposed through nsIXULRuntime.accessibilityInstantiator.
+   */
+  static void GetHumanReadableConsumersStr(nsAString &aResult);
+
+  /**
+   * Initialize compatibility mode information.
+   */
+  static void Init();
+
+  /**
+   * return true if a known, non-UIA a11y consumer is present
+   */
+  static bool HasKnownNonUiaConsumer();
+
 private:
   Compatibility();
   Compatibility(const Compatibility&);
   Compatibility& operator = (const Compatibility&);
 
-  /**
-   * Initialize compatibility mode. Called by platform (see Platform.h) during
-   * accessibility initialization.
-   */
-  static void Init();
-  friend void PlatformInit();
+  static void InitConsumers();
 
   /**
    * List of detected consumers of a11y (used for statistics/telemetry and compat)
@@ -68,6 +86,7 @@ private:
     UNKNOWN = 1 << 10,
     UIAUTOMATION = 1 << 11
   };
+  #define CONSUMERS_ENUM_LEN 12
 
 private:
   static uint32_t sConsumers;

@@ -28,7 +28,7 @@ Cu.import("resource:///modules/RecentWindow.jsm");
 
 const ANIMATION_PREF = "toolkit.cosmeticAnimations.enabled";
 
-const PROCESS_COUNT_PREF = "dom.ipc.processCount";
+const MULTI_OPT_OUT_PREF = "dom.ipc.multiOptOut";
 
 const TARGET_URI = "chrome://tabpaint/content/target.html";
 
@@ -72,8 +72,8 @@ var TabPaint = {
 
     this.originalAnimate = Services.prefs.getBoolPref(ANIMATION_PREF);
     Services.prefs.setBoolPref(ANIMATION_PREF, false);
-    this.originalProcessCount = Services.prefs.getIntPref(PROCESS_COUNT_PREF);
-    Services.prefs.setIntPref(PROCESS_COUNT_PREF, 1);
+    Services.prefs.setIntPref(MULTI_OPT_OUT_PREF,
+                              Services.appinfo.E10S_MULTI_EXPERIMENT);
   },
 
   uninit() {
@@ -82,7 +82,7 @@ var TabPaint = {
     }
 
     Services.prefs.setBoolPref(ANIMATION_PREF, this.originalAnimate);
-    Services.prefs.setIntPref(PROCESS_COUNT_PREF, this.originalProcessCount);
+    Services.prefs.clearUserPref(MULTI_OPT_OUT_PREF);
   },
 
   receiveMessage(msg) {
@@ -90,7 +90,7 @@ var TabPaint = {
 
     let gBrowser = browser.ownerGlobal.gBrowser;
 
-    switch(msg.name) {
+    switch (msg.name) {
       case "TabPaint:Go": {
         // Our document has loaded, and we're off to the races!
         this.go(gBrowser).then((results) => {
@@ -133,7 +133,7 @@ var TabPaint = {
    *            The time (ms) it took to present a tab that
    *            was opened from content.
    */
-  go: Task.async(function*(gBrowser) {
+  go: Task.async(function* (gBrowser) {
     let fromParent = yield this.openTabFromParent(gBrowser);
     let fromContent = yield this.openTabFromContent(gBrowser);
 
@@ -152,10 +152,10 @@ var TabPaint = {
    *         with the time (in ms) it took to open the tab from the parent.
    */
   openTabFromParent(gBrowser) {
-    let win = gBrowser.ownerGlobal;
     return new Promise((resolve) => {
       this.Profiler.resume("tabpaint parent start");
 
+      // eslint-disable-next-line mozilla/avoid-Date-timing
       gBrowser.selectedTab = gBrowser.addTab(TARGET_URI + "?" + Date.now(), {
         triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
       });
@@ -181,7 +181,6 @@ var TabPaint = {
    *         with the time (in ms) it took to open the tab from content.
    */
   openTabFromContent(gBrowser) {
-    let win = gBrowser.ownerGlobal;
     return new Promise((resolve) => {
       this.Profiler.resume("tabpaint content start");
 
@@ -227,7 +226,7 @@ var TabPaint = {
         }
       }, true);
 
-      tab.ownerDocument.defaultView.gBrowser.removeTab(tab);
+      tab.ownerGlobal.gBrowser.removeTab(tab);
     });
   },
 

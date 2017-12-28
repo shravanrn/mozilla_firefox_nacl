@@ -24,7 +24,7 @@ public:
   // nsIFrame
   virtual void Reflow(nsPresContext*      aPresContext,
                       ReflowOutput& aDesiredSize,
-                      const ReflowInput& aMaxSize,
+                      const ReflowInput& aReflowInput,
                       nsReflowStatus&      aStatus) override;
 
   virtual bool IsFrameOfType(uint32_t aFlags) const override
@@ -36,6 +36,11 @@ public:
   virtual void SetSharedPageData(nsSharedPageData* aPD) { mPD = aPD; }
 
   virtual bool HasTransformGetter() const override { return true; }
+
+  /**
+   * Return our canvas frame.
+   */
+  void AppendDirectlyOwnedAnonBoxes(nsTArray<OwnedAnonBox>& aResult) override;
 
 #ifdef DEBUG_FRAME_DUMP
   // Debugging

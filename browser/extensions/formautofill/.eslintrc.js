@@ -32,14 +32,8 @@ module.exports = {
     // No space padding in parentheses
     "space-in-parens": ["error", "never"],
 
-    // Commas at the end of the line not the start
-    "comma-style": "error",
-
     // Require braces around blocks that start a new line
     "curly": ["error", "all"],
-
-    // Require function* name()
-    "generator-star-spacing": ["error", {"before": false, "after": true}],
 
     // Two space indent
     "indent": ["error", 2, {"SwitchCase": 1}],
@@ -73,9 +67,6 @@ module.exports = {
     // Enforce dots on the next line with property name.
     "dot-location": ["error", "property"],
 
-    // Encourage the use of dot notation whenever possible.
-    "dot-notation": "error",
-
     // Maximum length of a line.
     // This should be 100 but too many lines were longer than that so set a
     // conservative upper bound for now.
@@ -83,9 +74,6 @@ module.exports = {
 
     // Maximum depth callbacks can be nested.
     "max-nested-callbacks": ["error", 4],
-
-    // Disallow use of arguments.caller or arguments.callee.
-    "no-caller": "error",
 
     // Disallow using the console API.
     "no-console": "error",
@@ -110,9 +98,6 @@ module.exports = {
     // throw new Error("error")).
     "no-throw-literal": "error",
 
-    // Disallow the use of Boolean literals in conditional expressions.
-    "no-unneeded-ternary": "error",
-
     // Disallow padding within blocks.
     "padded-blocks": ["warn", "never"],
 
@@ -130,8 +115,5 @@ module.exports = {
 
     // Disallow function or variable declarations in nested blocks
     "no-inner-declarations": "error",
-
-    // Disallow creating new instances of String, Number, and Boolean
-    "no-new-wrappers": "error",
   },
 };

@@ -300,13 +300,13 @@ add_task(async function mouse() {
   checkState(state, "x", ["xfoo", "xbar"], 1);
 
   state = await msg("mousemove", 2);
-  checkState(state, "x", ["xfoo", "xbar"], 1, 0);
+  checkState(state, "x", ["xfoo", "xbar"], 2, 0);
 
   state = await msg("mousemove", 3);
-  checkState(state, "x", ["xfoo", "xbar"], 1, 1);
+  checkState(state, "x", ["xfoo", "xbar"], 3, 1);
 
   state = await msg("mousemove", -1);
-  checkState(state, "x", ["xfoo", "xbar"], 1);
+  checkState(state, "x", ["xfoo", "xbar"], -1);
 
   await msg("reset");
   await setUp();
@@ -318,10 +318,10 @@ add_task(async function mouse() {
   checkState(state, "x", ["xfoo", "xbar"], 0);
 
   state = await msg("mousemove", 2);
-  checkState(state, "x", ["xfoo", "xbar"], 0, 0);
+  checkState(state, "x", ["xfoo", "xbar"], 2, 0);
 
   state = await msg("mousemove", -1);
-  checkState(state, "x", ["xfoo", "xbar"], 0);
+  checkState(state, "x", ["xfoo", "xbar"], -1);
 
   await msg("reset");
 });
@@ -333,7 +333,7 @@ add_task(async function formHistory() {
   let state = await msg("key", { key: "x", waitForSuggestions: true });
   checkState(state, "x", ["xfoo", "xbar"], -1);
   // Wait for Satchel to say it's been added to form history.
-  let deferred = Promise.defer();
+  let deferred = PromiseUtils.defer();
   Services.obs.addObserver(function onAdd(subj, topic, data) {
     if (data == "formhistory-add") {
       Services.obs.removeObserver(onAdd, "satchel-storage-changed");
@@ -357,7 +357,7 @@ add_task(async function formHistory() {
              0);
 
   // Wait for Satchel.
-  deferred = Promise.defer();
+  deferred = PromiseUtils.defer();
   Services.obs.addObserver(function onRemove(subj, topic, data) {
     if (data == "formhistory-remove") {
       Services.obs.removeObserver(onRemove, "satchel-storage-changed");
@@ -510,24 +510,7 @@ add_task(async function search() {
   await setUp();
 
   // Test selecting a suggestion, then clicking a one-off without deselecting the
-  // suggestion.
-  await msg("key", { key: "x", waitForSuggestions: true });
-  p = msg("waitForSearch");
-  await msg("mousemove", 1);
-  await msg("mousemove", 3);
-  await msg("click", { eltIdx: 3, modifiers });
-  mesg = await p;
-  eventData.searchString = "xfoo"
-  eventData.selection = {
-    index: 1,
-    kind: "mouse",
-  };
-  SimpleTest.isDeeply(eventData, mesg, "Search event data");
-
-  await promiseTab();
-  await setUp();
-
-  // Same as above, but with the keyboard.
+  // suggestion, using the keyboard.
   delete modifiers.button;
   await msg("key", { key: "x", waitForSuggestions: true });
   p = msg("waitForSearch");
@@ -536,6 +519,7 @@ add_task(async function search() {
   await msg("key", "VK_TAB");
   await msg("key", { key: "VK_RETURN", modifiers });
   mesg = await p;
+  eventData.searchString = "xfoo";
   eventData.selection = {
     index: 1,
     kind: "key",
@@ -598,7 +582,7 @@ add_task(async function search() {
 
   // Remove form history entries.
   // Wait for Satchel.
-  let deferred = Promise.defer();
+  let deferred = PromiseUtils.defer();
   let historyCount = 2;
   Services.obs.addObserver(function onRemove(subj, topic, data) {
     if (data == "formhistory-remove") {
@@ -715,7 +699,7 @@ function checkState(actualState, expectedInputVal, expectedSuggestions,
 var gMsgMan;
 
 async function promiseTab() {
-  let deferred = Promise.defer();
+  let deferred = PromiseUtils.defer();
   let tab = await BrowserTestUtils.openNewForegroundTab(gBrowser);
   registerCleanupFunction(() => BrowserTestUtils.removeTab(tab));
   let pageURL = getRootDirectory(gTestPath) + TEST_PAGE_BASENAME;

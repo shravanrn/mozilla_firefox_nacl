@@ -74,7 +74,7 @@ class LIRGeneratorNone : public LIRGeneratorShared
     void visitUnbox(MUnbox* unbox) { MOZ_CRASH(); }
     void visitReturn(MReturn* ret) { MOZ_CRASH(); }
     void visitPowHalf(MPowHalf*) { MOZ_CRASH(); }
-    void visitAsmJSNeg(MAsmJSNeg*) { MOZ_CRASH(); }
+    void visitWasmNeg(MWasmNeg*) { MOZ_CRASH(); }
     void visitGuardShape(MGuardShape* ins) { MOZ_CRASH(); }
     void visitGuardObjectGroup(MGuardObjectGroup* ins) { MOZ_CRASH(); }
     void visitWasmUnsignedToDouble(MWasmUnsignedToDouble* ins) { MOZ_CRASH(); }
@@ -108,6 +108,7 @@ class LIRGeneratorNone : public LIRGeneratorShared
     void visitWasmTruncateToInt64(MWasmTruncateToInt64*) { MOZ_CRASH(); }
     void visitInt64ToFloatingPoint(MInt64ToFloatingPoint*) { MOZ_CRASH(); }
     void visitExtendInt32ToInt64(MExtendInt32ToInt64* ins) { MOZ_CRASH(); }
+    void visitSignExtendInt64(MSignExtendInt64* ins) { MOZ_CRASH(); }
 };
 
 typedef LIRGeneratorNone LIRGeneratorSpecific;

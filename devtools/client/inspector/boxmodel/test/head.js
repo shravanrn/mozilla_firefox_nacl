@@ -11,10 +11,8 @@ Services.scriptloader.loadSubScript(
   "chrome://mochitests/content/browser/devtools/client/inspector/test/head.js",
   this);
 
-Services.prefs.setBoolPref("devtools.layoutview.enabled", true);
 Services.prefs.setIntPref("devtools.toolbox.footer.height", 350);
 registerCleanupFunction(() => {
-  Services.prefs.clearUserPref("devtools.layoutview.enabled");
   Services.prefs.clearUserPref("devtools.toolbox.footer.height");
 });
 
@@ -105,15 +103,15 @@ function waitForMarkupLoaded(inspector) {
 
 function getStyle(testActor, selector, propertyName) {
   return testActor.eval(`
-    content.document.querySelector("${selector}")
-                    .style.getPropertyValue("${propertyName}");
+    document.querySelector("${selector}")
+            .style.getPropertyValue("${propertyName}");
   `);
 }
 
 function setStyle(testActor, selector, propertyName, value) {
   return testActor.eval(`
-    content.document.querySelector("${selector}")
-                    .style.${propertyName} = "${value}";
+    document.querySelector("${selector}")
+            .style.${propertyName} = "${value}";
   `);
 }
 

@@ -9,8 +9,7 @@
 
 #[macro_use] extern crate heapsize;
 #[macro_use] extern crate heapsize_derive;
-extern crate serde;
-#[macro_use] extern crate serde_derive;
+#[macro_use] extern crate serde;
 extern crate servo_rand;
 extern crate url;
 extern crate url_serde;
@@ -29,7 +28,7 @@ use url::{Url, Position};
 
 pub use url::Host;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, HeapSizeOf)]
+#[derive(Clone, Eq, Hash, HeapSizeOf, Ord, PartialEq, PartialOrd)]
 pub struct ServoUrl(Arc<Url>);
 
 impl ServoUrl {
@@ -84,6 +83,10 @@ impl ServoUrl {
     pub fn is_secure_scheme(&self) -> bool {
         let scheme = self.scheme();
         scheme == "https" || scheme == "wss"
+    }
+
+    pub fn is_chrome(&self) -> bool {
+        self.scheme() == "chrome"
     }
 
     pub fn as_str(&self) -> &str {
@@ -151,7 +154,7 @@ impl ServoUrl {
     }
 
     pub fn from_file_path<P: AsRef<Path>>(path: P) -> Result<Self, ()> {
-        Ok(Self::from_url(try!(Url::from_file_path(path))))
+        Ok(Self::from_url(Url::from_file_path(path)?))
     }
 }
 
@@ -209,9 +212,9 @@ impl serde::Serialize for ServoUrl {
     }
 }
 
-impl serde::Deserialize for ServoUrl {
+impl<'de> serde::Deserialize<'de> for ServoUrl {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: serde::Deserializer,
+        where D: serde::Deserializer<'de>,
     {
         url_serde::deserialize(deserializer).map(Self::from_url)
     }

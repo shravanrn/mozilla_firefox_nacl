@@ -302,14 +302,14 @@ BoxModel.prototype = {
           properties[0].name = property.substring(9);
         }
 
-        session.setProperties(properties).catch(e => console.error(e));
+        session.setProperties(properties).catch(console.error);
       },
       done: (value, commit) => {
         editor.elt.parentNode.classList.remove("boxmodel-editing");
         if (!commit) {
           session.revert().then(() => {
             session.destroy();
-          }, e => console.error(e));
+          }, console.error);
           return;
         }
 
@@ -322,9 +322,8 @@ BoxModel.prototype = {
           autoMargins: true,
         }).then(layout => {
           this.store.dispatch(updateLayout(layout));
-        }, e => console.error(e));
+        }, console.error);
       },
-      contextMenu: this.inspector.onTextBoxContextMenu,
       cssProperties: getCssProperties(this.inspector.toolbox)
     }, event);
   },
@@ -347,10 +346,9 @@ BoxModel.prototype = {
   },
 
   /**
-   * Handler for the inspector sidebar select event. Starts listening for
-   * "grid-layout-changed" if the layout panel is visible. Otherwise, stop
-   * listening for grid layout changes. Finally, refresh the layout view if
-   * it is visible.
+   * Handler for the inspector sidebar select event. Starts tracking reflows if the
+   * layout panel is visible. Otherwise, stop tracking reflows. Finally, refresh the box
+   * model view if it is visible.
    */
   onSidebarSelect() {
     if (!this.isPanelVisible()) {

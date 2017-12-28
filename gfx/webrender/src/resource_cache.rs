@@ -2,31 +2,38 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use api::{AddFont, BlobImageData, BlobImageResources, ResourceUpdate, ResourceUpdates};
+use api::{BlobImageDescriptor, BlobImageError, BlobImageRenderer, BlobImageRequest};
+use api::{ColorF, FontRenderMode, SubpixelDirection};
+use api::{DevicePoint, DeviceUintRect, DeviceUintSize};
+use api::{Epoch, FontInstance, FontInstanceKey, FontKey, FontTemplate};
+use api::{ExternalImageData, ExternalImageType};
+use api::{FontInstanceOptions, FontInstancePlatformOptions};
+use api::{GlyphDimensions, GlyphKey, IdNamespace};
+use api::{ImageData, ImageDescriptor, ImageKey, ImageRendering};
+use api::{TileOffset, TileSize};
 use app_units::Au;
 use device::TextureFilter;
-use fnv::FnvHasher;
 use frame::FrameId;
-use gpu_cache::GpuCache;
-use internal_types::{FontTemplate, SourceTexture, TextureUpdateList};
-use profiler::TextureCacheProfileCounters;
-use std::collections::{HashMap, HashSet};
+use glyph_cache::GlyphCache;
+use glyph_rasterizer::{GlyphRasterizer, GlyphRequest};
+use gpu_cache::{GpuCache, GpuCacheAddress, GpuCacheHandle};
+use internal_types::{FastHashMap, FastHashSet, SourceTexture, TextureUpdateList};
+use profiler::{ResourceProfileCounters, TextureCacheProfileCounters};
+use rayon::ThreadPool;
 use std::collections::hash_map::Entry::{self, Occupied, Vacant};
 use std::fmt::Debug;
-use std::hash::BuildHasherDefault;
 use std::hash::Hash;
 use std::mem;
 use std::sync::Arc;
-use texture_cache::{TextureCache, TextureCacheItemId};
-use webrender_traits::{Epoch, FontKey, GlyphKey, ImageKey, ImageRendering};
-use webrender_traits::{FontRenderMode, ImageData, GlyphDimensions, WebGLContextId};
-use webrender_traits::{DevicePoint, DeviceIntSize, DeviceUintRect, ImageDescriptor, ColorF};
-use webrender_traits::{GlyphOptions, GlyphInstance, TileOffset, TileSize};
-use webrender_traits::{BlobImageRenderer, BlobImageDescriptor, BlobImageError, BlobImageRequest, BlobImageData, ImageStore};
-use webrender_traits::{ExternalImageData, ExternalImageType, LayoutPoint};
-use rayon::ThreadPool;
-use glyph_rasterizer::{GlyphRasterizer, GlyphCache, GlyphRequest};
+use texture_cache::{TextureCache, TextureCacheHandle};
 
 const DEFAULT_TILE_SIZE: TileSize = 512;
+
+pub struct GlyphFetchResult {
+    pub index_in_text_run: i32,
+    pub uv_rect_address: GpuCacheAddress,
+}
 
 // These coordinates are always in texels.
 // They are converted to normalized ST
@@ -39,10 +46,10 @@ const DEFAULT_TILE_SIZE: TileSize = 512;
 // various CPU-side structures.
 pub struct CacheItem {
     pub texture_id: SourceTexture,
-    pub uv0: DevicePoint,
-    pub uv1: DevicePoint,
+    pub uv_rect_handle: GpuCacheHandle,
 }
 
+#[derive(Debug)]
 pub struct ImageProperties {
     pub descriptor: ImageDescriptor,
     pub external_image: Option<ExternalImageData>,
@@ -56,22 +63,31 @@ enum State {
     QueryResources,
 }
 
+#[derive(Debug)]
 struct ImageResource {
     data: ImageData,
     descriptor: ImageDescriptor,
     epoch: Epoch,
     tiling: Option<TileSize>,
-    dirty_rect: Option<DeviceUintRect>
+    dirty_rect: Option<DeviceUintRect>,
 }
 
+#[derive(Debug)]
+pub struct ImageTiling {
+    pub image_size: DeviceUintSize,
+    pub tile_size: TileSize,
+}
+
+pub type TiledImageMap = FastHashMap<ImageKey, ImageTiling>;
+
 struct ImageTemplates {
-    images: HashMap<ImageKey, ImageResource, BuildHasherDefault<FnvHasher>>,
+    images: FastHashMap<ImageKey, ImageResource>,
 }
 
 impl ImageTemplates {
     fn new() -> Self {
         ImageTemplates {
-            images: HashMap::with_hasher(Default::default())
+            images: FastHashMap::default(),
         }
     }
 
@@ -92,74 +108,58 @@ impl ImageTemplates {
     }
 }
 
-impl ImageStore for ImageTemplates {
-    fn get_image(&self, key: ImageKey) -> Option<(&ImageData, &ImageDescriptor)> {
-        self.images.get(&key).map(|resource|{ (&resource.data, &resource.descriptor) })
-    }
-}
-
 struct CachedImageInfo {
-    texture_cache_id: TextureCacheItemId,
+    texture_cache_handle: TextureCacheHandle,
     epoch: Epoch,
 }
 
-pub struct ResourceClassCache<K,V> {
-    resources: HashMap<K, V, BuildHasherDefault<FnvHasher>>,
-    last_access_times: HashMap<K, FrameId, BuildHasherDefault<FnvHasher>>,
+pub struct ResourceClassCache<K, V> {
+    resources: FastHashMap<K, V>,
 }
 
-impl<K,V> ResourceClassCache<K,V> where K: Clone + Hash + Eq + Debug, V: Resource {
-    pub fn new() -> ResourceClassCache<K,V> {
+impl<K, V> ResourceClassCache<K, V>
+where
+    K: Clone + Hash + Eq + Debug,
+{
+    pub fn new() -> ResourceClassCache<K, V> {
         ResourceClassCache {
-            resources: HashMap::default(),
-            last_access_times: HashMap::default(),
+            resources: FastHashMap::default(),
         }
     }
 
-    pub fn contains_key(&self, key: &K) -> bool {
-        self.resources.contains_key(key)
+    fn get(&self, key: &K) -> &V {
+        self.resources
+            .get(key)
+            .expect("Didn't find a cached resource with that ID!")
     }
 
-    fn get(&self, key: &K, frame: FrameId) -> &V {
-        // This assert catches cases in which we accidentally request a resource that we forgot to
-        // mark as needed this frame.
-        debug_assert_eq!(frame, *self.last_access_times
-                                     .get(key)
-                                     .expect("Didn't find the access time for a cached resource \
-                                              with that ID!"));
-        self.resources.get(key).expect("Didn't find a cached resource with that ID!")
-    }
-
-    pub fn insert(&mut self, key: K, value: V, frame: FrameId) {
-        self.last_access_times.insert(key.clone(), frame);
+    pub fn insert(&mut self, key: K, value: V) {
         self.resources.insert(key, value);
     }
 
-    fn entry(&mut self, key: K, frame: FrameId) -> Entry<K,V> {
-        self.last_access_times.insert(key.clone(), frame);
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        self.resources.get_mut(key)
+    }
+
+    pub fn entry(&mut self, key: K) -> Entry<K, V> {
         self.resources.entry(key)
     }
 
-    pub fn mark_as_needed(&mut self, key: &K, frame: FrameId) {
-        self.last_access_times.insert((*key).clone(), frame);
+    pub fn clear(&mut self) {
+        self.resources.clear();
     }
 
-    fn expire_old_resources(&mut self, texture_cache: &mut TextureCache, frame_id: FrameId) {
-        let mut resources_to_destroy = vec![];
-        for (key, this_frame_id) in &self.last_access_times {
-            if *this_frame_id < frame_id {
-                resources_to_destroy.push((*key).clone())
-            }
-        }
+    fn clear_keys<F>(&mut self, key_fun: F)
+    where
+        for<'r> F: Fn(&'r &K) -> bool,
+    {
+        let resources_to_destroy = self.resources
+            .keys()
+            .filter(&key_fun)
+            .cloned()
+            .collect::<Vec<_>>();
         for key in resources_to_destroy {
-            let resource =
-                self.resources
-                    .remove(&key)
-                    .expect("Resource was in `last_access_times` but not in `resources`!");
-            self.last_access_times.remove(&key);
-            if let Some(texture_cache_item_id) = resource.texture_cache_item_id() {
-                texture_cache.free(texture_cache_item_id)
-            }
+            self.resources.remove(&key).unwrap();
         }
     }
 }
@@ -181,55 +181,66 @@ impl Into<BlobImageRequest> for ImageRequest {
     }
 }
 
-struct WebGLTexture {
-    id: SourceTexture,
-    size: DeviceIntSize,
+struct Resources {
+    font_templates: FastHashMap<FontKey, FontTemplate>,
+    font_instances: FastHashMap<FontInstanceKey, FontInstance>,
+    image_templates: ImageTemplates,
+}
+
+impl BlobImageResources for Resources {
+    fn get_font_data(&self, key: FontKey) -> &FontTemplate {
+        self.font_templates.get(&key).unwrap()
+    }
+    fn get_image(&self, key: ImageKey) -> Option<(&ImageData, &ImageDescriptor)> {
+        self.image_templates
+            .get(key)
+            .map(|resource| (&resource.data, &resource.descriptor))
+    }
 }
 
 pub struct ResourceCache {
     cached_glyphs: GlyphCache,
     cached_images: ResourceClassCache<ImageRequest, CachedImageInfo>,
 
-    // TODO(pcwalton): Figure out the lifecycle of these.
-    webgl_textures: HashMap<WebGLContextId, WebGLTexture, BuildHasherDefault<FnvHasher>>,
-
-    font_templates: HashMap<FontKey, FontTemplate, BuildHasherDefault<FnvHasher>>,
-    image_templates: ImageTemplates,
+    resources: Resources,
     state: State,
     current_frame_id: FrameId,
 
     texture_cache: TextureCache,
-    pub gpu_cache: GpuCache,
 
     // TODO(gw): We should expire (parts of) this cache semi-regularly!
-    cached_glyph_dimensions: HashMap<GlyphKey, Option<GlyphDimensions>, BuildHasherDefault<FnvHasher>>,
-    pending_image_requests: Vec<ImageRequest>,
+    cached_glyph_dimensions: FastHashMap<GlyphRequest, Option<GlyphDimensions>>,
     glyph_rasterizer: GlyphRasterizer,
 
+    // The set of images that aren't present or valid in the texture cache,
+    // and need to be rasterized and/or uploaded this frame. This includes
+    // both blobs and regular images.
+    pending_image_requests: FastHashSet<ImageRequest>,
+
     blob_image_renderer: Option<Box<BlobImageRenderer>>,
-    blob_image_requests: HashSet<ImageRequest>,
 }
 
 impl ResourceCache {
-    pub fn new(texture_cache: TextureCache,
-               workers: Arc<ThreadPool>,
-               blob_image_renderer: Option<Box<BlobImageRenderer>>) -> ResourceCache {
+    pub fn new(
+        texture_cache: TextureCache,
+        workers: Arc<ThreadPool>,
+        blob_image_renderer: Option<Box<BlobImageRenderer>>,
+    ) -> ResourceCache {
         ResourceCache {
-            cached_glyphs: ResourceClassCache::new(),
+            cached_glyphs: GlyphCache::new(),
             cached_images: ResourceClassCache::new(),
-            webgl_textures: HashMap::default(),
-            font_templates: HashMap::default(),
-            image_templates: ImageTemplates::new(),
-            cached_glyph_dimensions: HashMap::default(),
-            texture_cache: texture_cache,
-            gpu_cache: GpuCache::new(),
+            resources: Resources {
+                font_templates: FastHashMap::default(),
+                font_instances: FastHashMap::default(),
+                image_templates: ImageTemplates::new(),
+            },
+            cached_glyph_dimensions: FastHashMap::default(),
+            texture_cache,
             state: State::Idle,
             current_frame_id: FrameId(0),
-            pending_image_requests: Vec::new(),
+            pending_image_requests: FastHashSet::default(),
             glyph_rasterizer: GlyphRasterizer::new(workers),
-
-            blob_image_renderer: blob_image_renderer,
-            blob_image_requests: HashSet::new(),
+            blob_image_renderer,
         }
     }
 
@@ -241,12 +252,63 @@ impl ResourceCache {
         let limit = self.max_texture_size();
         let size_check = descriptor.width > limit || descriptor.height > limit;
         match *data {
-            ImageData::Raw(_) | ImageData::Blob(_) => { size_check }
+            ImageData::Raw(_) | ImageData::Blob(_) => size_check,
             ImageData::External(info) => {
                 // External handles already represent existing textures so it does
                 // not make sense to tile them into smaller ones.
                 info.image_type == ExternalImageType::ExternalBuffer && size_check
-            },
+            }
+        }
+    }
+
+    pub fn update_resources(
+        &mut self,
+        updates: ResourceUpdates,
+        profile_counters: &mut ResourceProfileCounters,
+    ) {
+        // TODO, there is potential for optimization here, by processing updates in
+        // bulk rather than one by one (for example by sorting allocations by size or
+        // in a way that reduces fragmentation in the atlas).
+
+        for update in updates.updates {
+            match update {
+                ResourceUpdate::AddImage(img) => {
+                    if let ImageData::Raw(ref bytes) = img.data {
+                        profile_counters.image_templates.inc(bytes.len());
+                    }
+                    self.add_image_template(img.key, img.descriptor, img.data, img.tiling);
+                }
+                ResourceUpdate::UpdateImage(img) => {
+                    self.update_image_template(img.key, img.descriptor, img.data, img.dirty_rect);
+                }
+                ResourceUpdate::DeleteImage(img) => {
+                    self.delete_image_template(img);
+                }
+                ResourceUpdate::AddFont(font) => match font {
+                    AddFont::Raw(id, bytes, index) => {
+                        profile_counters.font_templates.inc(bytes.len());
+                        self.add_font_template(id, FontTemplate::Raw(Arc::new(bytes), index));
+                    }
+                    AddFont::Native(id, native_font_handle) => {
+                        self.add_font_template(id, FontTemplate::Native(native_font_handle));
+                    }
+                },
+                ResourceUpdate::DeleteFont(font) => {
+                    self.delete_font_template(font);
+                }
+                ResourceUpdate::AddFontInstance(instance) => {
+                    self.add_font_instance(
+                        instance.key,
+                        instance.font_key,
+                        instance.glyph_size,
+                        instance.options,
+                        instance.platform_options,
+                    );
+                }
+                ResourceUpdate::DeleteFontInstance(instance) => {
+                    self.delete_font_instance(instance);
+                }
+            }
         }
     }
 
@@ -254,19 +316,62 @@ impl ResourceCache {
         // Push the new font to the font renderer, and also store
         // it locally for glyph metric requests.
         self.glyph_rasterizer.add_font(font_key, template.clone());
-        self.font_templates.insert(font_key, template);
+        self.resources.font_templates.insert(font_key, template);
     }
 
     pub fn delete_font_template(&mut self, font_key: FontKey) {
         self.glyph_rasterizer.delete_font(font_key);
-        self.font_templates.remove(&font_key);
+        self.resources.font_templates.remove(&font_key);
+        if let Some(ref mut r) = self.blob_image_renderer {
+            r.delete_font(font_key);
+        }
     }
 
-    pub fn add_image_template(&mut self,
-                              image_key: ImageKey,
-                              descriptor: ImageDescriptor,
-                              mut data: ImageData,
-                              mut tiling: Option<TileSize>) {
+    pub fn add_font_instance(
+        &mut self,
+        instance_key: FontInstanceKey,
+        font_key: FontKey,
+        glyph_size: Au,
+        options: Option<FontInstanceOptions>,
+        platform_options: Option<FontInstancePlatformOptions>,
+    ) {
+        let mut render_mode = FontRenderMode::Subpixel;
+        let mut subpx_dir = SubpixelDirection::Horizontal;
+        if let Some(options) = options {
+            render_mode = options.render_mode;
+            if render_mode == FontRenderMode::Mono {
+                subpx_dir = SubpixelDirection::None;
+            }
+        }
+        let instance = FontInstance::new(
+            font_key,
+            glyph_size,
+            ColorF::new(0.0, 0.0, 0.0, 1.0),
+            render_mode,
+            subpx_dir,
+            platform_options,
+        );
+        self.resources.font_instances.insert(instance_key, instance);
+    }
+
+    pub fn delete_font_instance(&mut self, instance_key: FontInstanceKey) {
+        self.resources.font_instances.remove(&instance_key);
+        if let Some(ref mut r) = self.blob_image_renderer {
+            r.delete_font_instance(instance_key);
+        }
+    }
+
+    pub fn get_font_instance(&self, instance_key: FontInstanceKey) -> Option<&FontInstance> {
+        self.resources.font_instances.get(&instance_key)
+    }
+
+    pub fn add_image_template(
+        &mut self,
+        image_key: ImageKey,
+        descriptor: ImageDescriptor,
+        mut data: ImageData,
+        mut tiling: Option<TileSize>,
+    ) {
         if tiling.is_none() && self.should_tile(&descriptor, &data) {
             // We aren't going to be able to upload a texture this big, so tile it, even
             // if tiling was not requested.
@@ -277,31 +382,29 @@ impl ResourceCache {
             self.blob_image_renderer.as_mut().unwrap().add(
                 image_key,
                 mem::replace(blob, BlobImageData::new()),
-                tiling
+                tiling,
             );
         }
 
         let resource = ImageResource {
-            descriptor: descriptor,
-            data: data,
+            descriptor,
+            data,
             epoch: Epoch(0),
-            tiling: tiling,
+            tiling,
             dirty_rect: None,
         };
 
-        self.image_templates.insert(image_key, resource);
+        self.resources.image_templates.insert(image_key, resource);
     }
 
-    pub fn update_image_template(&mut self,
-                                 image_key: ImageKey,
-                                 descriptor: ImageDescriptor,
-                                 mut data: ImageData,
-                                 dirty_rect: Option<DeviceUintRect>) {
-        let resource = if let Some(image) = self.image_templates.get(image_key) {
-            assert_eq!(image.descriptor.width, descriptor.width);
-            assert_eq!(image.descriptor.height, descriptor.height);
-            assert_eq!(image.descriptor.format, descriptor.format);
-
+    pub fn update_image_template(
+        &mut self,
+        image_key: ImageKey,
+        descriptor: ImageDescriptor,
+        mut data: ImageData,
+        dirty_rect: Option<DeviceUintRect>,
+    ) {
+        let resource = if let Some(image) = self.resources.image_templates.get(image_key) {
             let next_epoch = Epoch(image.epoch.0 + 1);
 
             let mut tiling = image.tiling;
@@ -310,17 +413,17 @@ impl ResourceCache {
             }
 
             if let ImageData::Blob(ref mut blob) = data {
-                self.blob_image_renderer.as_mut().unwrap().update(
-                    image_key,
-                    mem::replace(blob, BlobImageData::new())
-                );
+                self.blob_image_renderer
+                    .as_mut()
+                    .unwrap()
+                    .update(image_key, mem::replace(blob, BlobImageData::new()));
             }
 
             ImageResource {
-                descriptor: descriptor,
-                data: data,
+                descriptor,
+                data,
                 epoch: next_epoch,
-                tiling: tiling,
+                tiling,
                 dirty_rect: match (dirty_rect, image.dirty_rect) {
                     (Some(rect), Some(prev_rect)) => Some(rect.union(&prev_rect)),
                     (Some(rect), None) => Some(rect),
@@ -328,118 +431,142 @@ impl ResourceCache {
                 },
             }
         } else {
-            panic!("Attempt to update non-existant image (key {:?}).", image_key);
+            panic!(
+                "Attempt to update non-existant image (key {:?}).",
+                image_key
+            );
         };
 
-        self.image_templates.insert(image_key, resource);
+        self.resources.image_templates.insert(image_key, resource);
     }
 
     pub fn delete_image_template(&mut self, image_key: ImageKey) {
-        let value = self.image_templates.remove(image_key);
+        let value = self.resources.image_templates.remove(image_key);
+
+        self.cached_images
+            .clear_keys(|request| request.key == image_key);
 
         match value {
-            Some(image) => {
-                if image.data.is_blob() {
-                    self.blob_image_renderer.as_mut().unwrap().delete(image_key);
-                }
-            }
+            Some(image) => if image.data.is_blob() {
+                self.blob_image_renderer.as_mut().unwrap().delete(image_key);
+            },
             None => {
                 println!("Delete the non-exist key:{:?}", image_key);
             }
         }
     }
 
-    pub fn add_webgl_texture(&mut self, id: WebGLContextId, texture_id: SourceTexture, size: DeviceIntSize) {
-        self.webgl_textures.insert(id, WebGLTexture {
-            id: texture_id,
-            size: size,
-        });
-    }
-
-    pub fn update_webgl_texture(&mut self, id: WebGLContextId, texture_id: SourceTexture, size: DeviceIntSize) {
-        let webgl_texture = self.webgl_textures.get_mut(&id).unwrap();
-
-        // Update new texture id and size
-        webgl_texture.id = texture_id;
-        webgl_texture.size = size;
-    }
-
-    pub fn request_image(&mut self,
-                         key: ImageKey,
-                         rendering: ImageRendering,
-                         tile: Option<TileOffset>) {
-
+    pub fn request_image(
+        &mut self,
+        key: ImageKey,
+        rendering: ImageRendering,
+        tile: Option<TileOffset>,
+        gpu_cache: &mut GpuCache,
+    ) {
         debug_assert_eq!(self.state, State::AddResources);
         let request = ImageRequest {
-            key: key,
-            rendering: rendering,
-            tile: tile,
+            key,
+            rendering,
+            tile,
         };
 
-        let template = self.image_templates.get(key).unwrap();
-        if template.data.uses_texture_cache() {
-            self.cached_images.mark_as_needed(&request, self.current_frame_id);
-        }
-        if template.data.is_blob() {
-            if let Some(ref mut renderer) = self.blob_image_renderer {
-                let same_epoch = match self.cached_images.resources.get(&request) {
-                    Some(entry) => entry.epoch == template.epoch,
-                    None => false,
+        match self.resources.image_templates.get(key) {
+            Some(template) => {
+                // Images that don't use the texture cache can early out.
+                if !template.data.uses_texture_cache() {
+                    return;
+                }
+
+                // If this image exists in the texture cache, *and* the epoch
+                // in the cache matches that of the template, then it is
+                // valid to use as-is.
+                let (entry, needs_update) = match self.cached_images.entry(request) {
+                    Occupied(entry) => {
+                        let needs_update = entry.get().epoch != template.epoch;
+                        (entry.into_mut(), needs_update)
+                    }
+                    Vacant(entry) => (
+                        entry.insert(CachedImageInfo {
+                            epoch: template.epoch,
+                            texture_cache_handle: TextureCacheHandle::new(),
+                        }),
+                        true,
+                    ),
                 };
 
-                if !same_epoch && self.blob_image_requests.insert(request) {
-                    let (offset, w, h) = match template.tiling {
-                        Some(tile_size) => {
-                            let tile_offset = request.tile.unwrap();
-                            let (w, h) = compute_tile_size(&template.descriptor, tile_size, tile_offset);
-                            let offset = DevicePoint::new(
-                                tile_offset.x as f32 * tile_size as f32,
-                                tile_offset.y as f32 * tile_size as f32,
+                let needs_upload = self.texture_cache
+                    .request(&mut entry.texture_cache_handle, gpu_cache);
+
+                if !needs_upload && !needs_update {
+                    return;
+                }
+
+                // We can start a worker thread rasterizing right now, if:
+                //  - The image is a blob.
+                //  - The blob hasn't already been requested this frame.
+                if self.pending_image_requests.insert(request) {
+                    if template.data.is_blob() {
+                        if let Some(ref mut renderer) = self.blob_image_renderer {
+                            let (offset, w, h) = match template.tiling {
+                                Some(tile_size) => {
+                                    let tile_offset = request.tile.unwrap();
+                                    let (w, h) = compute_tile_size(
+                                        &template.descriptor,
+                                        tile_size,
+                                        tile_offset,
+                                    );
+                                    let offset = DevicePoint::new(
+                                        tile_offset.x as f32 * tile_size as f32,
+                                        tile_offset.y as f32 * tile_size as f32,
+                                    );
+
+                                    (offset, w, h)
+                                }
+                                None => (
+                                    DevicePoint::zero(),
+                                    template.descriptor.width,
+                                    template.descriptor.height,
+                                ),
+                            };
+
+                            renderer.request(
+                                &self.resources,
+                                request.into(),
+                                &BlobImageDescriptor {
+                                    width: w,
+                                    height: h,
+                                    offset,
+                                    format: template.descriptor.format,
+                                },
+                                template.dirty_rect,
                             );
-
-                            (offset, w, h)
                         }
-                        None => {
-                            (DevicePoint::zero(), template.descriptor.width, template.descriptor.height)
-                        }
-                    };
-
-                    renderer.request(
-                        request.into(),
-                        &BlobImageDescriptor {
-                            width: w,
-                            height: h,
-                            offset: offset,
-                            format: template.descriptor.format,
-                        },
-                        template.dirty_rect,
-                        &self.image_templates,
-                    );
+                    }
                 }
             }
-        } else {
-            self.pending_image_requests.push(request);
+            None => {
+                warn!(
+                    "ERROR: Trying to render deleted / non-existent key {:?}",
+                    key
+                );
+            }
         }
     }
 
-    pub fn request_glyphs(&mut self,
-                          key: FontKey,
-                          size: Au,
-                          color: ColorF,
-                          glyph_instances: &[GlyphInstance],
-                          render_mode: FontRenderMode,
-                          glyph_options: Option<GlyphOptions>) {
+    pub fn request_glyphs(
+        &mut self,
+        font: FontInstance,
+        glyph_keys: &[GlyphKey],
+        gpu_cache: &mut GpuCache,
+    ) {
         debug_assert_eq!(self.state, State::AddResources);
 
         self.glyph_rasterizer.request_glyphs(
             &mut self.cached_glyphs,
-            self.current_frame_id,
-            key,
-            size,
-            color,
-            glyph_instances,
-            render_mode,
-            glyph_options,
+            font,
+            glyph_keys,
+            &mut self.texture_cache,
+            gpu_cache,
         );
     }
 
@@ -447,283 +574,253 @@ impl ResourceCache {
         self.texture_cache.pending_updates()
     }
 
-    pub fn get_glyphs<F>(&self,
-                         font_key: FontKey,
-                         size: Au,
-                         color: ColorF,
-                         glyph_instances: &[GlyphInstance],
-                         render_mode: FontRenderMode,
-                         glyph_options: Option<GlyphOptions>,
-                         mut f: F) -> SourceTexture where F: FnMut(usize, DevicePoint, DevicePoint) {
+    pub fn fetch_glyphs<F>(
+        &self,
+        font: FontInstance,
+        glyph_keys: &[GlyphKey],
+        fetch_buffer: &mut Vec<GlyphFetchResult>,
+        gpu_cache: &GpuCache,
+        mut f: F,
+    ) where
+        F: FnMut(SourceTexture, &[GlyphFetchResult]),
+    {
         debug_assert_eq!(self.state, State::QueryResources);
-        let mut glyph_key = GlyphRequest::new(
-            font_key,
-            size,
-            color,
-            0,
-            LayoutPoint::new(0.0, 0.0),
-            render_mode,
-            glyph_options
-        );
-        let mut texture_id = None;
-        for (loop_index, glyph_instance) in glyph_instances.iter().enumerate() {
-            glyph_key.key.index = glyph_instance.index;
-            glyph_key.key.subpixel_point.set_offset(glyph_instance.point, render_mode);
+        let glyph_key_cache = self.cached_glyphs.get_glyph_key_cache_for_font(&font);
 
-            let image_id = self.cached_glyphs.get(&glyph_key, self.current_frame_id);
-            let cache_item = image_id.map(|image_id| self.texture_cache.get(image_id));
+        let mut current_texture_id = SourceTexture::Invalid;
+        debug_assert!(fetch_buffer.is_empty());
+
+        for (loop_index, key) in glyph_keys.iter().enumerate() {
+            let glyph = glyph_key_cache.get(key);
+            let cache_item = glyph
+                .as_ref()
+                .map(|info| self.texture_cache.get(&info.texture_cache_handle));
             if let Some(cache_item) = cache_item {
-                let uv0 = DevicePoint::new(cache_item.pixel_rect.top_left.x as f32,
-                                           cache_item.pixel_rect.top_left.y as f32);
-                let uv1 = DevicePoint::new(cache_item.pixel_rect.bottom_right.x as f32,
-                                           cache_item.pixel_rect.bottom_right.y as f32);
-                f(loop_index, uv0, uv1);
-                debug_assert!(texture_id == None ||
-                              texture_id == Some(cache_item.texture_id));
-                texture_id = Some(cache_item.texture_id);
+                if current_texture_id != cache_item.texture_id {
+                    if !fetch_buffer.is_empty() {
+                        f(current_texture_id, fetch_buffer);
+                        fetch_buffer.clear();
+                    }
+                    current_texture_id = cache_item.texture_id;
+                }
+                fetch_buffer.push(GlyphFetchResult {
+                    index_in_text_run: loop_index as i32,
+                    uv_rect_address: gpu_cache.get_address(&cache_item.uv_rect_handle),
+                });
             }
         }
 
-        texture_id.map_or(SourceTexture::Invalid, SourceTexture::TextureCache)
+        if !fetch_buffer.is_empty() {
+            f(current_texture_id, fetch_buffer);
+            fetch_buffer.clear();
+        }
     }
 
-    pub fn get_glyph_dimensions(&mut self, glyph_key: &GlyphKey) -> Option<GlyphDimensions> {
-        match self.cached_glyph_dimensions.entry(glyph_key.clone()) {
+    pub fn get_glyph_dimensions(
+        &mut self,
+        font: &FontInstance,
+        key: &GlyphKey,
+    ) -> Option<GlyphDimensions> {
+        let key = GlyphRequest::new(font, key);
+
+        match self.cached_glyph_dimensions.entry(key.clone()) {
             Occupied(entry) => *entry.get(),
-            Vacant(entry) => {
-                *entry.insert(self.glyph_rasterizer.get_glyph_dimensions(glyph_key))
-            }
+            Vacant(entry) => *entry.insert(
+                self.glyph_rasterizer
+                    .get_glyph_dimensions(&key.font, &key.key),
+            ),
         }
+    }
+
+    pub fn get_glyph_index(&mut self, font_key: FontKey, ch: char) -> Option<u32> {
+        self.glyph_rasterizer.get_glyph_index(font_key, ch)
     }
 
     #[inline]
-    pub fn get_cached_image(&self,
-                            image_key: ImageKey,
-                            image_rendering: ImageRendering,
-                            tile: Option<TileOffset>) -> CacheItem {
+    pub fn get_cached_image(
+        &self,
+        image_key: ImageKey,
+        image_rendering: ImageRendering,
+        tile: Option<TileOffset>,
+    ) -> CacheItem {
         debug_assert_eq!(self.state, State::QueryResources);
         let key = ImageRequest {
             key: image_key,
             rendering: image_rendering,
-            tile: tile,
+            tile,
         };
-        let image_info = &self.cached_images.get(&key, self.current_frame_id);
-        let item = self.texture_cache.get(image_info.texture_cache_id);
-        CacheItem {
-            texture_id: SourceTexture::TextureCache(item.texture_id),
-            uv0: DevicePoint::new(item.pixel_rect.top_left.x as f32,
-                                  item.pixel_rect.top_left.y as f32),
-            uv1: DevicePoint::new(item.pixel_rect.bottom_right.x as f32,
-                                  item.pixel_rect.bottom_right.y as f32),
-        }
+        let image_info = &self.cached_images.get(&key);
+        self.texture_cache.get(&image_info.texture_cache_handle)
     }
 
-    pub fn get_image_properties(&self, image_key: ImageKey) -> ImageProperties {
-        let image_template = &self.image_templates.get(image_key).unwrap();
+    pub fn get_image_properties(&self, image_key: ImageKey) -> Option<ImageProperties> {
+        let image_template = &self.resources.image_templates.get(image_key);
 
-        let external_image = match image_template.data {
-            ImageData::External(ext_image) => {
-                match ext_image.image_type {
-                    ExternalImageType::Texture2DHandle |
-                    ExternalImageType::TextureRectHandle |
-                    ExternalImageType::TextureExternalHandle => {
-                        Some(ext_image)
-                    },
-                    // external buffer uses resource_cache.
-                    ExternalImageType::ExternalBuffer => None,
+        image_template.map(|image_template| {
+            let external_image = match image_template.data {
+                ImageData::External(ext_image) => {
+                    match ext_image.image_type {
+                        ExternalImageType::Texture2DHandle |
+                        ExternalImageType::Texture2DArrayHandle |
+                        ExternalImageType::TextureRectHandle |
+                        ExternalImageType::TextureExternalHandle => Some(ext_image),
+                        // external buffer uses resource_cache.
+                        ExternalImageType::ExternalBuffer => None,
+                    }
                 }
-            },
-            // raw and blob image are all using resource_cache.
-            ImageData::Raw(..) | ImageData::Blob(..) => None,
-        };
+                // raw and blob image are all using resource_cache.
+                ImageData::Raw(..) | ImageData::Blob(..) => None,
+            };
 
-        ImageProperties {
-            descriptor: image_template.descriptor,
-            external_image: external_image,
-            tiling: image_template.tiling,
-        }
+            ImageProperties {
+                descriptor: image_template.descriptor,
+                external_image,
+                tiling: image_template.tiling,
+            }
+        })
     }
 
-    #[inline]
-    pub fn get_webgl_texture(&self, context_id: &WebGLContextId) -> CacheItem {
-        let webgl_texture = &self.webgl_textures[context_id];
-        CacheItem {
-            texture_id: webgl_texture.id,
-            uv0: DevicePoint::new(0.0, webgl_texture.size.height as f32),
-            uv1: DevicePoint::new(webgl_texture.size.width as f32, 0.0),
-        }
-    }
-
-    pub fn get_webgl_texture_size(&self, context_id: &WebGLContextId) -> DeviceIntSize {
-        self.webgl_textures[context_id].size
-    }
-
-    pub fn expire_old_resources(&mut self, frame_id: FrameId) {
-        self.cached_images.expire_old_resources(&mut self.texture_cache, frame_id);
-        self.cached_glyphs.expire_old_resources(&mut self.texture_cache, frame_id);
+    pub fn get_tiled_image_map(&self) -> TiledImageMap {
+        self.resources
+            .image_templates
+            .images
+            .iter()
+            .filter_map(|(&key, template)| {
+                template.tiling.map(|tile_size| {
+                    (
+                        key,
+                        ImageTiling {
+                            image_size: DeviceUintSize::new(
+                                template.descriptor.width,
+                                template.descriptor.height,
+                            ),
+                            tile_size,
+                        },
+                    )
+                })
+            })
+            .collect()
     }
 
     pub fn begin_frame(&mut self, frame_id: FrameId) {
         debug_assert_eq!(self.state, State::Idle);
         self.state = State::AddResources;
+        self.texture_cache.begin_frame(frame_id);
         self.current_frame_id = frame_id;
-        self.gpu_cache.begin_frame();
     }
 
-    pub fn block_until_all_resources_added(&mut self,
-                                           texture_cache_profile: &mut TextureCacheProfileCounters) {
+    pub fn block_until_all_resources_added(
+        &mut self,
+        gpu_cache: &mut GpuCache,
+        texture_cache_profile: &mut TextureCacheProfileCounters,
+    ) {
         profile_scope!("block_until_all_resources_added");
 
         debug_assert_eq!(self.state, State::AddResources);
         self.state = State::QueryResources;
 
         self.glyph_rasterizer.resolve_glyphs(
-            self.current_frame_id,
             &mut self.cached_glyphs,
             &mut self.texture_cache,
+            gpu_cache,
             texture_cache_profile,
         );
 
-        let mut image_requests = mem::replace(&mut self.pending_image_requests, Vec::new());
-        for request in image_requests.drain(..) {
-            self.finalize_image_request(request, None, texture_cache_profile);
-        }
-
-        let mut blob_image_requests = mem::replace(&mut self.blob_image_requests, HashSet::new());
-        if self.blob_image_renderer.is_some() {
-            for request in blob_image_requests.drain() {
-                match self.blob_image_renderer.as_mut().unwrap().resolve(request.into()) {
-                    Ok(image) => {
-                        self.finalize_image_request(request,
-                                                    Some(ImageData::new(image.data)),
-                                                    texture_cache_profile);
-                    }
-                    // TODO(nical): I think that we should handle these somewhat gracefully,
-                    // at least in the out-of-memory scenario.
-                    Err(BlobImageError::Oom) => {
-                        // This one should be recoverable-ish.
-                        panic!("Failed to render a vector image (OOM)");
-                    }
-                    Err(BlobImageError::InvalidKey) => {
-                        panic!("Invalid vector image key");
-                    }
-                    Err(BlobImageError::InvalidData) => {
-                        // TODO(nical): If we run into this we should kill the content process.
-                        panic!("Invalid vector image data");
-                    }
-                    Err(BlobImageError::Other(msg)) => {
-                        panic!("Vector image error {}", msg);
-                    }
-                }
-            }
-        }
+        // Apply any updates of new / updated images (incl. blobs) to the texture cache.
+        self.update_texture_cache(gpu_cache);
+        self.texture_cache.end_frame(texture_cache_profile);
     }
 
-    fn update_texture_cache(&mut self,
-                            request: &ImageRequest,
-                            image_data: Option<ImageData>,
-                            texture_cache_profile: &mut TextureCacheProfileCounters) {
-        let image_template = self.image_templates.get_mut(request.key).unwrap();
-        let image_data = image_data.unwrap_or_else(||{
-            image_template.data.clone()
-        });
+    fn update_texture_cache(&mut self, gpu_cache: &mut GpuCache) {
+        for request in self.pending_image_requests.drain() {
+            let image_template = self.resources.image_templates.get_mut(request.key).unwrap();
+            debug_assert!(image_template.data.uses_texture_cache());
 
-        let descriptor = if let Some(tile) = request.tile {
-            let tile_size = image_template.tiling.unwrap();
-            let image_descriptor = &image_template.descriptor;
-
-            let (actual_width, actual_height) = compute_tile_size(image_descriptor, tile_size, tile);
-
-            // The tiled image could be stored on the CPU as one large image or be
-            // already broken up into tiles. This affects the way we compute the stride
-            // and offset.
-            let tiled_on_cpu = image_template.data.is_blob();
-
-            let (stride, offset) = if tiled_on_cpu {
-                (image_descriptor.stride, 0)
-            } else {
-                let bpp = image_descriptor.format.bytes_per_pixel().unwrap();
-                let stride = image_descriptor.compute_stride();
-                let offset = image_descriptor.offset + tile.y as u32 * tile_size as u32 * stride
-                                                     + tile.x as u32 * tile_size as u32 * bpp;
-                (Some(stride), offset)
+            let image_data = match image_template.data {
+                ImageData::Raw(..) | ImageData::External(..) => {
+                    // Safe to clone here since the Raw image data is an
+                    // Arc, and the external image data is small.
+                    image_template.data.clone()
+                }
+                ImageData::Blob(..) => {
+                    // Extract the rasterized image from the blob renderer.
+                    match self.blob_image_renderer
+                        .as_mut()
+                        .unwrap()
+                        .resolve(request.into())
+                    {
+                        Ok(image) => ImageData::new(image.data),
+                        // TODO(nical): I think that we should handle these somewhat gracefully,
+                        // at least in the out-of-memory scenario.
+                        Err(BlobImageError::Oom) => {
+                            // This one should be recoverable-ish.
+                            panic!("Failed to render a vector image (OOM)");
+                        }
+                        Err(BlobImageError::InvalidKey) => {
+                            panic!("Invalid vector image key");
+                        }
+                        Err(BlobImageError::InvalidData) => {
+                            // TODO(nical): If we run into this we should kill the content process.
+                            panic!("Invalid vector image data");
+                        }
+                        Err(BlobImageError::Other(msg)) => {
+                            panic!("Vector image error {}", msg);
+                        }
+                    }
+                }
             };
 
-            ImageDescriptor {
-                width: actual_width,
-                height: actual_height,
-                stride: stride,
-                offset: offset,
-                format: image_descriptor.format,
-                is_opaque: image_descriptor.is_opaque,
-            }
-        } else {
-            image_template.descriptor.clone()
-        };
+            let filter = match request.rendering {
+                ImageRendering::Pixelated => TextureFilter::Nearest,
+                ImageRendering::Auto | ImageRendering::CrispEdges => TextureFilter::Linear,
+            };
 
-        match self.cached_images.entry(*request, self.current_frame_id) {
-            Occupied(entry) => {
-                let image_id = entry.get().texture_cache_id;
+            let descriptor = if let Some(tile) = request.tile {
+                let tile_size = image_template.tiling.unwrap();
+                let image_descriptor = &image_template.descriptor;
 
-                if entry.get().epoch != image_template.epoch {
-                    self.texture_cache.update(image_id,
-                                              descriptor,
-                                              image_data,
-                                              image_template.dirty_rect);
+                let (actual_width, actual_height) =
+                    compute_tile_size(image_descriptor, tile_size, tile);
 
-                    // Update the cached epoch
-                    *entry.into_mut() = CachedImageInfo {
-                        texture_cache_id: image_id,
-                        epoch: image_template.epoch,
-                    };
-                    image_template.dirty_rect = None;
-                }
-            }
-            Vacant(entry) => {
-                let image_id = self.texture_cache.new_item_id();
+                // The tiled image could be stored on the CPU as one large image or be
+                // already broken up into tiles. This affects the way we compute the stride
+                // and offset.
+                let tiled_on_cpu = image_template.data.is_blob();
 
-                let filter = match request.rendering {
-                    ImageRendering::Pixelated => TextureFilter::Nearest,
-                    ImageRendering::Auto | ImageRendering::CrispEdges => TextureFilter::Linear,
+                let (stride, offset) = if tiled_on_cpu {
+                    (image_descriptor.stride, 0)
+                } else {
+                    let bpp = image_descriptor.format.bytes_per_pixel();
+                    let stride = image_descriptor.compute_stride();
+                    let offset = image_descriptor.offset +
+                        tile.y as u32 * tile_size as u32 * stride +
+                        tile.x as u32 * tile_size as u32 * bpp;
+                    (Some(stride), offset)
                 };
 
-                self.texture_cache.insert(image_id,
-                                          descriptor,
-                                          filter,
-                                          image_data,
-                                          texture_cache_profile);
-
-                entry.insert(CachedImageInfo {
-                    texture_cache_id: image_id,
-                    epoch: image_template.epoch,
-                });
-            }
-        }
-    }
-    fn finalize_image_request(&mut self,
-                              request: ImageRequest,
-                              image_data: Option<ImageData>,
-                              texture_cache_profile: &mut TextureCacheProfileCounters) {
-        match self.image_templates.get(request.key).unwrap().data {
-            ImageData::External(ext_image) => {
-                match ext_image.image_type {
-                    ExternalImageType::Texture2DHandle |
-                    ExternalImageType::TextureRectHandle |
-                    ExternalImageType::TextureExternalHandle => {
-                        // external handle doesn't need to update the texture_cache.
-                    }
-                    ExternalImageType::ExternalBuffer => {
-                        self.update_texture_cache(&request,
-                                                  image_data,
-                                                  texture_cache_profile);
-                    }
+                ImageDescriptor {
+                    width: actual_width,
+                    height: actual_height,
+                    stride,
+                    offset,
+                    format: image_descriptor.format,
+                    is_opaque: image_descriptor.is_opaque,
                 }
-            }
-            ImageData::Raw(..) | ImageData::Blob(..) => {
-                self.update_texture_cache(&request,
-                                           image_data,
-                                           texture_cache_profile);
-            }
+            } else {
+                image_template.descriptor.clone()
+            };
+
+            let entry = self.cached_images.get_mut(&request).unwrap();
+            self.texture_cache.update(
+                &mut entry.texture_cache_handle,
+                descriptor,
+                filter,
+                image_data,
+                [0.0; 2],
+                image_template.dirty_rect,
+                gpu_cache,
+            );
+            image_template.dirty_rect = None;
         }
     }
 
@@ -731,35 +828,56 @@ impl ResourceCache {
         debug_assert_eq!(self.state, State::QueryResources);
         self.state = State::Idle;
     }
-}
 
-pub trait Resource {
-    fn texture_cache_item_id(&self) -> Option<TextureCacheItemId>;
-}
+    pub fn on_memory_pressure(&mut self) {
+        // This is drastic. It will basically flush everything out of the cache,
+        // and the next frame will have to rebuild all of its resources.
+        // We may want to look into something less extreme, but on the other hand this
+        // should only be used in situations where are running low enough on memory
+        // that we risk crashing if we don't do something about it.
+        // The advantage of clearing the cache completely is that it gets rid of any
+        // remaining fragmentation that could have persisted if we kept around the most
+        // recently used resources.
+        self.cached_images.clear();
+        self.cached_glyphs.clear();
+    }
 
-impl Resource for TextureCacheItemId {
-    fn texture_cache_item_id(&self) -> Option<TextureCacheItemId> {
-        Some(*self)
+    pub fn clear_namespace(&mut self, namespace: IdNamespace) {
+        //TODO: use `retain` when we are on Rust-1.18
+        let image_keys: Vec<_> = self.resources
+            .image_templates
+            .images
+            .keys()
+            .filter(|&key| key.0 == namespace)
+            .cloned()
+            .collect();
+        for key in &image_keys {
+            self.resources.image_templates.images.remove(key);
+        }
+
+        let font_keys: Vec<_> = self.resources
+            .font_templates
+            .keys()
+            .filter(|&key| key.0 == namespace)
+            .cloned()
+            .collect();
+        for key in &font_keys {
+            self.resources.font_templates.remove(key);
+        }
+
+        self.cached_images
+            .clear_keys(|request| request.key.0 == namespace);
+        self.cached_glyphs
+            .clear_fonts(|font| font.font_key.0 == namespace);
     }
 }
-
-impl Resource for Option<TextureCacheItemId> {
-    fn texture_cache_item_id(&self) -> Option<TextureCacheItemId> {
-        *self
-    }
-}
-
-impl Resource for CachedImageInfo {
-    fn texture_cache_item_id(&self) -> Option<TextureCacheItemId> {
-        Some(self.texture_cache_id)
-    }
-}
-
 
 // Compute the width and height of a tile depending on its position in the image.
-pub fn compute_tile_size(descriptor: &ImageDescriptor,
-                         base_size: TileSize,
-                         tile: TileOffset) -> (u32, u32) {
+pub fn compute_tile_size(
+    descriptor: &ImageDescriptor,
+    base_size: TileSize,
+    tile: TileOffset,
+) -> (u32, u32) {
     let base_size = base_size as u32;
     // Most tiles are going to have base_size as width and height,
     // except for tiles around the edges that are shrunk to fit the mage data

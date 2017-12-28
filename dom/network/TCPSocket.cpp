@@ -33,10 +33,6 @@
 #include "nsStringStream.h"
 #include "secerr.h"
 #include "sslerr.h"
-#ifdef MOZ_WIDGET_GONK
-#include "nsINetworkManager.h"
-#include "nsINetworkInterface.h"
-#endif
 
 #define BUFFER_SIZE 65536
 #define NETWORK_STATS_THRESHOLD 65536
@@ -136,7 +132,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 NS_IMPL_ADDREF_INHERITED(TCPSocket, DOMEventTargetHelper)
 NS_IMPL_RELEASE_INHERITED(TCPSocket, DOMEventTargetHelper)
 
-NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(TCPSocket)
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(TCPSocket)
   NS_INTERFACE_MAP_ENTRY(nsITransportEventSink)
   NS_INTERFACE_MAP_ENTRY(nsIRequestObserver)
   NS_INTERFACE_MAP_ENTRY(nsIStreamListener)
@@ -162,10 +158,6 @@ TCPSocket::TCPSocket(nsIGlobalObject* aGlobal, const nsAString& aHost, uint16_t 
   , mTrackingNumber(0)
   , mWaitingForStartTLS(false)
   , mObserversActive(false)
-#ifdef MOZ_WIDGET_GONK
-  , mAppId(nsIScriptSecurityManager::UNKNOWN_APP_ID)
-  , mInIsolatedMozBrowser(false)
-#endif
 {
   if (aGlobal) {
     nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(aGlobal);
@@ -200,10 +192,8 @@ TCPSocket::CreateStream()
   nsCOMPtr<nsIAsyncInputStream> asyncStream = do_QueryInterface(mSocketInputStream);
   NS_ENSURE_TRUE(asyncStream, NS_ERROR_NOT_AVAILABLE);
 
-  nsCOMPtr<nsIThread> mainThread;
-  NS_GetMainThread(getter_AddRefs(mainThread));
-
-  rv = asyncStream->AsyncWait(this, nsIAsyncInputStream::WAIT_CLOSURE_ONLY, 0, mainThread);
+  nsCOMPtr<nsIEventTarget> mainTarget = GetMainThreadEventTarget();
+  rv = asyncStream->AsyncWait(this, nsIAsyncInputStream::WAIT_CLOSURE_ONLY, 0, mainTarget);
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (mUseArrayBuffers) {
@@ -220,6 +210,7 @@ TCPSocket::CreateStream()
 
   mMultiplexStream = do_CreateInstance("@mozilla.org/io/multiplex-input-stream;1", &rv);
   NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIInputStream> stream = do_QueryInterface(mMultiplexStream);
 
   mMultiplexStreamCopier = do_CreateInstance("@mozilla.org/network/async-stream-copier;1", &rv);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -228,7 +219,7 @@ TCPSocket::CreateStream()
       do_GetService("@mozilla.org/network/socket-transport-service;1");
 
   nsCOMPtr<nsIEventTarget> target = do_QueryInterface(sts);
-  rv = mMultiplexStreamCopier->Init(mMultiplexStream,
+  rv = mMultiplexStreamCopier->Init(stream,
                                     mSocketOutputStream,
                                     target,
                                     true, /* source buffered */
@@ -248,9 +239,8 @@ TCPSocket::InitWithUnconnectedTransport(nsISocketTransport* aTransport)
 
   MOZ_ASSERT(XRE_GetProcessType() != GeckoProcessType_Content);
 
-  nsCOMPtr<nsIThread> mainThread;
-  NS_GetMainThread(getter_AddRefs(mainThread));
-  mTransport->SetEventSink(this, mainThread);
+  nsCOMPtr<nsIEventTarget> mainTarget = GetMainThreadEventTarget();
+  mTransport->SetEventSink(this, mainTarget);
 
   nsresult rv = CreateStream();
   NS_ENSURE_SUCCESS(rv, rv);
@@ -270,7 +260,12 @@ TCPSocket::Init()
 
   if (XRE_GetProcessType() == GeckoProcessType_Content) {
     mReadyState = TCPReadyState::Connecting;
-    mSocketBridgeChild = new TCPSocketChild(mHost, mPort);
+
+    nsCOMPtr<nsIEventTarget> target;
+    if (nsCOMPtr<nsIGlobalObject> global = GetOwnerGlobal()) {
+      target = global->EventTargetFor(TaskCategory::Other);
+    }
+    mSocketBridgeChild = new TCPSocketChild(mHost, mPort, target);
     mSocketBridgeChild->SendOpen(this, mSsl, mUseArrayBuffers);
     return NS_OK;
   }
@@ -319,13 +314,6 @@ TCPSocket::InitWithTransport(nsISocketTransport* aTransport)
   int32_t port;
   mTransport->GetPort(&port);
   mPort = port;
-
-#ifdef MOZ_WIDGET_GONK
-  nsCOMPtr<nsINetworkManager> networkManager = do_GetService("@mozilla.org/network/manager;1");
-  if (networkManager) {
-    networkManager->GetActiveNetworkInfo(getter_AddRefs(mActiveNetworkInfo));
-  }
-#endif
 
   return NS_OK;
 }
@@ -404,7 +392,7 @@ void
 TCPSocket::NotifyCopyComplete(nsresult aStatus)
 {
   mAsyncCopierActive = false;
-  
+
   uint32_t countRemaining;
   nsresult rvRemaining = mMultiplexStream->GetCount(&countRemaining);
   NS_ENSURE_SUCCESS_VOID(rvRemaining);
@@ -418,7 +406,7 @@ TCPSocket::NotifyCopyComplete(nsresult aStatus)
       mMultiplexStream->AppendStream(stream);
       mPendingDataWhileCopierActive.RemoveElementAt(0);
   }
-  
+
   if (mSocketBridgeParent) {
     mozilla::Unused << mSocketBridgeParent->SendUpdateBufferedAmount(BufferedAmount(),
                                                                      mTrackingNumber);
@@ -609,7 +597,8 @@ TCPSocket::BufferedAmount()
   }
   if (mMultiplexStream) {
     uint64_t available = 0;
-    mMultiplexStream->Available(&available);
+    nsCOMPtr<nsIInputStream> stream(do_QueryInterface(mMultiplexStream));
+    stream->Available(&available);
     return available;
   }
   return 0;
@@ -1134,15 +1123,6 @@ void
 TCPSocket::SetSocketBridgeParent(TCPSocketParent* aBridgeParent)
 {
   mSocketBridgeParent = aBridgeParent;
-}
-
-void
-TCPSocket::SetAppIdAndBrowser(uint32_t aAppId, bool aInIsolatedMozBrowser)
-{
-#ifdef MOZ_WIDGET_GONK
-  mAppId = aAppId;
-  mInIsolatedMozBrowser = aInIsolatedMozBrowser;
-#endif
 }
 
 NS_IMETHODIMP

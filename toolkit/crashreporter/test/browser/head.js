@@ -17,7 +17,7 @@ function make_fake_appdir() {
   // just because we know that will get cleaned up after the mochitest run.
   let dirSvc = Cc["@mozilla.org/file/directory_service;1"]
                .getService(Ci.nsIProperties);
-  let profD = dirSvc.get("ProfD", Ci.nsILocalFile);
+  let profD = dirSvc.get("ProfD", Ci.nsIFile);
   // create a subdir just to keep our files out of the way
   let appD = create_subdir(profD, "UAppData");
 
@@ -105,7 +105,7 @@ function writeDataToFile(file, data) {
   fstream.init(file, -1, -1, 0);
   var os = Cc["@mozilla.org/intl/converter-output-stream;1"]
            .createInstance(Ci.nsIConverterOutputStream);
-  os.init(fstream, "UTF-8", 0, 0x0000);
+  os.init(fstream, "UTF-8");
   os.writeString(data);
   os.close();
   fstream.close();

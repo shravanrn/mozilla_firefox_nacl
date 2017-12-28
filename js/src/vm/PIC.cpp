@@ -289,8 +289,8 @@ ForOfPIC_traceObject(JSTracer* trc, JSObject* obj)
 }
 
 static const ClassOps ForOfPICClassOps = {
-    nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr, ForOfPIC_finalize,
+    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr, ForOfPIC_finalize,
     nullptr,              /* call        */
     nullptr,              /* hasInstance */
     nullptr,              /* construct   */

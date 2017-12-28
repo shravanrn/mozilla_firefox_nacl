@@ -8,18 +8,18 @@
 
 use Atom;
 use cssparser::{AtRuleParser, DeclarationListParser, DeclarationParser};
-use cssparser::{Parser, Token, serialize_identifier, BasicParseError};
-use error_reporting::ContextualParseError;
+use cssparser::{Parser, Token, serialize_identifier, BasicParseError, CowRcStr};
+use error_reporting::{ContextualParseError, ParseErrorReporter};
 #[cfg(feature = "gecko")] use gecko::rules::CounterStyleDescriptors;
 #[cfg(feature = "gecko")] use gecko_bindings::structs::nsCSSCounterDesc;
-use parser::{ParserContext, log_css_error, Parse};
+use parser::{ParserContext, ParserErrorContext, Parse};
 use selectors::parser::SelectorParseError;
 use shared_lock::{SharedRwLockReadGuard, ToCssWithGuard};
 use std::ascii::AsciiExt;
 use std::borrow::Cow;
 use std::fmt;
 use std::ops::Range;
-use style_traits::{ToCss, OneOrMoreCommaSeparated, ParseError, StyleParseError};
+use style_traits::{Comma, OneOrMoreSeparated, ParseError, StyleParseError, ToCss};
 use values::CustomIdent;
 
 /// Parse the prelude of an @counter-style rule
@@ -50,9 +50,14 @@ pub fn parse_counter_style_name<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Cu
 }
 
 /// Parse the body (inside `{}`) of an @counter-style rule
-pub fn parse_counter_style_body<'i, 't>(name: CustomIdent, context: &ParserContext, input: &mut Parser<'i, 't>)
-                                        -> Result<CounterStyleRuleData, ParseError<'i>> {
-    let start = input.position();
+pub fn parse_counter_style_body<'i, 't, R>(name: CustomIdent,
+                                           context: &ParserContext,
+                                           error_context: &ParserErrorContext<R>,
+                                           input: &mut Parser<'i, 't>)
+                                           -> Result<CounterStyleRuleData, ParseError<'i>>
+    where R: ParseErrorReporter
+{
+    let start = input.current_source_location();
     let mut rule = CounterStyleRuleData::empty(name);
     {
         let parser = CounterStyleRuleParser {
@@ -62,10 +67,8 @@ pub fn parse_counter_style_body<'i, 't>(name: CustomIdent, context: &ParserConte
         let mut iter = DeclarationListParser::new(input, parser);
         while let Some(declaration) = iter.next() {
             if let Err(err) = declaration {
-                let pos = err.span.start;
-                let error = ContextualParseError::UnsupportedCounterStyleDescriptorDeclaration(
-                    iter.input.slice(err.span), err.error);
-                log_css_error(iter.input, pos, error, context);
+                let error = ContextualParseError::UnsupportedCounterStyleDescriptorDeclaration(err.slice, err.error);
+                context.log_css_error(error_context, err.location, error)
             }
         }
     }
@@ -97,7 +100,7 @@ pub fn parse_counter_style_body<'i, 't>(name: CustomIdent, context: &ParserConte
         _ => None
     };
     if let Some(error) = error {
-        log_css_error(input, start, error, context);
+        context.log_css_error(error_context, start, error);
         Err(StyleParseError::UnspecifiedError.into())
     } else {
         Ok(rule)
@@ -111,7 +114,8 @@ struct CounterStyleRuleParser<'a, 'b: 'a> {
 
 /// Default methods reject all at rules.
 impl<'a, 'b, 'i> AtRuleParser<'i> for CounterStyleRuleParser<'a, 'b> {
-    type Prelude = ();
+    type PreludeNoBlock = ();
+    type PreludeBlock = ();
     type AtRule = ();
     type Error = SelectorParseError<'i, StyleParseError<'i>>;
 }
@@ -184,7 +188,7 @@ macro_rules! counter_style_descriptors {
             type Declaration = ();
             type Error = SelectorParseError<'i, StyleParseError<'i>>;
 
-            fn parse_value<'t>(&mut self, name: Cow<'i, str>, input: &mut Parser<'i, 't>)
+            fn parse_value<'t>(&mut self, name: CowRcStr<'i>, input: &mut Parser<'i, 't>)
                                -> Result<(), ParseError<'i>> {
                 match_ignore_ascii_case! { &*name,
                     $(
@@ -272,7 +276,7 @@ counter_style_descriptors! {
 }
 
 /// https://drafts.csswg.org/css-counter-styles/#counter-style-system
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum System {
     /// 'cyclic'
     Cyclic,
@@ -295,7 +299,7 @@ pub enum System {
 
 impl Parse for System {
     fn parse<'i, 't>(_context: &ParserContext, input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i>> {
-        try_match_ident_ignore_ascii_case! { input.expect_ident()?,
+        try_match_ident_ignore_ascii_case! { input.expect_ident_cloned()?,
             "cyclic" => Ok(System::Cyclic),
             "numeric" => Ok(System::Numeric),
             "alphabetic" => Ok(System::Alphabetic),
@@ -323,7 +327,8 @@ impl ToCss for System {
             System::Additive => dest.write_str("additive"),
             System::Fixed { first_symbol_value } => {
                 if let Some(value) = first_symbol_value {
-                    write!(dest, "fixed {}", value)
+                    dest.write_str("fixed ")?;
+                    value.to_css(dest)
                 } else {
                     dest.write_str("fixed")
                 }
@@ -337,7 +342,8 @@ impl ToCss for System {
 }
 
 /// https://drafts.csswg.org/css-counter-styles/#typedef-symbol
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "gecko", derive(MallocSizeOf))]
+#[derive(Clone, Debug, Eq, PartialEq, ToComputedValue)]
 pub enum Symbol {
     /// <string>
     String(String),
@@ -351,9 +357,9 @@ pub enum Symbol {
 impl Parse for Symbol {
     fn parse<'i, 't>(_context: &ParserContext, input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i>> {
         match input.next() {
-            Ok(Token::QuotedString(s)) => Ok(Symbol::String(s.into_owned())),
-            Ok(Token::Ident(s)) => Ok(Symbol::Ident(s.into_owned())),
-            Ok(t) => Err(BasicParseError::UnexpectedToken(t).into()),
+            Ok(&Token::QuotedString(ref s)) => Ok(Symbol::String(s.as_ref().to_owned())),
+            Ok(&Token::Ident(ref s)) => Ok(Symbol::Ident(s.as_ref().to_owned())),
+            Ok(t) => Err(BasicParseError::UnexpectedToken(t.clone()).into()),
             Err(e) => Err(e.into()),
         }
     }
@@ -380,7 +386,7 @@ impl Symbol {
 }
 
 /// https://drafts.csswg.org/css-counter-styles/#counter-style-negative
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, ToCss)]
 pub struct Negative(pub Symbol, pub Option<Symbol>);
 
 impl Parse for Negative {
@@ -392,21 +398,10 @@ impl Parse for Negative {
     }
 }
 
-impl ToCss for Negative {
-    fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
-        self.0.to_css(dest)?;
-        if let Some(ref symbol) = self.1 {
-            dest.write_char(' ')?;
-            symbol.to_css(dest)?
-        }
-        Ok(())
-    }
-}
-
 /// https://drafts.csswg.org/css-counter-styles/#counter-style-range
 ///
 /// Empty Vec represents 'auto'
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Ranges(pub Vec<Range<Option<i32>>>);
 
 impl Parse for Ranges {
@@ -430,9 +425,9 @@ impl Parse for Ranges {
 
 fn parse_bound<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Option<i32>, ParseError<'i>> {
     match input.next() {
-        Ok(Token::Number(ref v)) if v.int_value.is_some() => Ok(Some(v.int_value.unwrap())),
-        Ok(Token::Ident(ref ident)) if ident.eq_ignore_ascii_case("infinite") => Ok(None),
-        Ok(t) => Err(BasicParseError::UnexpectedToken(t).into()),
+        Ok(&Token::Number { int_value: Some(v), .. }) => Ok(Some(v)),
+        Ok(&Token::Ident(ref ident)) if ident.eq_ignore_ascii_case("infinite") => Ok(None),
+        Ok(t) => Err(BasicParseError::UnexpectedToken(t.clone()).into()),
         Err(e) => Err(e.into()),
     }
 }
@@ -462,14 +457,14 @@ where W: fmt::Write {
 
 fn bound_to_css<W>(range: Option<i32>, dest: &mut W) -> fmt::Result where W: fmt::Write {
     if let Some(finite) = range {
-        write!(dest, "{}", finite)
+        finite.to_css(dest)
     } else {
         dest.write_str("infinite")
     }
 }
 
 /// https://drafts.csswg.org/css-counter-styles/#counter-style-pad
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, ToCss)]
 pub struct Pad(pub u32, pub Symbol);
 
 impl Parse for Pad {
@@ -484,15 +479,8 @@ impl Parse for Pad {
     }
 }
 
-impl ToCss for Pad {
-    fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
-        write!(dest, "{} ", self.0)?;
-        self.1.to_css(dest)
-    }
-}
-
 /// https://drafts.csswg.org/css-counter-styles/#counter-style-fallback
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, ToCss)]
 pub struct Fallback(pub CustomIdent);
 
 impl Parse for Fallback {
@@ -501,14 +489,9 @@ impl Parse for Fallback {
     }
 }
 
-impl ToCss for Fallback {
-    fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
-        self.0.to_css(dest)
-    }
-}
-
 /// https://drafts.csswg.org/css-counter-styles/#descdef-counter-style-symbols
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "gecko", derive(MallocSizeOf))]
+#[derive(Clone, Debug, Eq, PartialEq, ToComputedValue)]
 pub struct Symbols(pub Vec<Symbol>);
 
 impl Parse for Symbols {
@@ -542,7 +525,7 @@ impl ToCss for Symbols {
 }
 
 /// https://drafts.csswg.org/css-counter-styles/#descdef-counter-style-additive-symbols
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, ToCss)]
 pub struct AdditiveSymbols(pub Vec<AdditiveTuple>);
 
 impl Parse for AdditiveSymbols {
@@ -556,14 +539,8 @@ impl Parse for AdditiveSymbols {
     }
 }
 
-impl ToCss for AdditiveSymbols {
-    fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
-        self.0.to_css(dest)
-    }
-}
-
 /// <integer> && <symbol>
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, ToCss)]
 pub struct AdditiveTuple {
     /// <integer>
     pub weight: u32,
@@ -571,7 +548,9 @@ pub struct AdditiveTuple {
     pub symbol: Symbol,
 }
 
-impl OneOrMoreCommaSeparated for AdditiveTuple {}
+impl OneOrMoreSeparated for AdditiveTuple {
+    type S = Comma;
+}
 
 impl Parse for AdditiveTuple {
     fn parse<'i, 't>(context: &ParserContext, input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i>> {
@@ -588,15 +567,8 @@ impl Parse for AdditiveTuple {
     }
 }
 
-impl ToCss for AdditiveTuple {
-    fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
-        write!(dest, "{} ", self.weight)?;
-        self.symbol.to_css(dest)
-    }
-}
-
 /// https://drafts.csswg.org/css-counter-styles/#counter-style-speak-as
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, ToCss)]
 pub enum SpeakAs {
     /// auto
     Auto,
@@ -637,17 +609,5 @@ impl Parse for SpeakAs {
         result.or_else(|_| {
             Ok(SpeakAs::Other(parse_counter_style_name(input)?))
         })
-    }
-}
-
-impl ToCss for SpeakAs {
-    fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
-        match *self {
-            SpeakAs::Auto => dest.write_str("auto"),
-            SpeakAs::Bullets => dest.write_str("bullets"),
-            SpeakAs::Numbers => dest.write_str("numbers"),
-            SpeakAs::Words => dest.write_str("words"),
-            SpeakAs::Other(ref other) => other.to_css(dest),
-        }
     }
 }

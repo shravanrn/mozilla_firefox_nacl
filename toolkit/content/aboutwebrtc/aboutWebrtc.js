@@ -172,29 +172,29 @@ SavePage.prototype.onClick = function() {
   FoldEffect.expandAll();
   FilePicker.init(window, getString("save_page_dialog_title"), FilePicker.modeSave);
   FilePicker.defaultString = LOGFILE_NAME_DEFAULT;
-  let rv = FilePicker.show();
+  FilePicker.open(rv => {
+    if (rv == FilePicker.returnOK || rv == FilePicker.returnReplace) {
+      let fout = FileUtils.openAtomicFileOutputStream(
+        FilePicker.file, FileUtils.MODE_WRONLY | FileUtils.MODE_CREATE);
 
-  if (rv == FilePicker.returnOK || rv == FilePicker.returnReplace) {
-    let fout = FileUtils.openAtomicFileOutputStream(
-      FilePicker.file, FileUtils.MODE_WRONLY | FileUtils.MODE_CREATE);
+      let nodes = content.querySelectorAll(".no-print");
+      let noPrintList = [];
+      for (let node of nodes) {
+        noPrintList.push(node);
+        node.style.setProperty("display", "none");
+      }
 
-    let nodes = content.querySelectorAll(".no-print");
-    let noPrintList = [];
-    for (let node of nodes) {
-      noPrintList.push(node);
-      node.style.setProperty("display", "none");
+      fout.write(content.outerHTML, content.outerHTML.length);
+      FileUtils.closeAtomicFileOutputStream(fout);
+
+      for (let node of noPrintList) {
+        node.style.removeProperty("display");
+      }
+
+      this._message = formatString("save_page_msg", [FilePicker.file.path], 1);
+      this.update();
     }
-
-    fout.write(content.outerHTML, content.outerHTML.length);
-    FileUtils.closeAtomicFileOutputStream(fout);
-
-    for (let node of noPrintList) {
-      node.style.removeProperty("display");
-    }
-
-    this._message = formatString("save_page_msg", [FilePicker.file.path], 1);
-    this.update();
-  }
+  });
 };
 
 function DebugMode() {
@@ -663,13 +663,16 @@ ICEStats.prototype = {
         stat.state || "",
         stat.priority || "",
         stat.nominated || "",
-        stat.selected || ""
+        stat.selected || "",
+        stat.bytesSent || "",
+        stat.bytesReceived || ""
       ]);
     }
 
     let statsTable = new SimpleTable(
       [getString("local_candidate"), getString("remote_candidate"), getString("ice_state"),
-       getString("priority"), getString("nominated"), getString("selected")],
+       getString("priority"), getString("nominated"), getString("selected"),
+       getString("ice_pair_bytes_sent"), getString("ice_pair_bytes_received")],
       tbody);
 
     let div = document.createElement("div");
@@ -727,7 +730,9 @@ ICEStats.prototype = {
           state: pair.state,
           priority: pair.priority,
           nominated: pair.nominated,
-          selected: pair.selected
+          selected: pair.selected,
+          bytesSent: pair.bytesSent,
+          bytesReceived: pair.bytesReceived
         };
         matched[local.id] = true;
 

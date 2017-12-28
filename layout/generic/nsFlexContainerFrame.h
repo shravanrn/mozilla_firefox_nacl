@@ -64,7 +64,6 @@ public:
             nsIFrame*         aPrevInFlow) override;
 
   void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                        const nsRect&           aDirtyRect,
                         const nsDisplayListSet& aLists) override;
 
   void MarkIntrinsicISizesDirty() override;
@@ -74,8 +73,8 @@ public:
               const ReflowInput& aReflowInput,
               nsReflowStatus& aStatus) override;
 
-  nscoord GetMinISize(nsRenderingContext* aRenderingContext) override;
-  nscoord GetPrefISize(nsRenderingContext* aRenderingContext) override;
+  nscoord GetMinISize(gfxContext* aRenderingContext) override;
+  nscoord GetPrefISize(gfxContext* aRenderingContext) override;
 
 #ifdef DEBUG_FRAME_DUMP
   nsresult GetFrameName(nsAString& aResult) const override;

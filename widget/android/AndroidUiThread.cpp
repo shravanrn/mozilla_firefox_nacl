@@ -6,12 +6,15 @@
 #include "base/message_loop.h"
 #include "GeneratedJNIWrappers.h"
 #include "mozilla/Atomics.h"
+#include "mozilla/EventQueue.h"
 #include "mozilla/LinkedList.h"
 #include "mozilla/Monitor.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/StaticPtr.h"
+#include "mozilla/ThreadEventQueue.h"
 #include "mozilla/TimeStamp.h"
+#include "mozilla/UniquePtr.h"
 #include "nsThread.h"
 #include "nsThreadManager.h"
 #include "nsThreadUtils.h"
@@ -50,7 +53,9 @@ class AndroidUiThread : public nsThread
 {
 public:
   NS_DECL_ISUPPORTS_INHERITED
-  AndroidUiThread() : nsThread(nsThread::NOT_MAIN_THREAD, 0)
+  AndroidUiThread()
+    : nsThread(WrapNotNull(new ThreadEventQueue<mozilla::EventQueue>(MakeUnique<mozilla::EventQueue>())),
+               nsThread::NOT_MAIN_THREAD, 0)
   {}
 
   nsresult Dispatch(already_AddRefed<nsIRunnable> aEvent, uint32_t aFlags) override;
@@ -103,9 +108,9 @@ private:
 NS_IMPL_ISUPPORTS(ThreadObserver, nsIThreadObserver)
 
 NS_IMETHODIMP
-ThreadObserver::OnDispatchedEvent(nsIThreadInternal *thread)
+ThreadObserver::OnDispatchedEvent()
 {
-  EnqueueTask(NS_NewRunnableFunction(&PumpEvents), 0);
+  EnqueueTask(NS_NewRunnableFunction("PumpEvents", &PumpEvents), 0);
   return NS_OK;
 }
 
@@ -166,7 +171,7 @@ private:
 
 class CreateOnUiThread : public Runnable {
 public:
-  CreateOnUiThread()
+  CreateOnUiThread() : Runnable("CreateOnUiThread")
   {}
 
   NS_IMETHOD Run() override {
@@ -184,7 +189,7 @@ public:
 
 class DestroyOnUiThread : public Runnable {
 public:
-  DestroyOnUiThread() : mDestroyed(false)
+  DestroyOnUiThread() : Runnable("DestroyOnUiThread"), mDestroyed(false)
   {}
 
   NS_IMETHOD Run() override {

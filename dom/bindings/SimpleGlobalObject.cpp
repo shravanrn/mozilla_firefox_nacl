@@ -50,20 +50,20 @@ SimpleGlobal_finalize(js::FreeOp *fop, JSObject *obj)
   NS_RELEASE(globalObject);
 }
 
-static void
-SimpleGlobal_moved(JSObject *obj, const JSObject *old)
+static size_t
+SimpleGlobal_moved(JSObject *obj, JSObject *old)
 {
   SimpleGlobalObject* globalObject =
     static_cast<SimpleGlobalObject*>(JS_GetPrivate(obj));
   globalObject->UpdateWrapper(obj, old);
+  return 0;
 }
 
 static const js::ClassOps SimpleGlobalClassOps = {
     nullptr,
     nullptr,
     nullptr,
-    nullptr,
-    JS_EnumerateStandardClasses,
+    JS_NewEnumerateStandardClasses,
     JS_ResolveStandardClass,
     JS_MayResolveStandardClass,
     SimpleGlobal_finalize,

@@ -5,6 +5,7 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "tls_connect.h"
+#include "sslexp.h"
 extern "C" {
 #include "libssl_internals.h"
 }
@@ -169,13 +170,13 @@ void TlsConnectTestBase::ClearStats() {
 
 void TlsConnectTestBase::ClearServerCache() {
   SSL_ShutdownServerSessionIDCache();
-  SSLInt_ClearSessionTicketKey();
+  SSLInt_ClearSelfEncryptKey();
   SSL_ConfigServerSessionIDCache(1024, 0, 0, g_working_dir_path.c_str());
 }
 
 void TlsConnectTestBase::SetUp() {
   SSL_ConfigServerSessionIDCache(1024, 0, 0, g_working_dir_path.c_str());
-  SSLInt_ClearSessionTicketKey();
+  SSLInt_ClearSelfEncryptKey();
   SSLInt_SetTicketLifetime(30);
   SSLInt_SetMaxEarlyDataSize(1024);
   ClearStats();
@@ -187,7 +188,7 @@ void TlsConnectTestBase::TearDown() {
   server_ = nullptr;
 
   SSL_ClearSessionCache();
-  SSLInt_ClearSessionTicketKey();
+  SSLInt_ClearSelfEncryptKey();
   SSL_ShutdownServerSessionIDCache();
 }
 

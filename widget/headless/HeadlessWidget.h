@@ -9,6 +9,7 @@
 
 #include "mozilla/widget/InProcessCompositorWidget.h"
 #include "nsBaseWidget.h"
+#include "CompositorWidget.h"
 
 namespace mozilla {
 namespace widget {
@@ -16,7 +17,7 @@ namespace widget {
 class HeadlessWidget : public nsBaseWidget
 {
 public:
-  HeadlessWidget() {}
+  HeadlessWidget();
 
   NS_DECL_ISUPPORTS_INHERITED
 
@@ -35,6 +36,10 @@ public:
                                                   nsWidgetInitData* aInitData = nullptr,
                                                   bool aForceUseIWidgetParent = false) override;
 
+  virtual nsIWidget* GetTopLevelWidget() override;
+
+  virtual void GetCompositorWidgetInitData(mozilla::widget::CompositorWidgetInitData* aInitData) override;
+
   virtual void Show(bool aState) override;
   virtual bool IsVisible() const override;
   virtual void Move(double aX, double aY) override;
@@ -51,7 +56,7 @@ public:
                                   nsIScreen* aTargetScreen = nullptr) override;
   virtual void Enable(bool aState) override;
   virtual bool IsEnabled() const override;
-  virtual nsresult SetFocus(bool aRaise) override { return NS_OK; }
+  virtual nsresult SetFocus(bool aRaise) override;
   virtual nsresult ConfigureChildren(const nsTArray<Configuration>& aConfigurations) override
   {
     MOZ_ASSERT_UNREACHABLE("Headless widgets do not support configuring children.");
@@ -81,19 +86,30 @@ public:
                   LayersBackend aBackendHint = mozilla::layers::LayersBackend::LAYERS_NONE,
                   LayerManagerPersistence aPersistence = LAYER_MANAGER_CURRENT) override;
 
+  void SetCompositorWidgetDelegate(CompositorWidgetDelegate* delegate) override;
+
   virtual nsresult DispatchEvent(WidgetGUIEvent* aEvent,
                                  nsEventStatus& aStatus) override;
 
 private:
-  ~HeadlessWidget() {}
+  ~HeadlessWidget();
   bool mEnabled;
   bool mVisible;
+  nsIWidget* mTopLevel;
+  HeadlessCompositorWidget* mCompositorWidget;
   // The size mode before entering fullscreen mode.
   nsSizeMode mLastSizeMode;
+  // The last size mode set while the window was visible.
+  nsSizeMode mEffectiveSizeMode;
   InputContext mInputContext;
   // In headless there is no window manager to track window bounds
   // across size mode changes, so we must track it to emulate.
   LayoutDeviceIntRect mRestoreBounds;
+  void ApplySizeModeSideEffects();
+  // Similarly, we must track the active window ourselves in order
+  // to dispatch (de)activation events properly.
+  void RaiseWindow();
+  static HeadlessWidget* sActiveWindow;
 };
 
 } // namespace widget

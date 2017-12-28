@@ -15,12 +15,20 @@ const { LocalizationHelper } = require("devtools/shared/l10n");
 const INSPECTOR_L10N =
   new LocalizationHelper("devtools/client/locales/inspector.properties");
 
-const SHOW_GRID_OUTLINE_PREF = "devtools.gridinspector.showGridOutline";
+// @remove after release 56 (See Bug 1355747)
+const PROMOTE_COUNT_PREF = "devtools.promote.layoutview";
+
+// @remove after release 56 (See Bug 1355747)
+const GRID_LINK = "https://www.mozilla.org/en-US/developer/css-grid/?utm_source=gridtooltip&utm_medium=devtools&utm_campaign=cssgrid_layout";
+
+loader.lazyRequireGetter(this, "GridInspector", "devtools/client/inspector/grids/grid-inspector");
 
 function LayoutView(inspector, window) {
   this.document = window.document;
   this.inspector = inspector;
   this.store = inspector.store;
+
+  this.onPromoteLearnMoreClick = this.onPromoteLearnMoreClick.bind(this);
 
   this.init();
 }
@@ -44,6 +52,7 @@ LayoutView.prototype = {
       onToggleGeometryEditor,
     } = this.inspector.getPanel("boxmodel").getComponentProps();
 
+    this.gridInspector = new GridInspector(this.inspector, this.inspector.panelWin);
     let {
       getSwatchColorPickerTooltip,
       onSetGridOverlayColor,
@@ -54,7 +63,11 @@ LayoutView.prototype = {
       onToggleShowGridAreas,
       onToggleShowGridLineNumbers,
       onToggleShowInfiniteLines,
-    } = this.inspector.gridInspector.getComponentProps();
+    } = this.gridInspector.getComponentProps();
+
+    let {
+      onPromoteLearnMoreClick,
+    } = this;
 
     let app = App({
       getSwatchColorPickerTooltip,
@@ -64,14 +77,8 @@ LayoutView.prototype = {
        * default.
        */
       showBoxModelProperties: true,
-
-      /**
-       * Shows the grid outline if user preferences are set to true, otherwise, hidden by
-       * default.
-       */
-      showGridOutline: Services.prefs.getBoolPref(SHOW_GRID_OUTLINE_PREF),
-
       onHideBoxModelHighlighter,
+      onPromoteLearnMoreClick,
       onSetGridOverlayColor,
       onShowBoxModelEditor,
       onShowBoxModelHighlighter,
@@ -87,30 +94,35 @@ LayoutView.prototype = {
     });
 
     let provider = createElement(Provider, {
-      store: this.store,
       id: "layoutview",
-      title: INSPECTOR_L10N.getStr("inspector.sidebar.layoutViewTitle2"),
       key: "layoutview",
+      store: this.store,
+      title: INSPECTOR_L10N.getStr("inspector.sidebar.layoutViewTitle2"),
+      // @remove after release 56 (See Bug 1355747)
+      badge: Services.prefs.getIntPref(PROMOTE_COUNT_PREF) > 0 ?
+        INSPECTOR_L10N.getStr("inspector.sidebar.newBadge") : null,
+      showBadge: () => Services.prefs.getIntPref(PROMOTE_COUNT_PREF) > 0,
     }, app);
 
-    let defaultTab = Services.prefs.getCharPref("devtools.inspector.activeSidebar");
-
-    this.inspector.addSidebarTab(
-      "layoutview",
-      INSPECTOR_L10N.getStr("inspector.sidebar.layoutViewTitle2"),
-      provider,
-      defaultTab == "layoutview"
-    );
+    // Expose the provider to let inspector.js use it in setupSidebar.
+    this.provider = provider;
   },
 
   /**
    * Destruction function called when the inspector is destroyed. Cleans up references.
    */
   destroy() {
+    this.gridInspector.destroy();
+
     this.document = null;
     this.inspector = null;
     this.store = null;
   },
+
+  onPromoteLearnMoreClick() {
+    let browserWin = this.inspector.target.tab.ownerDocument.defaultView;
+    browserWin.openUILinkIn(GRID_LINK, "current");
+  }
 
 };
 

@@ -70,7 +70,7 @@ class LIRGeneratorMIPSShared : public LIRGeneratorShared
     void lowerUDiv(MDiv* div);
     void lowerUMod(MMod* mod);
     void visitPowHalf(MPowHalf* ins);
-    void visitAsmJSNeg(MAsmJSNeg* ins);
+    void visitWasmNeg(MWasmNeg* ins);
     void visitWasmLoad(MWasmLoad* ins);
     void visitWasmStore(MWasmStore* ins);
     void visitWasmSelect(MWasmSelect* ins);
@@ -95,10 +95,9 @@ class LIRGeneratorMIPSShared : public LIRGeneratorShared
     void visitAtomicExchangeTypedArrayElement(MAtomicExchangeTypedArrayElement* ins);
     void visitAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop* ins);
     void visitSubstr(MSubstr* ins);
-    void visitWasmTruncateToInt64(MWasmTruncateToInt64* ins);
-    void visitInt64ToFloatingPoint(MInt64ToFloatingPoint* ins);
     void visitCopySign(MCopySign* ins);
     void visitExtendInt32ToInt64(MExtendInt32ToInt64* ins);
+    void visitSignExtendInt64(MSignExtendInt64* ins);
 
 };
 

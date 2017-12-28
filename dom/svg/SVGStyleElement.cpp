@@ -23,14 +23,10 @@ SVGStyleElement::WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto)
 //----------------------------------------------------------------------
 // nsISupports methods
 
-NS_IMPL_ADDREF_INHERITED(SVGStyleElement, SVGStyleElementBase)
-NS_IMPL_RELEASE_INHERITED(SVGStyleElement, SVGStyleElementBase)
-
-NS_INTERFACE_TABLE_HEAD_CYCLE_COLLECTION_INHERITED(SVGStyleElement)
-  NS_INTERFACE_TABLE_INHERITED(SVGStyleElement,
-                               nsIStyleSheetLinkingElement,
-                               nsIMutationObserver)
-NS_INTERFACE_TABLE_TAIL_INHERITING(SVGStyleElementBase)
+NS_IMPL_ISUPPORTS_CYCLE_COLLECTION_INHERITED(SVGStyleElement,
+                                             SVGStyleElementBase,
+                                             nsIStyleSheetLinkingElement,
+                                             nsIMutationObserver)
 
 NS_IMPL_CYCLE_COLLECTION_CLASS(SVGStyleElement)
 
@@ -78,7 +74,8 @@ SVGStyleElement::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
   NS_ENSURE_SUCCESS(rv, rv);
 
   void (SVGStyleElement::*update)() = &SVGStyleElement::UpdateStyleSheetInternal;
-  nsContentUtils::AddScriptRunner(NewRunnableMethod(this, update));
+  nsContentUtils::AddScriptRunner(
+    NewRunnableMethod("dom::SVGStyleElement::BindToTree", this, update));
 
   return rv;
 }
@@ -294,8 +291,6 @@ SVGStyleElement::GetStyleSheetInfo(nsAString& aTitle,
 
   *aIsScoped = HasAttr(kNameSpaceID_None, nsGkAtoms::scoped) &&
                OwnerDoc()->IsScopedStyleEnabled();
-
-  return;
 }
 
 CORSMode

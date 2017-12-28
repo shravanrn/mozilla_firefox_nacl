@@ -28,7 +28,7 @@ add_task(function* () {
   let { highlighters, store } = inspector;
 
   yield selectNode("#grid", inspector);
-  let gridList = doc.querySelector("#grid-list");
+  let gridList = doc.getElementById("grid-list");
   let checkbox1 = gridList.children[0].querySelector("input");
 
   info("Checking the initial state of the Grid Inspector.");
@@ -53,7 +53,7 @@ add_task(function* () {
     state.grids[0].highlighted &&
     !state.grids[1].highlighted);
   testActor.eval(`
-    content.document.getElementById("grid2").classList.add("grid");
+    document.getElementById("grid2").classList.add("grid");
   `);
   yield onGridListUpdate;
 

@@ -33,7 +33,6 @@
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/Likely.h"
 #include "mozilla/MathAlgorithms.h"
-#include "mozilla/SizePrintfMacros.h"
 
 #include "jit/arm/Assembler-arm.h"
 #include "jit/arm/disasm/Constants-arm.h"
@@ -1104,7 +1103,7 @@ Simulator::setLastDebuggerInput(char* input)
 /* static */ void
 SimulatorProcess::FlushICache(void* start_addr, size_t size)
 {
-    JitSpewCont(JitSpew_CacheFlush, "[%p %" PRIxSIZE "]", start_addr, size);
+    JitSpewCont(JitSpew_CacheFlush, "[%p %zx]", start_addr, size);
     if (!ICacheCheckingDisableCount) {
         AutoLockSimulatorCache als;
         js::jit::FlushICacheLocked(icache(), start_addr, size);
@@ -1598,7 +1597,14 @@ Simulator::handleWasmFault(int32_t addr, unsigned numBytes)
 
     void* pc = reinterpret_cast<void*>(get_pc());
     uint8_t* fp = reinterpret_cast<uint8_t*>(get_register(r11));
-    wasm::Instance* instance = wasm::LookupFaultingInstance(act, pc, fp);
+
+    // Cache the wasm::Code to avoid lookup on every load/store.
+    if (!wasm_code_ || !wasm_code_->containsCodePC(pc))
+        wasm_code_ = act->compartment()->wasm.lookupCode(pc);
+    if (!wasm_code_)
+        return false;
+
+    wasm::Instance* instance = wasm::LookupFaultingInstance(*wasm_code_, pc, fp);
     if (!instance || !instance->memoryAccessInGuardRegion((uint8_t*)addr, numBytes))
         return false;
 
@@ -4793,6 +4799,19 @@ Simulator::disable_single_stepping()
     single_step_callback_arg_ = nullptr;
 }
 
+static void
+FakeInterruptHandler()
+{
+    JSContext* cx = TlsContext.get();
+    uint8_t* pc = cx->simulator()->get_pc_as<uint8_t*>();
+
+    const wasm::CodeSegment* cs = nullptr;
+    if (!wasm::InInterruptibleCode(cx, pc, &cs))
+        return;
+
+    cx->simulator()->trigger_wasm_interrupt();
+}
+
 template<bool EnableStopSimAt>
 void
 Simulator::execute()
@@ -4812,6 +4831,8 @@ Simulator::execute()
         } else {
             if (single_stepping_)
                 single_step_callback_(single_step_callback_arg_, this, (void*)program_counter);
+            if (MOZ_UNLIKELY(JitOptions.simulatorAlwaysInterrupt))
+                FakeInterruptHandler();
             SimInstruction* instr = reinterpret_cast<SimInstruction*>(program_counter);
             instructionDecode(instr);
             icount_++;

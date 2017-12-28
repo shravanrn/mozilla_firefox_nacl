@@ -124,6 +124,7 @@ FRAME_ID(nsSVGPatternFrame, SVGPattern, NotLeaf)
 FRAME_ID(nsSVGRadialGradientFrame, SVGRadialGradient, NotLeaf)
 FRAME_ID(nsSVGStopFrame, SVGStop, Leaf)
 FRAME_ID(nsSVGSwitchFrame, SVGSwitch, NotLeaf)
+FRAME_ID(nsSVGSymbolFrame, SVGSymbol, NotLeaf)
 FRAME_ID(SVGTextFrame, SVGText, NotLeaf)
 FRAME_ID(nsSVGUseFrame, SVGUse, Leaf)
 FRAME_ID(SVGViewFrame, SVGView, Leaf)
@@ -144,6 +145,12 @@ FRAME_ID(nsVideoFrame, HTMLVideo, Leaf)
 FRAME_ID(nsXULLabelFrame, XULLabel, NotLeaf)
 FRAME_ID(nsXULScrollFrame, Scroll, NotLeaf)
 FRAME_ID(ViewportFrame, Viewport, NotLeaf)
+
+// The following ABSTRACT_FRAME_IDs needs to come after the above
+// FRAME_IDs, because we have two separate enums, one that includes
+// only FRAME_IDs and another which includes both and we depend on
+// FRAME_IDs to have the same number in both.
+// See ClassID (the former) and FrameIID in nsQueryFrame.h.
 
 // Non-concrete classes (for FrameIID use)
 ABSTRACT_FRAME_ID(nsContainerFrame)

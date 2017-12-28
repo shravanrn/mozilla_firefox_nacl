@@ -6,7 +6,7 @@
 
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const { assert, fetch } = DevToolsUtils;
-const EventEmitter = require("devtools/shared/event-emitter");
+const EventEmitter = require("devtools/shared/old-event-emitter");
 const { OriginalLocation, GeneratedLocation } = require("devtools/server/actors/common");
 const { resolve } = require("promise");
 const { joinURI } = require("devtools/shared/path");
@@ -15,6 +15,7 @@ loader.lazyRequireGetter(this, "SourceActor", "devtools/server/actors/source", t
 loader.lazyRequireGetter(this, "isEvalSource", "devtools/server/actors/source", true);
 loader.lazyRequireGetter(this, "SourceMapConsumer", "source-map", true);
 loader.lazyRequireGetter(this, "SourceMapGenerator", "source-map", true);
+loader.lazyRequireGetter(this, "WasmRemap", "devtools/shared/wasm-source-map", true);
 
 /**
  * Manages the sources for a thread. Handles source maps, locations in the
@@ -300,6 +301,10 @@ TabSources.prototype = {
     } else if (source.introductionType === "wasm") {
       // Wasm sources are not JavaScript. Give them their own content-type.
       spec.contentType = "text/wasm";
+    } else if (source.introductionType === "debugger eval") {
+      // All debugger eval code should have a text/javascript content-type.
+      // See Bug 1399064
+      spec.contentType = "text/javascript";
     } else if (url) {
       // There are a few special URLs that we know are JavaScript:
       // inline `javascript:` and code coming from the console
@@ -409,6 +414,11 @@ TabSources.prototype = {
     }
     let result = this._fetchSourceMap(sourceMapURL, source.url);
 
+    let isWasm = source.introductionType == "wasm";
+    if (isWasm) {
+      result = result.then((map) => new WasmRemap(map));
+    }
+
     // The promises in `_sourceMaps` must be the exact same instances
     // as returned by `_fetchSourceMap` for `clearSourceMapCache` to
     // work.
@@ -459,7 +469,7 @@ TabSources.prototype = {
         this._setSourceMapRoot(map, absSourceMapURL, sourceURL);
         return map;
       })
-      .then(null, error => {
+      .catch(error => {
         if (!DevToolsUtils.reportingDisabled) {
           DevToolsUtils.reportException("TabSources.prototype._fetchSourceMap", error);
         }

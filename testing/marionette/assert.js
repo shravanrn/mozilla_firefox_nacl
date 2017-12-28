@@ -10,14 +10,26 @@ Cu.import("resource://gre/modules/AppConstants.jsm");
 Cu.import("resource://gre/modules/Preferences.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 
-Cu.import("chrome://marionette/content/error.js");
+const {
+  InvalidArgumentError,
+  InvalidSessionIDError,
+  NoSuchWindowError,
+  pprint,
+  UnexpectedAlertOpenError,
+  UnsupportedOperationError,
+} = Cu.import("chrome://marionette/content/error.js", {});
 
 this.EXPORTED_SYMBOLS = ["assert"];
 
 const isFennec = () => AppConstants.platform == "android";
-const isFirefox = () => Services.appinfo.name == "Firefox";
+const isFirefox = () =>
+    Services.appinfo.ID == "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}";
 
-/** Shorthands for common assertions made in Marionette. */
+/**
+ * Shorthands for common assertions made in Marionette.
+ *
+ * @namespace
+ */
 this.assert = {};
 
 /**
@@ -29,15 +41,15 @@ this.assert = {};
  *     Custom error message.
  *
  * @return {string}
- *     Session ID.
+ *     Current session's ID.
  *
  * @throws {InvalidSessionIDError}
- *     If |driver| does not have a session ID.
+ *     If <var>driver</var> does not have a session ID.
  */
-assert.session = function (driver, msg = "") {
+assert.session = function(driver, msg = "") {
   assert.that(sessionID => sessionID,
-      msg, InvalidSessionIDError)(driver.sessionId);
-  return driver.sessionId;
+      msg, InvalidSessionIDError)(driver.sessionID);
+  return driver.sessionID;
 };
 
 /**
@@ -49,7 +61,7 @@ assert.session = function (driver, msg = "") {
  * @throws {UnsupportedOperationError}
  *     If current browser is not Firefox.
  */
-assert.firefox = function (msg = "") {
+assert.firefox = function(msg = "") {
   msg = msg || "Only supported in Firefox";
   assert.that(isFirefox, msg, UnsupportedOperationError)();
 };
@@ -63,7 +75,7 @@ assert.firefox = function (msg = "") {
  * @throws {UnsupportedOperationError}
  *     If current browser is not Fennec.
  */
-assert.fennec = function (msg = "") {
+assert.fennec = function(msg = "") {
   msg = msg || "Only supported in Fennec";
   assert.that(isFennec, msg, UnsupportedOperationError)();
 };
@@ -82,7 +94,7 @@ assert.fennec = function (msg = "") {
  * @throws {UnsupportedOperationError}
  *     If |context| is not content.
  */
-assert.content = function (context, msg = "") {
+assert.content = function(context, msg = "") {
   msg = msg || "Only supported in content context";
   assert.that(c => c.toString() == "content", msg, UnsupportedOperationError)(context);
 };
@@ -101,7 +113,7 @@ assert.content = function (context, msg = "") {
  * @throws {NoSuchWindowError}
  *     If |win| has been closed.
  */
-assert.window = function (win, msg = "") {
+assert.window = function(win, msg = "") {
   msg = msg || "Unable to locate window";
   return assert.that(w => w && !w.closed,
       msg,
@@ -119,7 +131,7 @@ assert.window = function (win, msg = "") {
  * @throws {NoSuchWindowError}
  *     If |context| is invalid.
  */
-assert.contentBrowser = function (context, msg = "") {
+assert.contentBrowser = function(context, msg = "") {
   // TODO: The contentBrowser uses a cached tab, which is only updated when
   // switchToTab is called. Because of that an additional check is needed to
   // make sure that the chrome window has not already been closed.
@@ -142,7 +154,7 @@ assert.contentBrowser = function (context, msg = "") {
  * @throws {UnexpectedAlertOpenError}
  *     If there is a user prompt.
  */
-assert.noUserPrompt = function (dialog, msg = "") {
+assert.noUserPrompt = function(dialog, msg = "") {
   assert.that(d => d === null || typeof d == "undefined",
       msg,
       UnexpectedAlertOpenError)(dialog);
@@ -162,8 +174,8 @@ assert.noUserPrompt = function (dialog, msg = "") {
  * @throws {InvalidArgumentError}
  *     If |obj| is not defined.
  */
-assert.defined = function (obj, msg = "") {
-  msg = msg || error.pprint`Expected ${obj} to be defined`;
+assert.defined = function(obj, msg = "") {
+  msg = msg || pprint`Expected ${obj} to be defined`;
   return assert.that(o => typeof o != "undefined", msg)(obj);
 };
 
@@ -181,8 +193,8 @@ assert.defined = function (obj, msg = "") {
  * @throws {InvalidArgumentError}
  *     If |obj| is not a number.
  */
-assert.number = function (obj, msg = "") {
-  msg = msg || error.pprint`Expected ${obj} to be finite number`;
+assert.number = function(obj, msg = "") {
+  msg = msg || pprint`Expected ${obj} to be finite number`;
   return assert.that(Number.isFinite, msg)(obj);
 };
 
@@ -200,8 +212,8 @@ assert.number = function (obj, msg = "") {
  * @throws {InvalidArgumentError}
  *     If |obj| is not callable.
  */
-assert.callable = function (obj, msg = "") {
-  msg = msg || error.pprint`${obj} is not callable`;
+assert.callable = function(obj, msg = "") {
+  msg = msg || pprint`${obj} is not callable`;
   return assert.that(o => typeof o == "function", msg)(obj);
 };
 
@@ -219,8 +231,8 @@ assert.callable = function (obj, msg = "") {
  * @throws {InvalidArgumentError}
  *     If |obj| is not an integer.
  */
-assert.integer = function (obj, msg = "") {
-  msg = msg || error.pprint`Expected ${obj} to be an integer`;
+assert.integer = function(obj, msg = "") {
+  msg = msg || pprint`Expected ${obj} to be an integer`;
   return assert.that(Number.isInteger, msg)(obj);
 };
 
@@ -238,9 +250,9 @@ assert.integer = function (obj, msg = "") {
  * @throws {InvalidArgumentError}
  *     If |obj| is not a positive integer.
  */
-assert.positiveInteger = function (obj, msg = "") {
+assert.positiveInteger = function(obj, msg = "") {
   assert.integer(obj, msg);
-  msg = msg || error.pprint`Expected ${obj} to be >= 0`;
+  msg = msg || pprint`Expected ${obj} to be >= 0`;
   return assert.that(n => n >= 0, msg)(obj);
 };
 
@@ -258,8 +270,8 @@ assert.positiveInteger = function (obj, msg = "") {
  * @throws {InvalidArgumentError}
  *     If |obj| is not a boolean.
  */
-assert.boolean = function (obj, msg = "") {
-  msg = msg || error.pprint`Expected ${obj} to be boolean`;
+assert.boolean = function(obj, msg = "") {
+  msg = msg || pprint`Expected ${obj} to be boolean`;
   return assert.that(b => typeof b == "boolean", msg)(obj);
 };
 
@@ -277,8 +289,8 @@ assert.boolean = function (obj, msg = "") {
  * @throws {InvalidArgumentError}
  *     If |obj| is not a string.
  */
-assert.string = function (obj, msg = "") {
-  msg = msg || error.pprint`Expected ${obj} to be a string`;
+assert.string = function(obj, msg = "") {
+  msg = msg || pprint`Expected ${obj} to be a string`;
   return assert.that(s => typeof s == "string", msg)(obj);
 };
 
@@ -296,14 +308,14 @@ assert.string = function (obj, msg = "") {
  * @throws {InvalidArgumentError}
  *     If |obj| is not an object.
  */
-assert.object = function (obj, msg = "") {
-  msg = msg || error.pprint`Expected ${obj} to be an object`;
+assert.object = function(obj, msg = "") {
+  msg = msg || pprint`Expected ${obj} to be an object`;
   return assert.that(o => {
     // unable to use instanceof because LHS and RHS may come from
     // different globals
     let s = Object.prototype.toString.call(o);
     return s == "[object Object]" || s == "[object nsJSIID]";
-  })(obj);
+  }, msg)(obj);
 };
 
 /**
@@ -322,9 +334,9 @@ assert.object = function (obj, msg = "") {
  * @throws {InvalidArgumentError}
  *     If |prop| is not in |obj|, or |obj| is not an object.
  */
-assert.in = function (prop, obj, msg = "") {
+assert.in = function(prop, obj, msg = "") {
   assert.object(obj, msg);
-  msg = msg || error.pprint`Expected ${prop} in ${obj}`;
+  msg = msg || pprint`Expected ${prop} in ${obj}`;
   assert.that(p => obj.hasOwnProperty(p), msg)(prop);
   return obj[prop];
 };
@@ -343,8 +355,8 @@ assert.in = function (prop, obj, msg = "") {
  * @throws {InvalidArgumentError}
  *     If |obj| is not an Array.
  */
-assert.array = function (obj, msg = "") {
-  msg = msg || error.pprint`Expected ${obj} to be an Array`;
+assert.array = function(obj, msg = "") {
+  msg = msg || pprint`Expected ${obj} to be an Array`;
   return assert.that(Array.isArray, msg)(obj);
 };
 
@@ -365,7 +377,7 @@ assert.array = function (obj, msg = "") {
  *     which may throw |error| with |message| if |predicate| evaluates
  *     to false.
  */
-assert.that = function (
+assert.that = function(
     predicate, message = "", error = InvalidArgumentError) {
   return obj => {
     if (!predicate(obj)) {

@@ -6,11 +6,11 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import unittest
 
-from ..try_option_syntax import TryOptionSyntax
-from ..try_option_syntax import RIDEALONG_BUILDS
-from ..graph import Graph
-from ..taskgraph import TaskGraph
-from ..task import Task
+from taskgraph.try_option_syntax import TryOptionSyntax
+from taskgraph.try_option_syntax import RIDEALONG_BUILDS
+from taskgraph.graph import Graph
+from taskgraph.taskgraph import TaskGraph
+from taskgraph.task import Task
 from mozunit import main
 
 
@@ -229,10 +229,12 @@ class TestTryOptionSyntax(unittest.TestCase):
         ]))
 
     def test_u_platforms_pretty(self):
-        "-u gtest[Ubuntu] selects the linux, linux64 and linux64-asan platforms for gtest"
+        """-u gtest[Ubuntu] selects the linux, linux64, linux64-asan, linux64-stylo-disabled,
+        and linux64-stylo-sequential platforms for gtest"""
         tos = TryOptionSyntax('try: -u gtest[Ubuntu]', graph_with_jobs)
         self.assertEqual(sorted(tos.unittests), sorted([
-            {'test': 'gtest', 'platforms': ['linux32', 'linux64', 'linux64-asan']},
+            {'test': 'gtest', 'platforms': ['linux32', 'linux64', 'linux64-asan',
+                                            'linux64-stylo-disabled', 'linux64-stylo-sequential']},
         ]))
 
     def test_u_platforms_negated(self):
@@ -323,6 +325,7 @@ class TestTryOptionSyntax(unittest.TestCase):
         "--no-retry sets no_retry to true"
         tos = TryOptionSyntax('try: --no-retry', graph_with_jobs)
         self.assertTrue(tos.no_retry)
+
 
 if __name__ == '__main__':
     main()

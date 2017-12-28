@@ -271,6 +271,8 @@ NotificationController::DropMutationEvent(AccTreeMutationEvent* aEvent)
   } else if (aEvent->GetEventType() == nsIAccessibleEvent::EVENT_SHOW) {
     aEvent->GetAccessible()->SetShowEventTarget(false);
   } else {
+    aEvent->GetAccessible()->SetHideEventTarget(false);
+
     AccHideEvent* hideEvent = downcast_accEvent(aEvent);
     MOZ_ASSERT(hideEvent);
 
@@ -590,7 +592,7 @@ NotificationController::ProcessMutationEvents()
 void
 NotificationController::WillRefresh(mozilla::TimeStamp aTime)
 {
-  PROFILER_LABEL_FUNC(js::ProfileEntry::Category::OTHER);
+  AUTO_PROFILER_LABEL("NotificationController::WillRefresh", OTHER);
 
   // If the document accessible that notification collector was created for is
   // now shut down, don't process notifications anymore.
@@ -599,9 +601,13 @@ NotificationController::WillRefresh(mozilla::TimeStamp aTime)
   if (!mDocument)
     return;
 
+  // Wait until an update, we have started, or an interruptible reflow is
+  // finished.
   if (mObservingState == eRefreshProcessing ||
-      mObservingState == eRefreshProcessingForUpdate)
+      mObservingState == eRefreshProcessingForUpdate ||
+      mPresShell->IsReflowInterrupted()) {
     return;
+  }
 
   // Any generic notifications should be queued if we're processing content
   // insertions or generic notifications.
@@ -807,7 +813,8 @@ NotificationController::WillRefresh(mozilla::TimeStamp aTime)
 
   // Process relocation list.
   for (uint32_t idx = 0; idx < mRelocations.Length(); idx++) {
-    if (mRelocations[idx]->IsInDocument()) {
+    // owner should be in a document and have na associated DOM node (docs sometimes don't)
+    if (mRelocations[idx]->IsInDocument() && mRelocations[idx]->HasOwnContent()) {
       mDocument->DoARIAOwnsRelocation(mRelocations[idx]);
     }
   }

@@ -4,15 +4,8 @@ const { Constructor: CC } = Components;
 
 Cu.import("resource://testing-common/httpd.js");
 
-const { Kinto } = Cu.import("resource://services-common/kinto-offline-client.js", {});
-const { FirefoxAdapter } = Cu.import("resource://services-common/kinto-storage-adapter.js", {});
-
 const BinaryInputStream = CC("@mozilla.org/binaryinputstream;1",
   "nsIBinaryInputStream", "setInputStream");
-
-const PREF_BLOCKLIST_PINNING_COLLECTION = "services.blocklist.pinning.collection";
-const COLLECTION_NAME = "pins";
-const KINTO_STORAGE_PATH    = "kinto.sqlite";
 
 // First, we need to setup appInfo or we can't do version checks
 var id = "xpcshell@tests.mozilla.org";
@@ -31,30 +24,9 @@ updateAppInfo({
 
 let server;
 
-
-function do_get_kinto_collection(connection, collectionName) {
-  let config = {
-    // Set the remote to be some server that will cause test failure when
-    // hit since we should never hit the server directly (any non-local
-    // request causes failure in tests), only via maybeSync()
-    remote: "https://firefox.settings.services.mozilla.com/v1/",
-    // Set up the adapter and bucket as normal
-    adapter: FirefoxAdapter,
-    adapterOptions: {sqliteHandle: connection},
-    bucket: "pinning"
-  };
-  let kintoClient = new Kinto(config);
-  return kintoClient.collection(collectionName);
-}
-
 // Some simple tests to demonstrate that the core preload sync operations work
 // correctly and that simple kinto operations are working as expected.
-add_task(function* test_something() {
-  // set the collection name explicitly - since there will be version
-  // specific collection names in prefs
-  Services.prefs.setCharPref(PREF_BLOCKLIST_PINNING_COLLECTION,
-                             COLLECTION_NAME);
-
+add_task(async function test_something() {
   const { PinningPreloadClient } = Cu.import("resource://services-common/blocklist-clients.js", {});
 
   const configPath = "/v1/";
@@ -104,29 +76,28 @@ add_task(function* test_something() {
                       Services.io.newURI("https://five.example.com"), 0));
 
   // Test an empty db populates
-  yield PinningPreloadClient.maybeSync(2000, Date.now());
-
-  let connection = yield FirefoxAdapter.openConnection({path: KINTO_STORAGE_PATH});
+  await PinningPreloadClient.maybeSync(2000, Date.now());
 
   // Open the collection, verify it's been populated:
   // Our test data has a single record; it should be in the local collection
-  let collection = do_get_kinto_collection(connection, COLLECTION_NAME);
-  let list = yield collection.list();
-  do_check_eq(list.data.length, 1);
+  await PinningPreloadClient.openCollection(async (collection) => {
+    const list = await collection.list();
+    do_check_eq(list.data.length, 1);
+  });
 
   // check that a pin exists for one.example.com
   ok(sss.isSecureURI(sss.HEADER_HPKP,
                      Services.io.newURI("https://one.example.com"), 0));
 
   // Test the db is updated when we call again with a later lastModified value
-  yield PinningPreloadClient.maybeSync(4000, Date.now());
+  await PinningPreloadClient.maybeSync(4000, Date.now());
 
   // Open the collection, verify it's been updated:
   // Our data now has four new records; all should be in the local collection
-  collection = do_get_kinto_collection(connection, COLLECTION_NAME);
-  list = yield collection.list();
-  do_check_eq(list.data.length, 5);
-  yield connection.close();
+  await PinningPreloadClient.openCollection(async (collection) => {
+    const list = await collection.list();
+    do_check_eq(list.data.length, 5);
+  });
 
   // check that a pin exists for two.example.com and three.example.com
   ok(sss.isSecureURI(sss.HEADER_HPKP,
@@ -143,15 +114,15 @@ add_task(function* test_something() {
   // should be attempted.
   // Clear the kinto base pref so any connections will cause a test failure
   Services.prefs.clearUserPref("services.settings.server");
-  yield PinningPreloadClient.maybeSync(4000, Date.now());
+  await PinningPreloadClient.maybeSync(4000, Date.now());
 
   // Try again with a lastModified value at some point in the past
-  yield PinningPreloadClient.maybeSync(3000, Date.now());
+  await PinningPreloadClient.maybeSync(3000, Date.now());
 
   // Check the pinning check time pref is modified, even if the collection
   // hasn't changed
   Services.prefs.setIntPref("services.blocklist.onecrl.checked", 0);
-  yield PinningPreloadClient.maybeSync(3000, Date.now());
+  await PinningPreloadClient.maybeSync(3000, Date.now());
   let newValue = Services.prefs.getIntPref("services.blocklist.pinning.checked");
   do_check_neq(newValue, 0);
 
@@ -168,7 +139,7 @@ add_task(function* test_something() {
   // acceptible test (the data below with last_modified of 300 is nonsense).
   Services.prefs.setCharPref("services.settings.server",
                              `http://localhost:${server.identity.primaryPort}/v1`);
-  yield PinningPreloadClient.maybeSync(5000, Date.now());
+  await PinningPreloadClient.maybeSync(5000, Date.now());
 
   // The STS entry for five.example.com now has includeSubdomains set;
   // ensure that the new includeSubdomains value is honored.

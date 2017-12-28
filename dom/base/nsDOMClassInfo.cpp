@@ -73,14 +73,6 @@
 #include "nsMemory.h"
 
 // includes needed for the prototype chain interfaces
-#include "nsIDOMXULCommandDispatcher.h"
-#include "nsIControllers.h"
-#ifdef MOZ_XUL
-#include "nsITreeSelection.h"
-#include "nsITreeContentView.h"
-#include "nsITreeView.h"
-#include "nsIXULTemplateBuilder.h"
-#endif
 
 #include "nsIEventListenerService.h"
 #include "nsIMessageManager.h"
@@ -177,28 +169,6 @@ static nsDOMClassInfoData sClassInfoData[] = {
                            XPC_SCRIPTABLE_DONT_ENUM_QUERY_INTERFACE)
 
   // Misc Core related classes
-
-  // XUL classes
-#ifdef MOZ_XUL
-  NS_DEFINE_CHROME_XBL_CLASSINFO_DATA(XULCommandDispatcher, nsDOMGenericSH,
-                                      DOM_DEFAULT_SCRIPTABLE_FLAGS)
-#endif
-  NS_DEFINE_CHROME_XBL_CLASSINFO_DATA(XULControllers, nsNonDOMObjectSH,
-                                      DEFAULT_SCRIPTABLE_FLAGS)
-#ifdef MOZ_XUL
-  NS_DEFINE_CHROME_XBL_CLASSINFO_DATA(TreeSelection, nsDOMGenericSH,
-                                      DEFAULT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CHROME_XBL_CLASSINFO_DATA(TreeContentView, nsDOMGenericSH,
-                                      DEFAULT_SCRIPTABLE_FLAGS)
-#endif
-
-#ifdef MOZ_XUL
-  NS_DEFINE_CHROME_XBL_CLASSINFO_DATA(XULTemplateBuilder, nsDOMGenericSH,
-                                      DEFAULT_SCRIPTABLE_FLAGS)
-
-  NS_DEFINE_CHROME_XBL_CLASSINFO_DATA(XULTreeBuilder, nsDOMGenericSH,
-                                      DEFAULT_SCRIPTABLE_FLAGS)
-#endif
 
   NS_DEFINE_CHROME_ONLY_CLASSINFO_DATA(ContentFrameMessageManager,
                                        nsMessageManagerSH<nsEventTargetSH>,
@@ -468,39 +438,6 @@ nsDOMClassInfo::Init()
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDOMConstructor)
   DOM_CLASSINFO_MAP_END
 
-#ifdef MOZ_XUL
-  DOM_CLASSINFO_MAP_BEGIN(XULCommandDispatcher, nsIDOMXULCommandDispatcher)
-    DOM_CLASSINFO_MAP_ENTRY(nsIDOMXULCommandDispatcher)
-  DOM_CLASSINFO_MAP_END
-#endif
-
-  DOM_CLASSINFO_MAP_BEGIN_NO_CLASS_IF(XULControllers, nsIControllers)
-    DOM_CLASSINFO_MAP_ENTRY(nsIControllers)
-  DOM_CLASSINFO_MAP_END
-
-#ifdef MOZ_XUL
-  DOM_CLASSINFO_MAP_BEGIN(TreeSelection, nsITreeSelection)
-    DOM_CLASSINFO_MAP_ENTRY(nsITreeSelection)
-  DOM_CLASSINFO_MAP_END
-
-  DOM_CLASSINFO_MAP_BEGIN(TreeContentView, nsITreeContentView)
-    DOM_CLASSINFO_MAP_ENTRY(nsITreeContentView)
-    DOM_CLASSINFO_MAP_ENTRY(nsITreeView)
-  DOM_CLASSINFO_MAP_END
-#endif
-
-#ifdef MOZ_XUL
-  DOM_CLASSINFO_MAP_BEGIN(XULTemplateBuilder, nsIXULTemplateBuilder)
-    DOM_CLASSINFO_MAP_ENTRY(nsIXULTemplateBuilder)
-  DOM_CLASSINFO_MAP_END
-
-  DOM_CLASSINFO_MAP_BEGIN(XULTreeBuilder, nsIXULTreeBuilder)
-    DOM_CLASSINFO_MAP_ENTRY(nsIXULTreeBuilder)
-    DOM_CLASSINFO_MAP_ENTRY(nsIXULTemplateBuilder)
-    DOM_CLASSINFO_MAP_ENTRY(nsITreeView)
-  DOM_CLASSINFO_MAP_END
-#endif
-
   DOM_CLASSINFO_MAP_BEGIN_NO_CLASS_IF(ContentFrameMessageManager, nsISupports)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)
     DOM_CLASSINFO_MAP_ENTRY(nsIMessageListenerManager)
@@ -717,26 +654,6 @@ nsDOMClassInfo::PreCreate(nsISupports *nativeObj, JSContext *cx,
 }
 
 NS_IMETHODIMP
-nsDOMClassInfo::GetProperty(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
-                            JSObject *obj, jsid id, JS::Value *vp,
-                            bool *_retval)
-{
-  NS_WARNING("nsDOMClassInfo::GetProperty Don't call me!");
-
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsDOMClassInfo::SetProperty(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
-                            JSObject *obj, jsid id, JS::Value *vp,
-                            bool *_retval)
-{
-  NS_WARNING("nsDOMClassInfo::SetProperty Don't call me!");
-
-  return NS_ERROR_UNEXPECTED;
-}
-
-NS_IMETHODIMP
 nsDOMClassInfo::Enumerate(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                           JSObject *obj, bool *_retval)
 {
@@ -778,8 +695,7 @@ nsDOMClassInfo::Resolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
     // window.classname, just fall through and let the JS engine
     // return the Object constructor.
     if (!::JS_DefinePropertyById(cx, obj, id, desc.value(),
-                                 JSPROP_ENUMERATE,
-                                 JS_STUBGETTER, JS_STUBSETTER)) {
+                                 JSPROP_ENUMERATE)) {
       return NS_ERROR_UNEXPECTED;
     }
 
@@ -869,9 +785,9 @@ nsDOMClassInfo::PostCreatePrototype(JSContext * cx, JSObject * aProto)
                          getter_AddRefs(if_info));
 
       if (if_info) {
-        nsXPIDLCString name;
+        nsCString name;
         if_info->GetName(getter_Copies(name));
-        NS_ASSERTION(nsCRT::strcmp(CutPrefix(name), mData->mClass.name) == 0,
+        NS_ASSERTION(nsCRT::strcmp(CutPrefix(name.get()), mData->mClass.name) == 0,
                      "Class name and proto chain interface name mismatch!");
       }
     }
@@ -1022,13 +938,12 @@ DefineInterfaceConstants(JSContext *cx, JS::Handle<JSObject*> obj, const nsIID *
 
   JS::Rooted<JS::Value> v(cx);
   for (i = parent_constant_count; i < constant_count; i++) {
-    nsXPIDLCString name;
+    nsCString name;
     rv = if_info->GetConstant(i, &v, getter_Copies(name));
     NS_ENSURE_TRUE(NS_SUCCEEDED(rv), rv);
 
-    if (!::JS_DefineProperty(cx, obj, name, v,
-                             JSPROP_ENUMERATE | JSPROP_READONLY | JSPROP_PERMANENT,
-                             JS_STUBGETTER, JS_STUBSETTER)) {
+    if (!::JS_DefineProperty(cx, obj, name.get(), v,
+                             JSPROP_ENUMERATE | JSPROP_READONLY | JSPROP_PERMANENT)) {
       return NS_ERROR_UNEXPECTED;
     }
   }
@@ -1558,8 +1473,7 @@ ResolvePrototype(nsIXPConnect *aXPConnect, nsGlobalWindow *aWin, JSContext *cx,
   // Per ECMA, the prototype property is {DontEnum, DontDelete, ReadOnly}
   if (!JS_WrapValue(cx, &v) ||
       !JS_DefineProperty(cx, class_obj, "prototype", v,
-                         JSPROP_PERMANENT | JSPROP_READONLY,
-                         JS_STUBGETTER, JS_STUBSETTER)) {
+                         JSPROP_PERMANENT | JSPROP_READONLY)) {
     return NS_ERROR_UNEXPECTED;
   }
 
@@ -1618,6 +1532,9 @@ nsWindowSH::NameStructEnabled(JSContext* aCx, nsGlobalWindow *aWin,
 
 #ifdef USE_CONTROLLERS_SHIM
 static const JSClass ControllersShimClass = {
+    "Controllers", 0
+};
+static const JSClass XULControllersShimClass = {
     "XULControllers", 0
 };
 #endif
@@ -1636,15 +1553,22 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
   // Note: We use |obj| rather than |aWin| to get the principal here, because
   // this is called during Window setup when the Document isn't necessarily
   // hooked up yet.
-  if (id == XPCJSRuntime::Get()->GetStringID(XPCJSContext::IDX_CONTROLLERS) &&
+  if ((id == XPCJSRuntime::Get()->GetStringID(XPCJSContext::IDX_CONTROLLERS) ||
+       id == XPCJSRuntime::Get()->GetStringID(XPCJSContext::IDX_CONTROLLERS_CLASS)) &&
       !xpc::IsXrayWrapper(obj) &&
       !nsContentUtils::IsSystemPrincipal(nsContentUtils::ObjectPrincipal(obj)))
   {
     if (aWin->GetDoc()) {
-      aWin->GetDoc()->WarnOnceAbout(nsIDocument::eWindow_Controllers);
+      aWin->GetDoc()->WarnOnceAbout(nsIDocument::eWindow_Cc_ontrollers);
+    }
+    const JSClass* clazz;
+    if (id == XPCJSRuntime::Get()->GetStringID(XPCJSContext::IDX_CONTROLLERS)) {
+      clazz = &XULControllersShimClass;
+    } else {
+      clazz = &ControllersShimClass;
     }
     MOZ_ASSERT(JS_IsGlobalObject(obj));
-    JS::Rooted<JSObject*> shim(cx, JS_NewObject(cx, &ControllersShimClass));
+    JS::Rooted<JSObject*> shim(cx, JS_NewObject(cx, clazz));
     if (NS_WARN_IF(!shim)) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
@@ -1830,8 +1754,7 @@ LookupComponentsShim(JSContext *cx, JS::Handle<JSObject*> global,
   NS_ENSURE_TRUE(interfaces, NS_ERROR_OUT_OF_MEMORY);
   bool ok =
     JS_DefineProperty(cx, components, "interfaces", interfaces,
-                      JSPROP_ENUMERATE | JSPROP_PERMANENT | JSPROP_READONLY,
-                      JS_STUBGETTER, JS_STUBSETTER);
+                      JSPROP_ENUMERATE | JSPROP_PERMANENT | JSPROP_READONLY);
   NS_ENSURE_TRUE(ok, NS_ERROR_OUT_OF_MEMORY);
 
   // Define a bunch of shims from the Ci.nsIDOMFoo to window.Foo for DOM
@@ -1853,8 +1776,7 @@ LookupComponentsShim(JSContext *cx, JS::Handle<JSObject*> global,
 
     // Define the shim on the interfaces object.
     ok = JS_DefineProperty(cx, interfaces, geckoName, v,
-                           JSPROP_ENUMERATE | JSPROP_PERMANENT | JSPROP_READONLY,
-                           JS_STUBGETTER, JS_STUBSETTER);
+                           JSPROP_ENUMERATE | JSPROP_PERMANENT | JSPROP_READONLY);
     NS_ENSURE_TRUE(ok, NS_ERROR_OUT_OF_MEMORY);
   }
 
@@ -2026,16 +1948,6 @@ nsDOMConstructorSH::HasInstance(nsIXPConnectWrappedNative *wrapper,
 #endif
 
   return wrapped->HasInstance(wrapper, cx, obj, val, bp, _retval);
-}
-
-NS_IMETHODIMP
-nsNonDOMObjectSH::GetFlags(uint32_t *aFlags)
-{
-  // This is NOT a DOM Object.  Use this helper class for cases when you need
-  // to do something like implement nsISecurityCheckedComponent in a meaningful
-  // way.
-  *aFlags = nsIClassInfo::MAIN_THREAD_ONLY | nsIClassInfo::SINGLETON_CLASSINFO;
-  return NS_OK;
 }
 
 // nsContentFrameMessageManagerSH

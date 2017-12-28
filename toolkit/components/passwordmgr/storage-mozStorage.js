@@ -8,7 +8,6 @@ const PERMISSION_SAVE_LOGINS = "login-saving";
 
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/Promise.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
                                   "resource://gre/modules/LoginHelper.jsm");
@@ -468,7 +467,7 @@ LoginManagerStorage_mozStorage.prototype = {
               if (aOptions.schemeUpgrades && (valueURI = Services.io.newURI(value)) &&
                   valueURI.scheme == "https") {
                 condition += ` OR ${field} = :http${field}`;
-                params["http" + field] = "http://" + valueURI.hostPort;
+                params["http" + field] = "http://" + valueURI.displayHostPort;
               }
             } catch (ex) {
               // newURI will throw for some values (e.g. chrome://FirefoxAccounts)
@@ -712,21 +711,21 @@ LoginManagerStorage_mozStorage.prototype = {
       conditions.push("hostname isnull");
     } else if (hostname != "") {
       conditions.push("hostname = :hostname");
-      params["hostname"] = hostname;
+      params.hostname = hostname;
     }
 
     if (formSubmitURL == null) {
       conditions.push("formSubmitURL isnull");
     } else if (formSubmitURL != "") {
       conditions.push("formSubmitURL = :formSubmitURL OR formSubmitURL = ''");
-      params["formSubmitURL"] = formSubmitURL;
+      params.formSubmitURL = formSubmitURL;
     }
 
     if (httpRealm == null) {
       conditions.push("httpRealm isnull");
     } else if (httpRealm != "") {
       conditions.push("httpRealm = :httpRealm");
-      params["httpRealm"] = httpRealm;
+      params.httpRealm = httpRealm;
     }
 
     return [conditions, params];

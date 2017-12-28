@@ -7,7 +7,6 @@ const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 Cu.import("resource://gre/modules/osfile.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/Task.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "FileUtils",
                                   "resource://gre/modules/FileUtils.jsm");
@@ -45,14 +44,27 @@ HandlerService.prototype = {
         path: OS.Path.join(OS.Constants.Path.profileDir, "handlers.json"),
         dataPostProcessor: this._dataPostProcessor.bind(this),
       });
+    }
+
+    // Always call this even if this.__store was set, since it may have been
+    // set by asyncInit, which might not have completed yet.
+    this._ensureStoreInitialized();
+    return this.__store;
+  },
+
+  __storeInitialized: false,
+  _ensureStoreInitialized() {
+    if (!this.__storeInitialized) {
+      this.__storeInitialized = true;
       this.__store.ensureDataReady();
 
       // We have to inject new default protocol handlers only if we haven't
       // already done this when migrating data from the RDF back-end.
       let alreadyInjected = this._migrateFromRDFIfNeeded();
       this._injectDefaultProtocolHandlersIfNeeded(alreadyInjected);
+
+      Services.obs.notifyObservers(null, "handlersvc-store-initialized");
     }
-    return this.__store;
   },
 
   _dataPostProcessor(data) {
@@ -214,12 +226,13 @@ HandlerService.prototype = {
   },
 
   _onDBChange() {
-    return Task.spawn(function* () {
+    return (async () => {
       if (this.__store) {
-        yield this.__store.finalize();
+        await this.__store.finalize();
       }
       this.__store = null;
-    }.bind(this)).catch(Cu.reportError);
+      this.__storeInitialized = false;
+    })().catch(Cu.reportError);
   },
 
   // nsIObserver
@@ -234,6 +247,22 @@ HandlerService.prototype = {
   },
 
   // nsIHandlerService
+  asyncInit() {
+    if (!this.__store) {
+      this.__store = new JSONFile({
+        path: OS.Path.join(OS.Constants.Path.profileDir, "handlers.json"),
+        dataPostProcessor: this._dataPostProcessor.bind(this),
+      });
+      this.__store.load().then(() => {
+        // __store can be null if we called _onDBChange in the mean time.
+        if (this.__store) {
+          this._ensureStoreInitialized();
+        }
+      }).catch(Cu.reportError);
+    }
+  },
+
+  // nsIHandlerService
   enumerate() {
     let handlers = Cc["@mozilla.org/array;1"]
                      .createInstance(Ci.nsIMutableArray);
@@ -242,7 +271,29 @@ HandlerService.prototype = {
       handlers.appendElement(handler);
     }
     for (let type of Object.keys(this._store.data.schemes)) {
-      let handler = gExternalProtocolService.getProtocolHandlerInfo(type);
+      // nsIExternalProtocolService.getProtocolHandlerInfo can be expensive
+      // on Windows, so we return a proxy to delay retrieving the nsIHandlerInfo
+      // until one of its properties is accessed.
+      //
+      // Note: our caller still needs to yield periodically when iterating
+      // the enumerator and accessing handler properties to avoid monopolizing
+      // the main thread.
+      //
+      let handler = new Proxy(
+        {
+          QueryInterface: XPCOMUtils.generateQI([Ci.nsIHandlerInfo]),
+          type: type,
+          get _handlerInfo() {
+            delete this._handlerInfo;
+            return this._handlerInfo = gExternalProtocolService.getProtocolHandlerInfo(type);
+          },
+        },
+        {
+          get: function(target, name) {
+            return target[name] || target._handlerInfo[name];
+          },
+        },
+      );
       handlers.appendElement(handler);
     }
     return handlers.enumerate();

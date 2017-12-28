@@ -37,6 +37,7 @@ enum class OculusControllerAxisType : uint16_t {
 class VROculusSession
 {
   NS_INLINE_DECL_REFCOUNTING(VROculusSession);
+  friend class VRDisplayOculus;
 public:
   VROculusSession();
   void Refresh();
@@ -56,13 +57,14 @@ private:
   ovrInitFlags mInitFlags;
   ovrTextureSwapChain mTextureSet;
   nsTArray<RefPtr<layers::CompositingRenderTargetD3D11>> mRenderTargets;
-  bool mPresenting;
   IntSize mPresentationSize;
   RefPtr<ID3D11Device> mDevice;
   // The timestamp of the last time Oculus set ShouldQuit to true.
   TimeStamp mLastShouldQuit;
   // The timestamp of the last ending presentation
   TimeStamp mLastPresentationEnd;
+  VRTelemetry mTelemetry;
+  bool mPresenting;
 
   ~VROculusSession();
   void Uninitialize(bool aUnloadLib);
@@ -106,8 +108,6 @@ protected:
   RefPtr<VROculusSession> mSession;
   ovrFovPort mFOVPort[2];
 
-  RefPtr<ID3D11Device> mDevice;
-  RefPtr<ID3D11DeviceContext> mContext;
   ID3D11VertexShader* mQuadVS;
   ID3D11PixelShader* mQuadPS;
   RefPtr<ID3D11SamplerState> mLinearSamplerState;
@@ -131,7 +131,7 @@ protected:
 class VRControllerOculus : public VRControllerHost
 {
 public:
-  explicit VRControllerOculus(dom::GamepadHand aHand);
+  explicit VRControllerOculus(dom::GamepadHand aHand, uint32_t aDisplayID);
   float GetAxisMove(uint32_t aAxis);
   void SetAxisMove(uint32_t aAxis, float aValue);
   float GetIndexTrigger();
@@ -202,6 +202,9 @@ private:
   void HandleHandTriggerPress(uint32_t aControllerIdx, uint32_t aButton, float aValue);
   void HandleTouchEvent(uint32_t aControllerIdx, uint32_t aButton,
                         uint64_t aTouchMask, uint64_t aTouched);
+  void GetControllerPoseState(uint32_t aHandIdx, dom::GamepadPoseState& aPoseState,
+                              bool aForceUpdate = false);
+
   RefPtr<impl::VRDisplayOculus> mDisplay;
   nsTArray<RefPtr<impl::VRControllerOculus>> mOculusController;
   RefPtr<impl::VROculusSession> mSession;

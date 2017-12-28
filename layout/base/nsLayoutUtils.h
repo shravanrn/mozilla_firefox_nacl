@@ -34,7 +34,9 @@
 #include "SVGImageContext.h"
 #include <limits>
 #include <algorithm>
+#include "gfxPoint.h"
 
+class gfxContext;
 class nsPresContext;
 class nsIContent;
 class nsIAtom;
@@ -54,11 +56,9 @@ class nsView;
 class nsIFrame;
 class nsStyleCoord;
 class nsStyleCorners;
-class gfxContext;
 class nsPIDOMWindowOuter;
 class imgIRequest;
 class nsIDocument;
-struct gfxPoint;
 struct nsStyleFont;
 struct nsStyleImageOrientation;
 struct nsOverflowAreas;
@@ -72,6 +72,7 @@ struct ContainerLayerParameters;
 class WritingMode;
 class DisplayItemClip;
 class EffectSet;
+struct ActiveScrolledRoot;
 namespace dom {
 class CanvasRenderingContext2D;
 class DOMRectList;
@@ -184,9 +185,20 @@ public:
   static nsIContent* FindContentFor(ViewID aId);
 
   /**
+   * Find the view ID (or generate a new one) for the content element
+   * corresponding to the ASR.
+   */
+  static ViewID ViewIDForASR(const mozilla::ActiveScrolledRoot* aASR);
+
+  /**
    * Find the scrollable frame for a given ID.
    */
   static nsIScrollableFrame* FindScrollableFrameFor(ViewID aId);
+
+  /**
+   * Find the ID for a given scrollable frame.
+   */
+  static ViewID FindIDForScrollableFrame(nsIScrollableFrame* aScrollable);
 
   /**
    * Get display port for the given element, relative to the specified entity,
@@ -561,6 +573,12 @@ public:
                                         const ContainerLayerParameters& aContainerParameters);
 
   /**
+   * Get the scroll id for the root scrollframe of the presshell of the given
+   * prescontext. Returns NULL_SCROLL_ID if it couldn't be found.
+   */
+  static FrameMetrics::ViewID ScrollIdForRootScrollFrame(nsPresContext* aPresContext);
+
+  /**
    * Return true if aPresContext's viewport has a displayport.
    */
   static bool ViewportHasDisplayPort(nsPresContext* aPresContext);
@@ -779,6 +797,9 @@ public:
     TranslateViewToWidget(nsPresContext* aPresContext,
                           nsView* aView, nsPoint aPt,
                           nsIWidget* aWidget);
+
+  static mozilla::LayoutDeviceIntPoint
+    WidgetToWidgetOffset(nsIWidget* aFromWidget, nsIWidget* aToWidget);
 
   enum FrameForPointFlags {
     /**
@@ -1094,7 +1115,7 @@ public:
    * necessarily correspond to what's visible in the window; we don't
    * want to mess up the widget's layer tree.
    */
-  static nsresult PaintFrame(nsRenderingContext* aRenderingContext, nsIFrame* aFrame,
+  static nsresult PaintFrame(gfxContext* aRenderingContext, nsIFrame* aFrame,
                              const nsRegion& aDirtyRegion, nscolor aBackstop,
                              nsDisplayListBuilderMode aBuilderMode,
                              PaintFrameFlags aFlags = PaintFrameFlags(0));
@@ -1138,6 +1159,11 @@ public:
    * SVG frames return a single box, themselves.
    */
   static void GetAllInFlowBoxes(nsIFrame* aFrame, BoxCallback* aCallback);
+
+  /**
+   * Like GetAllInFlowBoxes, but doesn't include continuations.
+   */
+  static void AddBoxesForFrame(nsIFrame* aFrame, BoxCallback* aCallback);
 
   /**
    * Find the first frame descendant of aFrame (including aFrame) which is
@@ -1345,14 +1371,14 @@ public:
    * containing aFrame.
    */
   static nsIFrame*
-  FirstContinuationOrIBSplitSibling(nsIFrame *aFrame);
+  FirstContinuationOrIBSplitSibling(const nsIFrame *aFrame);
 
   /**
    * Get the last frame in the continuation-plus-ib-split-sibling chain
    * containing aFrame.
    */
   static nsIFrame*
-  LastContinuationOrIBSplitSibling(nsIFrame *aFrame);
+  LastContinuationOrIBSplitSibling(const nsIFrame *aFrame);
 
   /**
    * Is FirstContinuationOrIBSplitSibling(aFrame) going to return
@@ -1395,7 +1421,7 @@ public:
   };
   static nscoord
   IntrinsicForAxis(mozilla::PhysicalAxis aAxis,
-                   nsRenderingContext*   aRenderingContext,
+                   gfxContext*           aRenderingContext,
                    nsIFrame*             aFrame,
                    IntrinsicISizeType    aType,
                    const mozilla::Maybe<mozilla::LogicalSize>& aPercentageBasis = mozilla::Nothing(),
@@ -1404,7 +1430,7 @@ public:
   /**
    * Calls IntrinsicForAxis with aFrame's parent's inline physical axis.
    */
-  static nscoord IntrinsicForContainer(nsRenderingContext* aRenderingContext,
+  static nscoord IntrinsicForContainer(gfxContext*         aRenderingContext,
                                        nsIFrame*           aFrame,
                                        IntrinsicISizeType  aType,
                                        uint32_t            aFlags = 0);
@@ -1427,7 +1453,7 @@ public:
    * should be a grid/flex item.
    */
   static nscoord MinSizeContributionForAxis(mozilla::PhysicalAxis aAxis,
-                                            nsRenderingContext*   aRC,
+                                            gfxContext*           aRC,
                                             nsIFrame*             aFrame,
                                             IntrinsicISizeType    aType,
                                             uint32_t              aFlags = 0);
@@ -1539,11 +1565,11 @@ public:
 
   // Implement nsIFrame::GetPrefISize in terms of nsIFrame::AddInlinePrefISize
   static nscoord PrefISizeFromInline(nsIFrame* aFrame,
-                                     nsRenderingContext* aRenderingContext);
+                                     gfxContext* aRenderingContext);
 
   // Implement nsIFrame::GetMinISize in terms of nsIFrame::AddInlineMinISize
   static nscoord MinISizeFromInline(nsIFrame* aFrame,
-                                    nsRenderingContext* aRenderingContext);
+                                    gfxContext* aRenderingContext);
 
   // Get a suitable foreground color for painting aColor for aFrame.
   static nscolor DarkenColorIfNeeded(nsIFrame* aFrame, nscolor aColor);
@@ -1584,7 +1610,7 @@ public:
   static nscoord AppUnitWidthOfStringBidi(const nsString& aString,
                                           const nsIFrame* aFrame,
                                           nsFontMetrics& aFontMetrics,
-                                          nsRenderingContext& aContext) {
+                                          gfxContext& aContext) {
     return nsLayoutUtils::AppUnitWidthOfStringBidi(aString.get(),
                                                    aString.Length(), aFrame,
                                                    aFontMetrics, aContext);
@@ -1593,7 +1619,7 @@ public:
                                           uint32_t aLength,
                                           const nsIFrame* aFrame,
                                           nsFontMetrics& aFontMetrics,
-                                          nsRenderingContext& aContext);
+                                          gfxContext& aContext);
 
   static bool StringWidthIsGreaterThan(const nsString& aString,
                                        nsFontMetrics& aFontMetrics,
@@ -1607,7 +1633,7 @@ public:
 
   static void DrawString(const nsIFrame*     aFrame,
                          nsFontMetrics&      aFontMetrics,
-                         nsRenderingContext* aContext,
+                         gfxContext*         aContext,
                          const char16_t*     aString,
                          int32_t             aLength,
                          nsPoint             aPoint,
@@ -1625,19 +1651,19 @@ public:
                                uint32_t aLength,
                                nsPoint aPoint,
                                nsFontMetrics& aFontMetrics,
-                               nsRenderingContext& aContext);
+                               gfxContext& aContext);
 
   /**
    * Helper function for drawing text-shadow. The callback's job
    * is to draw whatever needs to be blurred onto the given context.
    */
-  typedef void (* TextShadowCallback)(nsRenderingContext* aCtx,
+  typedef void (* TextShadowCallback)(gfxContext* aCtx,
                                       nsPoint aShadowOffset,
                                       const nscolor& aShadowColor,
                                       void* aData);
 
   static void PaintTextShadow(const nsIFrame*     aFrame,
-                              nsRenderingContext* aContext,
+                              gfxContext*         aContext,
                               const nsRect&       aTextRect,
                               const nsRect&       aDirtyRect,
                               const nscolor&      aForegroundColor,
@@ -1808,6 +1834,9 @@ public:
    *   @param aRenderingContext Where to draw the image, set up with an
    *                            appropriate scale and transform for drawing in
    *                            app units.
+   *   @param aStyleContext     The style context of the nsIFrame (or
+   *                            pseudo-element) for which this image is being
+   *                            drawn.
    *   @param aImage            The image.
    *   @param aDest             Where one copy of the image should mapped to.
    *   @param aFill             The area to be filled with copies of the
@@ -1818,6 +1847,7 @@ public:
    *   @param aImageFlags       Image flags of the imgIContainer::FLAG_* variety
    */
   static DrawResult DrawImage(gfxContext&         aContext,
+                              nsStyleContext*     aStyleContext,
                               nsPresContext*      aPresContext,
                               imgIContainer*      aImage,
                               const SamplingFilter aSamplingFilter,
@@ -2315,11 +2345,6 @@ public:
   static bool CSSFiltersEnabled();
 
   /**
-   * Checks if we should enable parsing for CSS clip-path basic shapes.
-   */
-  static bool CSSClipPathShapesEnabled();
-
-  /**
    * Checks whether support for the CSS-wide "unset" value is enabled.
    */
   static bool UnsetValueEnabled();
@@ -2335,6 +2360,11 @@ public:
    * 'true' value is enabled.
    */
   static bool IsTextAlignUnsafeValueEnabled();
+
+  /**
+   * Checks whether support for inter-character ruby is enabled.
+   */
+  static bool IsInterCharacterRubyEnabled();
 
   static bool InterruptibleReflowEnabled()
   {
@@ -2454,10 +2484,17 @@ public:
   // to disable it dynamically in stylo-enabled builds via a pref.
   static bool StyloEnabled() {
 #ifdef MOZ_STYLO
-    return sStyloEnabled;
+    return sStyloEnabled && StyloSupportedInCurrentProcess();
 #else
     return false;
 #endif
+  }
+
+  // Whether Stylo should be allowed to be enabled in this process.  This
+  // returns true for content processes and the non-e10s parent process.
+  static bool StyloSupportedInCurrentProcess() {
+     return XRE_IsContentProcess() ||
+            (XRE_IsParentProcess() && !XRE_IsE10sParentProcess());
   }
 
   static bool StyleAttrWithXMLBaseDisabled() {
@@ -2491,6 +2528,31 @@ public:
 
   static void Initialize();
   static void Shutdown();
+
+#ifdef MOZ_STYLO
+  /**
+   * Principal-based blocklist for stylo.
+   * Check if aPrincipal is blocked by stylo's blocklist and should fallback to
+   * use Gecko's style backend. Note that using a document's principal rather
+   * than the document URI will let us piggy-back off the existing principal
+   * relationships and symmetries.
+   */
+  static bool IsInStyloBlocklist(nsIPrincipal* aPrincipal);
+
+  /**
+   * Add aBlockedDomain to the existing stylo blocklist, i.e., sStyloBlocklist.
+   * This function is exposed to nsDOMWindowUtils and only for testing purpose.
+   * So, NEVER use this in any other cases.
+   */
+  static void AddToStyloBlocklist(const nsACString& aBlockedDomain);
+
+  /**
+   * Remove aBlockedDomain from the existing stylo blocklist, i.e., sStyloBlocklist.
+   * This function is exposed to nsDOMWindowUtils and only for testing purpose.
+   * So, NEVER use this in any other cases.
+   */
+  static void RemoveFromStyloBlocklist(const nsACString& aBlockedDomain);
+#endif
 
   /**
    * Register an imgIRequest object with a refresh driver.
@@ -2715,9 +2777,7 @@ public:
                                   ViewID aScrollId,
                                   const std::string& aKey,
                                   const std::string& aValue) {
-    if (IsAPZTestLoggingEnabled()) {
-      DoLogTestDataForPaint(aManager, aScrollId, aKey, aValue);
-    }
+    DoLogTestDataForPaint(aManager, aScrollId, aKey, aValue);
   }
 
   /**
@@ -2730,10 +2790,8 @@ public:
                                   ViewID aScrollId,
                                   const std::string& aKey,
                                   const Value& aValue) {
-    if (IsAPZTestLoggingEnabled()) {
-      DoLogTestDataForPaint(aManager, aScrollId, aKey,
-          mozilla::ToString(aValue));
-    }
+    DoLogTestDataForPaint(aManager, aScrollId, aKey,
+                          mozilla::ToString(aValue));
   }
 
   /**
@@ -2820,6 +2878,16 @@ public:
                                               const mozilla::Maybe<nsRect>& aClipRect,
                                               bool aIsRoot,
                                               const ContainerLayerParameters& aContainerParameters);
+
+  /**
+   * Returns the metadata to put onto the root layer of a layer tree, if one is
+   * needed. The last argument is a callback function to check if the caller
+   * already has a metadata for a given scroll id.
+   */
+  static mozilla::Maybe<ScrollMetadata> GetRootMetadata(nsDisplayListBuilder* aBuilder,
+                                                        Layer* aRootLayer,
+                                                        const ContainerLayerParameters& aContainerParameters,
+                                                        const std::function<bool(ViewID& aScrollId)>& aCallback);
 
   /**
    * If the given scroll frame needs an area excluded from its composition
@@ -2948,6 +3016,8 @@ private:
   static bool sTextCombineUprightDigitsEnabled;
 #ifdef MOZ_STYLO
   static bool sStyloEnabled;
+  static bool sStyloBlocklistEnabled;
+  static nsTArray<nsCString>* sStyloBlocklist;
 #endif
   static bool sStyleAttrWithXMLBaseDisabled;
   static uint32_t sIdlePeriodDeadlineLimit;
@@ -3076,7 +3146,8 @@ void StrokeLineWithSnapping(const nsPoint& aP1, const nsPoint& aP2,
       bool mOldValue;
     };
 
-    void MaybeSetupTransactionIdAllocator(layers::LayerManager* aManager, nsView* aView);
+    void MaybeSetupTransactionIdAllocator(layers::LayerManager* aManager,
+                                          nsPresContext* aPresContext);
 
   } // namespace layout
 } // namespace mozilla
@@ -3105,6 +3176,23 @@ public:
 
   nsCOMPtr<nsIContent> mContent;
   nsCOMPtr<nsIAtom> mAttrName;
+};
+
+// This class allows you to easily set any pointer variable and ensure it's
+// set to nullptr when leaving its scope.
+template<typename T>
+class MOZ_RAII SetAndNullOnExit
+{
+public:
+  SetAndNullOnExit(T* &aVariable, T* aValue) {
+    aVariable = aValue;
+    mVariable = &aVariable;
+  }
+  ~SetAndNullOnExit() {
+    *mVariable = nullptr;
+  }
+private:
+  T** mVariable;
 };
 
 #endif // nsLayoutUtils_h__

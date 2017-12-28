@@ -20,6 +20,7 @@ import org.mozilla.gecko.util.ActivityUtils;
 import org.mozilla.gecko.util.BundleEventListener;
 import org.mozilla.gecko.util.EventCallback;
 import org.mozilla.gecko.util.GeckoBundle;
+import org.mozilla.gecko.util.ThreadUtils;
 
 import android.app.Activity;
 import android.content.ContentResolver;
@@ -27,6 +28,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.database.Cursor;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Bundle;
@@ -42,6 +44,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
+import android.view.inputmethod.InputMethodManager;
 
 public class GeckoView extends LayerView {
 
@@ -92,15 +95,226 @@ public class GeckoView extends LayerView {
     private final EventDispatcher mEventDispatcher =
         new EventDispatcher(mNativeQueue);
 
-    /* package */ ContentListener mContentListener;
-    /* package */ NavigationListener mNavigationListener;
-    /* package */ ProgressListener mProgressListener;
+    private final GeckoViewHandler<ContentListener> mContentHandler =
+        new GeckoViewHandler<ContentListener>(
+            "GeckoViewContent", this,
+            new String[]{
+                "GeckoView:ContextMenu",
+                "GeckoView:DOMTitleChanged",
+                "GeckoView:FullScreenEnter",
+                "GeckoView:FullScreenExit"
+            }
+        ) {
+            @Override
+            public void handleMessage(final ContentListener listener,
+                                      final String event,
+                                      final GeckoBundle message,
+                                      final EventCallback callback) {
+
+                if ("GeckoView:ContextMenu".equals(event)) {
+                    listener.onContextMenu(GeckoView.this,
+                                           message.getInt("screenX"),
+                                           message.getInt("screenY"),
+                                           message.getString("uri"),
+                                           message.getString("elementSrc"));
+                } else if ("GeckoView:DOMTitleChanged".equals(event)) {
+                    listener.onTitleChange(GeckoView.this,
+                                           message.getString("title"));
+                } else if ("GeckoView:FullScreenEnter".equals(event)) {
+                    listener.onFullScreen(GeckoView.this, true);
+                } else if ("GeckoView:FullScreenExit".equals(event)) {
+                    listener.onFullScreen(GeckoView.this, false);
+                }
+            }
+        };
+
+    private final GeckoViewHandler<NavigationListener> mNavigationHandler =
+        new GeckoViewHandler<NavigationListener>(
+            "GeckoViewNavigation", this,
+            new String[]{
+                "GeckoView:LocationChange",
+                "GeckoView:OnLoadUri"
+            }
+        ) {
+            @Override
+            public void handleMessage(final NavigationListener listener,
+                                      final String event,
+                                      final GeckoBundle message,
+                                      final EventCallback callback) {
+                if ("GeckoView:LocationChange".equals(event)) {
+                    listener.onLocationChange(GeckoView.this,
+                                              message.getString("uri"));
+                    listener.onCanGoBack(GeckoView.this,
+                                         message.getBoolean("canGoBack"));
+                    listener.onCanGoForward(GeckoView.this,
+                                            message.getBoolean("canGoForward"));
+                } else if ("GeckoView:OnLoadUri".equals(event)) {
+                    final String uri = message.getString("uri");
+                    final NavigationListener.TargetWindow where =
+                        NavigationListener.TargetWindow.forGeckoValue(
+                            message.getInt("where"));
+                    final boolean result =
+                        listener.onLoadUri(GeckoView.this, uri, where);
+                    callback.sendSuccess(result);
+                }
+            }
+        };
+
+    private final GeckoViewHandler<ProgressListener> mProgressHandler =
+        new GeckoViewHandler<ProgressListener>(
+            "GeckoViewProgress", this,
+            new String[]{
+                "GeckoView:PageStart",
+                "GeckoView:PageStop",
+                "GeckoView:SecurityChanged"
+            }
+        ) {
+            @Override
+            public void handleMessage(final ProgressListener listener,
+                                      final String event,
+                                      final GeckoBundle message,
+                                      final EventCallback callback) {
+                if ("GeckoView:PageStart".equals(event)) {
+                    listener.onPageStart(GeckoView.this,
+                                         message.getString("uri"));
+                } else if ("GeckoView:PageStop".equals(event)) {
+                    listener.onPageStop(GeckoView.this,
+                                        message.getBoolean("success"));
+                } else if ("GeckoView:SecurityChanged".equals(event)) {
+                    final GeckoBundle identity = message.getBundle("identity");
+                    listener.onSecurityChange(GeckoView.this, new ProgressListener.SecurityInformation(identity));
+                }
+            }
+        };
+
+    private final GeckoViewHandler<ScrollListener> mScrollHandler =
+        new GeckoViewHandler<ScrollListener>(
+            "GeckoViewScroll", this,
+            new String[]{ "GeckoView:ScrollChanged" }
+        ) {
+            @Override
+            public void handleMessage(final ScrollListener listener,
+                                      final String event,
+                                      final GeckoBundle message,
+                                      final EventCallback callback) {
+
+                if ("GeckoView:ScrollChanged".equals(event)) {
+                    listener.onScrollChanged(GeckoView.this,
+                                             message.getInt("scrollX"),
+                                             message.getInt("scrollY"));
+                }
+            }
+        };
+
+    private final GeckoViewHandler<PermissionDelegate> mPermissionHandler =
+        new GeckoViewHandler<PermissionDelegate>(
+            "GeckoViewPermission", this,
+            new String[] {
+                "GeckoView:AndroidPermission",
+                "GeckoView:ContentPermission",
+                "GeckoView:MediaPermission"
+            }, /* alwaysListen */ true
+        ) {
+            @Override
+            public void handleMessage(final PermissionDelegate listener,
+                                      final String event,
+                                      final GeckoBundle message,
+                                      final EventCallback callback) {
+
+                if (listener == null) {
+                    callback.sendSuccess(/* granted */ false);
+                    return;
+                }
+                if ("GeckoView:AndroidPermission".equals(event)) {
+                    listener.requestAndroidPermissions(
+                            GeckoView.this, message.getStringArray("perms"),
+                            new PermissionCallback("android", callback));
+                } else if ("GeckoView:ContentPermission".equals(event)) {
+                    final String type = message.getString("perm");
+                    listener.requestContentPermission(
+                            GeckoView.this, message.getString("uri"),
+                            type, message.getString("access"),
+                            new PermissionCallback(type, callback));
+                } else if ("GeckoView:MediaPermission".equals(event)) {
+                    listener.requestMediaPermission(
+                            GeckoView.this, message.getString("uri"),
+                            message.getBundleArray("video"), message.getBundleArray("audio"),
+                            new PermissionCallback("media", callback));
+                }
+            }
+        };
+
+    private static class PermissionCallback implements
+        PermissionDelegate.Callback, PermissionDelegate.MediaCallback {
+
+        private final String mType;
+        private EventCallback mCallback;
+
+        public PermissionCallback(final String type, final EventCallback callback) {
+            mType = type;
+            mCallback = callback;
+        }
+
+        private void submit(final Object response) {
+            if (mCallback != null) {
+                mCallback.sendSuccess(response);
+                mCallback = null;
+            }
+        }
+
+        @Override // PermissionDelegate.Callback
+        public void grant() {
+            if ("media".equals(mType)) {
+                throw new UnsupportedOperationException();
+            }
+            submit(/* response */ true);
+        }
+
+        @Override // PermissionDelegate.Callback, PermissionDelegate.MediaCallback
+        public void reject() {
+            submit(/* response */ false);
+        }
+
+        @Override // PermissionDelegate.MediaCallback
+        public void grant(final String video, final String audio) {
+            if (!"media".equals(mType)) {
+                throw new UnsupportedOperationException();
+            }
+            final GeckoBundle response = new GeckoBundle(2);
+            response.putString("video", video);
+            response.putString("audio", audio);
+            submit(response);
+        }
+
+        @Override // PermissionDelegate.MediaCallback
+        public void grant(final GeckoBundle video, final GeckoBundle audio) {
+            grant(video != null ? video.getString("id") : null,
+                  audio != null ? audio.getString("id") : null);
+        }
+    }
+
+    /**
+     * Get the current prompt delegate for this GeckoView.
+     * @return PromptDelegate instance or null if using default delegate.
+     */
+    public PermissionDelegate getPermissionDelegate() {
+        return mPermissionHandler.getListener();
+    }
+
+    /**
+     * Set the current permission delegate for this GeckoView.
+     * @param delegate PermissionDelegate instance or null to use the default delegate.
+     */
+    public void setPermissionDelegate(final PermissionDelegate delegate) {
+        mPermissionHandler.setListener(delegate, this);
+    }
+
     private PromptDelegate mPromptDelegate;
     private InputConnectionListener mInputConnectionListener;
+    private boolean mIsResettingFocus;
 
     private GeckoViewSettings mSettings;
 
-    protected boolean mOnAttachedToWindowCalled;
     protected String mChromeUri;
     protected int mScreenId = 0; // default to the primary screen
 
@@ -199,14 +413,7 @@ public class GeckoView extends LayerView {
     private class Listener implements BundleEventListener {
         /* package */ void registerListeners() {
             getEventDispatcher().registerUiThreadListener(this,
-                "GeckoView:DOMTitleChanged",
-                "GeckoView:FullScreenEnter",
-                "GeckoView:FullScreenExit",
-                "GeckoView:LocationChange",
-                "GeckoView:PageStart",
-                "GeckoView:PageStop",
                 "GeckoView:Prompt",
-                "GeckoView:SecurityChanged",
                 null);
         }
 
@@ -217,42 +424,8 @@ public class GeckoView extends LayerView {
                 Log.d(LOGTAG, "handleMessage: event = " + event);
             }
 
-            if ("GeckoView:DOMTitleChanged".equals(event)) {
-                if (mContentListener != null) {
-                    mContentListener.onTitleChange(GeckoView.this, message.getString("title"));
-                }
-            } else if ("GeckoView:FullScreenEnter".equals(event)) {
-                if (mContentListener != null) {
-                    mContentListener.onFullScreen(GeckoView.this, true);
-                }
-            } else if ("GeckoView:FullScreenExit".equals(event)) {
-                if (mContentListener != null) {
-                    mContentListener.onFullScreen(GeckoView.this, false);
-                }
-            } else if ("GeckoView:LocationChange".equals(event)) {
-                if (mNavigationListener == null) {
-                    // We shouldn't be getting this event.
-                    mEventDispatcher.dispatch("GeckoViewNavigation:Inactive", null);
-                } else {
-                    mNavigationListener.onLocationChange(GeckoView.this, message.getString("uri"));
-                    mNavigationListener.onCanGoBack(GeckoView.this, message.getBoolean("canGoBack"));
-                    mNavigationListener.onCanGoForward(GeckoView.this, message.getBoolean("canGoForward"));
-                }
-            } else if ("GeckoView:PageStart".equals(event)) {
-                if (mProgressListener != null) {
-                    mProgressListener.onPageStart(GeckoView.this, message.getString("uri"));
-                }
-            } else if ("GeckoView:PageStop".equals(event)) {
-                if (mProgressListener != null) {
-                    mProgressListener.onPageStop(GeckoView.this, message.getBoolean("success"));
-                }
-            } else if ("GeckoView:Prompt".equals(event)) {
+            if ("GeckoView:Prompt".equals(event)) {
                 handlePromptEvent(GeckoView.this, message, callback);
-            } else if ("GeckoView:SecurityChanged".equals(event)) {
-                if (mProgressListener != null) {
-                    int state = message.getInt("status") & ProgressListener.STATE_ALL;
-                    mProgressListener.onSecurityChange(GeckoView.this, state);
-                }
             }
         }
     }
@@ -298,7 +471,7 @@ public class GeckoView extends LayerView {
 
     /**
      * Preload GeckoView by starting Gecko with the specified arguments in the background,
-     * if Geckois not already running.
+     * if Gecko is not already running.
      *
      * @param context Activity or Application Context for starting GeckoView.
      * @param geckoArgs Arguments to be passed to Gecko, if Gecko is not already running
@@ -309,7 +482,7 @@ public class GeckoView extends LayerView {
             GeckoAppShell.setApplicationContext(appContext);
         }
 
-        if (GeckoThread.initMainProcess(GeckoProfile.get(appContext),
+        if (GeckoThread.initMainProcess(/* profile */ null,
                                         geckoArgs,
                                         /* debugging */ false)) {
             GeckoThread.launch();
@@ -347,10 +520,6 @@ public class GeckoView extends LayerView {
             mWindow = stateBinder.window;
         }
         mStateSaved = false;
-
-        if (mOnAttachedToWindowCalled) {
-            reattachWindow();
-        }
 
         // We have to always call super.onRestoreInstanceState because View keeps
         // track of these calls and throws an exception when we don't call it.
@@ -426,8 +595,6 @@ public class GeckoView extends LayerView {
         }
 
         super.onAttachedToWindow();
-
-        mOnAttachedToWindowCalled = true;
     }
 
     @Override
@@ -449,8 +616,6 @@ public class GeckoView extends LayerView {
             GeckoThread.queueNativeCallUntil(GeckoThread.State.PROFILE_READY,
                     mWindow, "disposeNative");
         }
-
-        mOnAttachedToWindowCalled = false;
     }
 
     @WrapForJNI public static final int LOAD_DEFAULT = 0;
@@ -500,6 +665,13 @@ public class GeckoView extends LayerView {
         mEventDispatcher.dispatch("GeckoView:Reload", null);
     }
 
+    /**
+    * Stop loading.
+    */
+    public void stop() {
+        mEventDispatcher.dispatch("GeckoView:Stop", null);
+    }
+
     /* package */ void setInputConnectionListener(final InputConnectionListener icl) {
         mInputConnectionListener = icl;
     }
@@ -520,6 +692,45 @@ public class GeckoView extends LayerView {
 
     public GeckoViewSettings getSettings() {
         return mSettings;
+    }
+
+    @Override
+    public void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
+
+        if (gainFocus && !mIsResettingFocus) {
+            ThreadUtils.postToUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (!isFocused()) {
+                        return;
+                    }
+
+                    final InputMethodManager imm = InputMethods.getInputMethodManager(getContext());
+                    // Bug 1404111:
+                    // Through View#onFocusChanged, the InputMethodManager queues up a checkFocus
+                    // call for the next spin of the message loop, so by posting this Runnable after
+                    // super#onFocusChanged, the IMM should have completed its focus change handling
+                    // at this point and we should be the active view for input handling.
+
+                    // If however onViewDetachedFromWindow for the previously active view gets
+                    // called *after* onFocusChanged, but *before* the focus change has been fully
+                    // processed by the IMM with the help of checkFocus, the IMM will lose track of
+                    // the currently active view, which means that we can't interact with the IME.
+                    if (!imm.isActive(GeckoView.this)) {
+                        // If that happens, we bring the IMM's internal state back into sync by
+                        // clearing and resetting our focus.
+                        mIsResettingFocus = true;
+                        clearFocus();
+                        // After calling clearFocus we might regain focus automatically, but we
+                        // explicitly request it again in case this doesn't happen.
+                        // If we've already got the focus back, this will then be a no-op anyway.
+                        requestFocus();
+                        mIsResettingFocus = false;
+                    }
+                }
+            });
+        }
     }
 
     @Override
@@ -600,12 +811,19 @@ public class GeckoView extends LayerView {
     }
 
     /**
+    * Exits fullscreen mode
+    */
+    public void exitFullScreen() {
+        mEventDispatcher.dispatch("GeckoViewContent:ExitFullScreen", null);
+    }
+
+    /**
     * Set the content callback handler.
     * This will replace the current handler.
-    * @param content An implementation of ContentListener.
+    * @param listener An implementation of ContentListener.
     */
-    public void setContentListener(ContentListener content) {
-        mContentListener = content;
+    public void setContentListener(ContentListener listener) {
+        mContentHandler.setListener(listener, this);
     }
 
     /**
@@ -613,16 +831,16 @@ public class GeckoView extends LayerView {
     * @return The current content callback handler.
     */
     public ContentListener getContentListener() {
-        return mContentListener;
+        return mContentHandler.getListener();
     }
 
     /**
     * Set the progress callback handler.
     * This will replace the current handler.
-    * @param progress An implementation of ProgressListener.
+    * @param listener An implementation of ProgressListener.
     */
-    public void setProgressListener(ProgressListener progress) {
-        mProgressListener = progress;
+    public void setProgressListener(ProgressListener listener) {
+        mProgressHandler.setListener(listener, this);
     }
 
     /**
@@ -630,25 +848,16 @@ public class GeckoView extends LayerView {
     * @return The current progress callback handler.
     */
     public ProgressListener getProgressListener() {
-        return mProgressListener;
+        return mProgressHandler.getListener();
     }
 
     /**
     * Set the navigation callback handler.
     * This will replace the current handler.
-    * @param navigation An implementation of NavigationListener.
+    * @param listener An implementation of NavigationListener.
     */
     public void setNavigationListener(NavigationListener listener) {
-        if (mNavigationListener == listener) {
-            return;
-        }
-        if (listener == null) {
-            mEventDispatcher.dispatch("GeckoViewNavigation:Inactive", null);
-        } else if (mNavigationListener == null) {
-            mEventDispatcher.dispatch("GeckoViewNavigation:Active", null);
-        }
-
-        mNavigationListener = listener;
+        mNavigationHandler.setListener(listener, this);
     }
 
     /**
@@ -656,7 +865,7 @@ public class GeckoView extends LayerView {
     * @return The current navigation callback handler.
     */
     public NavigationListener getNavigationListener() {
-        return mNavigationListener;
+        return mNavigationHandler.getListener();
     }
 
     /**
@@ -668,6 +877,15 @@ public class GeckoView extends LayerView {
      */
     public static void setDefaultPromptDelegate(PromptDelegate delegate) {
         sDefaultPromptDelegate = delegate;
+    }
+
+    /**
+    * Set the content scroll callback handler.
+    * This will replace the current handler.
+    * @param listener An implementation of ScrollListener.
+    */
+    public void setScrollListener(ScrollListener listener) {
+        mScrollHandler.setListener(listener, this);
     }
 
     /**
@@ -1056,10 +1274,90 @@ public class GeckoView extends LayerView {
     }
 
     public interface ProgressListener {
-        static final int STATE_IS_BROKEN = 1;
-        static final int STATE_IS_SECURE = 2;
-        static final int STATE_IS_INSECURE = 4;
-        /* package */ final int STATE_ALL = STATE_IS_BROKEN | STATE_IS_SECURE | STATE_IS_INSECURE;
+        /**
+         * Class representing security information for a site.
+         */
+        public class SecurityInformation {
+            public static final int SECURITY_MODE_UNKNOWN = 0;
+            public static final int SECURITY_MODE_IDENTIFIED = 1;
+            public static final int SECURITY_MODE_VERIFIED = 2;
+
+            public static final int CONTENT_UNKNOWN = 0;
+            public static final int CONTENT_BLOCKED = 1;
+            public static final int CONTENT_LOADED = 2;
+            /**
+             * Indicates whether or not the site is secure.
+             */
+            public final boolean isSecure;
+            /**
+             * Indicates whether or not the site is a security exception.
+             */
+            public final boolean isException;
+            /**
+             * Contains the origin of the certificate.
+             */
+            public final String origin;
+            /**
+             * Contains the host associated with the certificate.
+             */
+            public final String host;
+            /**
+             * Contains the human-readable name of the certificate subject.
+             */
+            public final String organization;
+            /**
+             * Contains the full name of the certificate subject, including location.
+             */
+            public final String subjectName;
+            /**
+             * Contains the common name of the issuing authority.
+             */
+            public final String issuerCommonName;
+            /**
+             * Contains the full/proper name of the issuing authority.
+             */
+            public final String issuerOrganization;
+            /**
+             * Indicates the security level of the site; possible values are SECURITY_MODE_UNKNOWN,
+             * SECURITY_MODE_IDENTIFIED, and SECURITY_MODE_VERIFIED. SECURITY_MODE_IDENTIFIED
+             * indicates domain validation only, while SECURITY_MODE_VERIFIED indicates extended validation.
+             */
+            public final int securityMode;
+            /**
+             * Indicates the presence of passive mixed content; possible values are
+             * CONTENT_UNKNOWN, CONTENT_BLOCKED, and CONTENT_LOADED.
+             */
+            public final int mixedModePassive;
+            /**
+             * Indicates the presence of active mixed content; possible values are
+             * CONTENT_UNKNOWN, CONTENT_BLOCKED, and CONTENT_LOADED.
+             */
+            public final int mixedModeActive;
+            /**
+             * Indicates the status of tracking protection; possible values are
+             * CONTENT_UNKNOWN, CONTENT_BLOCKED, and CONTENT_LOADED.
+             */
+            public final int trackingMode;
+
+            /* package */ SecurityInformation(GeckoBundle identityData) {
+                final GeckoBundle mode = identityData.getBundle("mode");
+
+                mixedModePassive = mode.getInt("mixed_display");
+                mixedModeActive = mode.getInt("mixed_active");
+                trackingMode = mode.getInt("tracking");
+
+                securityMode = mode.getInt("identity");
+
+                isSecure = identityData.getBoolean("secure");
+                isException = identityData.getBoolean("securityException");
+                origin = identityData.getString("origin");
+                host = identityData.getString("host");
+                organization = identityData.getString("organization");
+                subjectName = identityData.getString("subjectName");
+                issuerCommonName = identityData.getString("issuerCommonName");
+                issuerOrganization = identityData.getString("issuerOrganization");
+            }
+        }
 
         /**
         * A View has started loading content from the network.
@@ -1078,9 +1376,9 @@ public class GeckoView extends LayerView {
         /**
         * The security status has been updated.
         * @param view The GeckoView that initiated the callback.
-        * @param status The new security status.
+        * @param securityInfo The new security information.
         */
-        void onSecurityChange(GeckoView view, int status);
+        void onSecurityChange(GeckoView view, SecurityInformation securityInfo);
     }
 
     public interface ContentListener {
@@ -1101,6 +1399,23 @@ public class GeckoView extends LayerView {
          * @param fullScreen True if the page is in full screen mode.
          */
         void onFullScreen(GeckoView view, boolean fullScreen);
+
+
+        /**
+         * A user has initiated the context menu via long-press.
+         * This event is fired on links, (nested) images and (nested) media
+         * elements.
+         *
+         * @param view The GeckoView that initiated the callback.
+         * @param screenX The screen coordinates of the press.
+         * @param screenY The screen coordinates of the press.
+         * @param uri The URI of the pressed link, set for links and
+         *            image-links.
+         * @param elementSrc The source URI of the pressed element, set for
+         *                   (nested) images and media elements.
+         */
+        void onContextMenu(GeckoView view, int screenX, int screenY,
+                           String uri, String elementSrc);
     }
 
     public interface NavigationListener {
@@ -1124,6 +1439,61 @@ public class GeckoView extends LayerView {
         * @param canGoForward The new value for the ability.
         */
         void onCanGoForward(GeckoView view, boolean canGoForward);
+
+        enum TargetWindow {
+            DEFAULT(0),
+            CURRENT(1),
+            NEW(2);
+
+            private static final TargetWindow[] sValues = TargetWindow.values();
+            private int mValue;
+
+            private TargetWindow(int value) {
+                mValue = value;
+            }
+
+            public static TargetWindow forValue(int value) {
+                return sValues[value];
+            }
+
+            public static TargetWindow forGeckoValue(int value) {
+                // DEFAULT(0),
+                // CURRENT(1),
+                // NEW(2),
+                // NEWTAB(3),
+                // SWITCHTAB(4);
+                final TargetWindow[] sMap = {
+                    DEFAULT,
+                    CURRENT,
+                    NEW,
+                    NEW,
+                    NEW
+                };
+                return sMap[value];
+            }
+        }
+
+        enum LoadUriResult {
+            HANDLED(0),
+            LOAD_IN_FRAME(1);
+
+            private int mValue;
+
+            private LoadUriResult(int value) {
+                mValue = value;
+            }
+        }
+
+        /**
+        * A request to open an URI.
+        * @param view The GeckoView that initiated the callback.
+        * @param uri The URI to be loaded.
+        * @param where The target window.
+        *
+        * @return True if the URI loading has been handled, false if Gecko
+        *         should handle the loading.
+        */
+        boolean onLoadUri(GeckoView view, String uri, TargetWindow where);
     }
 
     /**
@@ -1322,7 +1692,7 @@ public class GeckoView extends LayerView {
              * Called by the prompt implementation when the multiple-choice list is
              * dismissed by the user.
              *
-             * @param id IDs of the selected items.
+             * @param ids IDs of the selected items.
              */
             void confirm(String[] ids);
 
@@ -1339,7 +1709,7 @@ public class GeckoView extends LayerView {
              * Called by the prompt implementation when the multiple-choice list is
              * dismissed by the user.
              *
-             * @param item Bundle array representing the selected items; must be original
+             * @param items Bundle array representing the selected items; must be original
              *             GeckoBundle objects that were passed to the implementation.
              */
             void confirm(GeckoBundle[] items);
@@ -1477,5 +1847,139 @@ public class GeckoView extends LayerView {
          */
         void promptForFile(GeckoView view, String title, int type,
                            String[] mimeTypes, FileCallback callback);
+    }
+
+    /**
+     * GeckoView applications implement this interface to handle content scroll
+     * events.
+     **/
+    public interface ScrollListener {
+        /**
+         * The scroll position of the content has changed.
+         *
+        * @param view The GeckoView that initiated the callback.
+        * @param scrollX The new horizontal scroll position in pixels.
+        * @param scrollY The new vertical scroll position in pixels.
+        */
+        public void onScrollChanged(GeckoView view, int scrollX, int scrollY);
+    }
+
+    /**
+     * GeckoView applications implement this interface to handle requests for permissions
+     * from content, such as geolocation and notifications. For each permission, usually
+     * two requests are generated: one request for the Android app permission through
+     * requestAppPermissions, which is typically handled by a system permission dialog;
+     * and another request for the content permission (e.g. through
+     * requestContentPermission), which is typically handled by an app-specific
+     * permission dialog.
+     **/
+    public interface PermissionDelegate {
+        /**
+         * Callback interface for notifying the result of a permission request.
+         */
+        interface Callback {
+            /**
+             * Called by the implementation after permissions are granted; the
+             * implementation must call either grant() or reject() for every request.
+             */
+            void grant();
+
+            /**
+             * Called by the implementation when permissions are not granted; the
+             * implementation must call either grant() or reject() for every request.
+             */
+            void reject();
+        }
+
+        /**
+         * Request Android app permissions.
+         *
+         * @param view GeckoView instance requesting the permissions.
+         * @param permissions List of permissions to request; possible values are,
+         *                    android.Manifest.permission.ACCESS_FINE_LOCATION
+         *                    android.Manifest.permission.CAMERA
+         *                    android.Manifest.permission.RECORD_AUDIO
+         * @param callback Callback interface.
+         */
+        void requestAndroidPermissions(GeckoView view, String[] permissions,
+                                       Callback callback);
+
+        /**
+         * Request content permission.
+         *
+         * @param view GeckoView instance requesting the permission.
+         * @param uri The URI of the content requesting the permission.
+         * @param type The type of the requested permission; possible values are,
+         *             "geolocation": permission for using the geolocation API
+         *             "desktop-notification": permission for using the notifications API
+         * @param access Not used.
+         * @param callback Callback interface.
+         */
+        void requestContentPermission(GeckoView view, String uri, String type,
+                                      String access, Callback callback);
+
+        /**
+         * Callback interface for notifying the result of a media permission request,
+         * including which media source(s) to use.
+         */
+        interface MediaCallback {
+            /**
+             * Called by the implementation after permissions are granted; the
+             * implementation must call one of grant() or reject() for every request.
+             *
+             * @param video "id" value from the bundle for the video source to use,
+             *              or null when video is not requested.
+             * @param audio "id" value from the bundle for the audio source to use,
+             *              or null when audio is not requested.
+             */
+            void grant(final String video, final String audio);
+
+            /**
+             * Called by the implementation after permissions are granted; the
+             * implementation must call one of grant() or reject() for every request.
+             *
+             * @param video Bundle for the video source to use (must be an original
+             *              GeckoBundle object that was passed to the implementation);
+             *              or null when video is not requested.
+             * @param audio Bundle for the audio source to use (must be an original
+             *              GeckoBundle object that was passed to the implementation);
+             *              or null when audio is not requested.
+             */
+            void grant(final GeckoBundle video, final GeckoBundle audio);
+
+            /**
+             * Called by the implementation when permissions are not granted; the
+             * implementation must call one of grant() or reject() for every request.
+             */
+            void reject();
+        }
+
+        /**
+         * Request content media permissions, including request for which video and/or
+         * audio source to use.
+         *
+         * @param view GeckoView instance requesting the permission.
+         * @param uri The URI of the content requesting the permission.
+         * @param video List of video sources, or null if not requesting video.
+         *              Each bundle represents a video source, with keys,
+         *              "id": String, the origin-specific source identifier;
+         *              "rawId": String, the non-origin-specific source identifier;
+         *              "name": String, the name of the video source from the system
+         *                      (for example, "Camera 0, Facing back, Orientation 90");
+         *                      may be empty;
+         *              "mediaSource": String, the media source type; possible values are,
+         *                             "camera", "screen", "application", "window",
+         *                             "browser", and "other";
+         *              "type": String, always "video";
+         * @param audio List of audio sources, or null if not requesting audio.
+         *              Each bundle represents an audio source with same keys and possible
+         *              values as video source bundles above, except for:
+         *              "mediaSource", String; possible values are "microphone",
+         *                             "audioCapture", and "other";
+         *              "type", String, always "audio";
+         * @param callback Callback interface.
+         */
+        void requestMediaPermission(GeckoView view, String uri, GeckoBundle[] video,
+                                    GeckoBundle[] audio, MediaCallback callback);
     }
 }

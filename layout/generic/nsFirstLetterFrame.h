@@ -21,7 +21,6 @@ public:
   {}
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 
   virtual void Init(nsIContent*       aContent,
@@ -43,15 +42,15 @@ public:
       ~(nsIFrame::eBidiInlineContainer));
   }
 
-  virtual nscoord GetMinISize(nsRenderingContext *aRenderingContext) override;
-  virtual nscoord GetPrefISize(nsRenderingContext *aRenderingContext) override;
-  virtual void AddInlineMinISize(nsRenderingContext *aRenderingContext,
+  virtual nscoord GetMinISize(gfxContext *aRenderingContext) override;
+  virtual nscoord GetPrefISize(gfxContext *aRenderingContext) override;
+  virtual void AddInlineMinISize(gfxContext *aRenderingContext,
                                  InlineMinISizeData *aData) override;
-  virtual void AddInlinePrefISize(nsRenderingContext *aRenderingContext,
+  virtual void AddInlinePrefISize(gfxContext *aRenderingContext,
                                   InlinePrefISizeData *aData) override;
 
   virtual mozilla::LogicalSize
-  ComputeSize(nsRenderingContext *aRenderingContext,
+  ComputeSize(gfxContext *aRenderingContext,
               mozilla::WritingMode aWritingMode,
               const mozilla::LogicalSize& aCBSize,
               nscoord aAvailableISize,

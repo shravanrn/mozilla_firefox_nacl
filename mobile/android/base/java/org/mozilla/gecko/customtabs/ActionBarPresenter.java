@@ -6,8 +6,6 @@
 package org.mozilla.gecko.customtabs;
 
 import android.content.res.Resources;
-import android.content.res.TypedArray;
-import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -30,11 +28,13 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import org.mozilla.gecko.GeckoView;
+import org.mozilla.gecko.GeckoView.ProgressListener.SecurityInformation;
 import org.mozilla.gecko.R;
 import org.mozilla.gecko.SiteIdentity;
 import org.mozilla.gecko.Tab;
 import org.mozilla.gecko.toolbar.SecurityModeUtil;
-import org.mozilla.gecko.toolbar.SiteIdentityPopup;
+import org.mozilla.gecko.toolbar.CustomTabsSecurityPopup;
 import org.mozilla.gecko.util.ColorUtil;
 
 /**
@@ -48,7 +48,7 @@ public class ActionBarPresenter {
     private static final long CUSTOM_VIEW_UPDATE_DELAY = 1000;
 
     private final ActionBar mActionBar;
-    private final SiteIdentityPopup mIdentityPopup;
+    private final CustomTabsSecurityPopup mIdentityPopup;
     private final ImageButton mIconView;
     private final TextView mTitleView;
     private final TextView mUrlView;
@@ -74,7 +74,7 @@ public class ActionBarPresenter {
         mTitleView.setTextColor(mTextPrimaryColor);
         mUrlView.setTextColor(mTextPrimaryColor);
 
-        mIdentityPopup = new SiteIdentityPopup(mActionBar.getThemedContext());
+        mIdentityPopup = new CustomTabsSecurityPopup(mActionBar.getThemedContext());
         mIdentityPopup.setAnchor(customView);
         mIconView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -87,46 +87,29 @@ public class ActionBarPresenter {
     }
 
     /**
-     * Called when ActionBar is to start interacting with user. Usually this method is called from
-     * Activity.onResume.
-     */
-    public void onResume() {
-        mIdentityPopup.registerListeners();
-    }
-
-    /**
-     * Called when ActionBar is going to background, but has not yet been killed. Usually this method
-     * is called from Activity.onPause.
-     */
-    public void onPause() {
-        mIdentityPopup.unregisterListeners();
-    }
-
-    /**
      * To display Url in CustomView only and immediately.
      *
      * @param url Url String to display
      */
     public void displayUrlOnly(@NonNull final String url) {
-        updateCustomView(null, null, url);
+        updateCustomView(null, url, /* security */ null);
     }
 
     /**
-     * Update appearance of CustomView of ActionBar.
+     * Update appearance of CustomView of ActionBar
      *
-     * @param tab a Tab instance of current web page to provide information to render ActionBar.
+     * @param title          Title for current website. Could be null if don't want to show title.
+     * @param url            URL for current website. At least Custom will show this url.
+     * @param security       A SecurityInformation object giving the current security information
      */
-    public void update(@NonNull final Tab tab) {
-        final String title = tab.getTitle();
-        final String url = tab.getBaseDomain();
-
+    public void update(final String title, final String url, final SecurityInformation security) {
         // Do not update CustomView immediately. If this method be invoked rapidly several times,
         // only apply last one.
         mHandler.removeCallbacks(mUpdateAction);
         mUpdateAction = new Runnable() {
             @Override
             public void run() {
-                updateCustomView(tab.getSiteIdentity(), title, url);
+                updateCustomView(title, url, security);
             }
         };
         mHandler.postDelayed(mUpdateAction, CUSTOM_VIEW_UPDATE_DELAY);
@@ -215,28 +198,35 @@ public class ActionBarPresenter {
     /**
      * To update appearance of CustomView of ActionBar, includes its icon, title and url text.
      *
-     * @param identity SiteIdentity for current website. Could be null if don't want to show icon.
      * @param title    Title for current website. Could be null if don't want to show title.
      * @param url      URL for current website. At least Custom will show this url.
+     * @param security A SecurityInformation object giving the current security information
      */
     @UiThread
-    private void updateCustomView(@Nullable SiteIdentity identity,
-                                  @Nullable String title,
-                                  @NonNull String url) {
-        // update site-info icon
-        if (identity == null) {
+    private void updateCustomView(final String title, final String url, final SecurityInformation security) {
+        if (security == null) {
             mIconView.setVisibility(View.INVISIBLE);
         } else {
-            final SecurityModeUtil.Mode mode = SecurityModeUtil.resolve(identity);
-            mIconView.setVisibility(View.VISIBLE);
-            mIconView.setImageLevel(mode.ordinal());
-            mIdentityPopup.setSiteIdentity(identity);
+            SecurityModeUtil.IconType icon;
+            if (SecurityInformation.SECURITY_MODE_UNKNOWN == security.securityMode) {
+                icon = SecurityModeUtil.IconType.UNKNOWN;
+            } else {
+                icon = SecurityModeUtil.IconType.LOCK_SECURE;
+            }
 
-            if (mode == SecurityModeUtil.Mode.LOCK_SECURE) {
-                // Lock-Secure is special case. Keep its original green color.
+            if (SecurityInformation.CONTENT_LOADED == security.mixedModePassive) {
+                icon = SecurityModeUtil.IconType.WARNING;
+            }
+
+            mIconView.setVisibility(View.VISIBLE);
+            mIconView.setImageLevel(SecurityModeUtil.getImageLevel(icon));
+            mIdentityPopup.setSecurityInformation(security);
+
+            if (icon == SecurityModeUtil.IconType.LOCK_SECURE) {
+                // Lock-Secure is a special case. Keep its original green color.
                 DrawableCompat.setTintList(mIconView.getDrawable(), null);
             } else {
-                // Icon use same color as TextView.
+                // Icon uses same color as TextView.
                 DrawableCompat.setTint(mIconView.getDrawable(), mTextPrimaryColor);
             }
         }

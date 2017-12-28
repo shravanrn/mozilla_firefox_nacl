@@ -249,14 +249,6 @@ MutatePrototype(JSContext* cx, HandlePlainObject obj, HandleValue value)
     return SetPrototype(cx, obj, newProto);
 }
 
-bool
-InitProp(JSContext* cx, HandleObject obj, HandlePropertyName name, HandleValue value,
-         jsbytecode* pc)
-{
-    RootedId id(cx, NameToId(name));
-    return InitPropertyOperation(cx, JSOp(*pc), obj, id, value);
-}
-
 template<bool Equal>
 bool
 LooselyEqual(JSContext* cx, MutableHandleValue lhs, MutableHandleValue rhs, bool* res)
@@ -323,6 +315,19 @@ StringsEqual(JSContext* cx, HandleString lhs, HandleString rhs, bool* res)
 template bool StringsEqual<true>(JSContext* cx, HandleString lhs, HandleString rhs, bool* res);
 template bool StringsEqual<false>(JSContext* cx, HandleString lhs, HandleString rhs, bool* res);
 
+bool StringSplitHelper(JSContext* cx, HandleString str, HandleString sep,
+                       HandleObjectGroup group, uint32_t limit,
+                       MutableHandleValue result)
+{
+    JSObject* resultObj = str_split_string(cx, group, str, sep, limit);
+    if (!resultObj)
+        return false;
+
+    result.setObject(*resultObj);
+    return true;
+}
+
+
 bool
 ArrayPopDense(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 {
@@ -358,12 +363,12 @@ ArrayPushDense(JSContext* cx, HandleObject obj, HandleValue v, uint32_t* length)
 
     // AutoDetectInvalidation uses GetTopJitJSScript(cx)->ionScript(), but it's
     // possible the SetOrExtendAnyBoxedOrUnboxedDenseElements call already
-    // invalidated the IonScript. JitFrameIterator::ionScript works when the
+    // invalidated the IonScript. JSJitFrameIter::ionScript works when the
     // script is invalidated so we use that instead.
-    JitFrameIterator it(cx);
-    MOZ_ASSERT(it.type() == JitFrame_Exit);
-    ++it;
-    IonScript* ionScript = it.ionScript();
+    JSJitFrameIter frame(cx);
+    MOZ_ASSERT(frame.type() == JitFrame_Exit);
+    ++frame;
+    IonScript* ionScript = frame.ionScript();
 
     JS::AutoValueArray<3> argv(cx);
     AutoDetectInvalidation adi(cx, argv[0], ionScript);
@@ -500,15 +505,20 @@ SetProperty(JSContext* cx, HandleObject obj, HandlePropertyName name, HandleValu
     RootedValue receiver(cx, ObjectValue(*obj));
     ObjectOpResult result;
     if (MOZ_LIKELY(!obj->getOpsSetProperty())) {
-        if (!NativeSetProperty(
-                cx, obj.as<NativeObject>(), id, value, receiver,
-                (op == JSOP_SETNAME || op == JSOP_STRICTSETNAME ||
-                 op == JSOP_SETGNAME || op == JSOP_STRICTSETGNAME)
-                ? Unqualified
-                : Qualified,
-                result))
+        if (op == JSOP_SETNAME || op == JSOP_STRICTSETNAME ||
+            op == JSOP_SETGNAME || op == JSOP_STRICTSETGNAME)
         {
-            return false;
+            if (!NativeSetProperty<Unqualified>(cx, obj.as<NativeObject>(), id, value, receiver,
+                                                result))
+            {
+                return false;
+            }
+        } else {
+            if (!NativeSetProperty<Qualified>(cx, obj.as<NativeObject>(), id, value, receiver,
+                                              result))
+            {
+                return false;
+            }
         }
     } else {
         if (!SetProperty(cx, obj, id, value, receiver, result))
@@ -534,6 +544,7 @@ InterruptCheck(JSContext* cx)
 void*
 MallocWrapper(JSRuntime* rt, size_t nbytes)
 {
+    AutoUnsafeCallWithABI unsafe;
     return rt->pod_malloc<uint8_t>(nbytes);
 }
 
@@ -639,6 +650,8 @@ GetDynamicName(JSContext* cx, JSObject* envChain, JSString* str, Value* vp)
     // undefined through rval. This function is infallible, and cannot GC or
     // invalidate.
 
+    AutoUnsafeCallWithABI unsafe;
+
     JSAtom* atom;
     if (str->isAtom()) {
         atom = &str->asAtom();
@@ -669,7 +682,7 @@ GetDynamicName(JSContext* cx, JSObject* envChain, JSString* str, Value* vp)
 void
 PostWriteBarrier(JSRuntime* rt, JSObject* obj)
 {
-    JS::AutoCheckCannotGC nogc;
+    AutoUnsafeCallWithABI unsafe;
     MOZ_ASSERT(!IsInsideNursery(obj));
     rt->gc.storeBuffer().putWholeCell(obj);
 }
@@ -680,7 +693,7 @@ template <IndexInBounds InBounds>
 void
 PostWriteElementBarrier(JSRuntime* rt, JSObject* obj, int32_t index)
 {
-    JS::AutoCheckCannotGC nogc;
+    AutoUnsafeCallWithABI unsafe;
 
     MOZ_ASSERT(!IsInsideNursery(obj));
 
@@ -734,7 +747,7 @@ int32_t
 GetIndexFromString(JSString* str)
 {
     // We shouldn't GC here as this is called directly from IC code.
-    JS::AutoCheckCannotGC nogc;
+    AutoUnsafeCallWithABI unsafe;
 
     if (!str->isFlat())
         return -1;
@@ -750,7 +763,7 @@ JSObject*
 WrapObjectPure(JSContext* cx, JSObject* obj)
 {
     // IC code calls this directly so we shouldn't GC.
-    JS::AutoCheckCannotGC nogc;
+    AutoUnsafeCallWithABI unsafe;
 
     MOZ_ASSERT(obj);
     MOZ_ASSERT(cx->compartment() != obj->compartment());
@@ -854,6 +867,7 @@ DebugEpilogue(JSContext* cx, BaselineFrame* frame, jsbytecode* pc, bool ok)
 void
 FrameIsDebuggeeCheck(BaselineFrame* frame)
 {
+    AutoUnsafeCallWithABI unsafe;
     if (frame->script()->isDebuggee())
         frame->setIsDebuggee();
 }
@@ -1130,6 +1144,7 @@ OnDebuggerStatement(JSContext* cx, BaselineFrame* frame, jsbytecode* pc, bool* m
 bool
 GlobalHasLiveOnDebuggerStatement(JSContext* cx)
 {
+    AutoUnsafeCallWithABI unsafe;
     return cx->compartment()->isDebuggee() &&
            Debugger::hasLiveHook(cx->global(), Debugger::OnDebuggerStatement);
 }
@@ -1251,12 +1266,12 @@ RecompileImpl(JSContext* cx, bool force)
 {
     MOZ_ASSERT(cx->currentlyRunningInJit());
     JitActivationIterator activations(cx);
-    JitFrameIterator iter(activations);
+    JSJitFrameIter frame(activations->asJit());
 
-    MOZ_ASSERT(iter.type() == JitFrame_Exit);
-    ++iter;
+    MOZ_ASSERT(frame.type() == JitFrame_Exit);
+    ++frame;
 
-    RootedScript script(cx, iter.script());
+    RootedScript script(cx, frame.script());
     MOZ_ASSERT(script->hasIonScript());
 
     if (!IsIonEnabled(cx))
@@ -1308,6 +1323,7 @@ AutoDetectInvalidation::setReturnOverride()
 void
 AssertValidObjectPtr(JSContext* cx, JSObject* obj)
 {
+    AutoUnsafeCallWithABI unsafe;
 #ifdef DEBUG
     // Check what we can, so that we'll hopefully assert/crash if we get a
     // bogus object (pointer).
@@ -1329,6 +1345,7 @@ AssertValidObjectPtr(JSContext* cx, JSObject* obj)
 void
 AssertValidObjectOrNullPtr(JSContext* cx, JSObject* obj)
 {
+    AutoUnsafeCallWithABI unsafe;
     if (obj)
         AssertValidObjectPtr(cx, obj);
 }
@@ -1336,6 +1353,7 @@ AssertValidObjectOrNullPtr(JSContext* cx, JSObject* obj)
 void
 AssertValidStringPtr(JSContext* cx, JSString* str)
 {
+    AutoUnsafeCallWithABI unsafe;
 #ifdef DEBUG
     // We can't closely inspect strings from another runtime.
     if (str->runtimeFromAnyThread() != cx->runtime()) {
@@ -1372,6 +1390,8 @@ AssertValidStringPtr(JSContext* cx, JSString* str)
 void
 AssertValidSymbolPtr(JSContext* cx, JS::Symbol* sym)
 {
+    AutoUnsafeCallWithABI unsafe;
+
     // We can't closely inspect symbols from another runtime.
     if (sym->runtimeFromAnyThread() != cx->runtime()) {
         MOZ_ASSERT(sym->isWellKnownSymbol());
@@ -1391,6 +1411,7 @@ AssertValidSymbolPtr(JSContext* cx, JS::Symbol* sym)
 void
 AssertValidValue(JSContext* cx, Value* v)
 {
+    AutoUnsafeCallWithABI unsafe;
     if (v->isObject())
         AssertValidObjectPtr(cx, &v->toObject());
     else if (v->isString())
@@ -1402,44 +1423,51 @@ AssertValidValue(JSContext* cx, Value* v)
 bool
 ObjectIsCallable(JSObject* obj)
 {
+    AutoUnsafeCallWithABI unsafe;
     return obj->isCallable();
 }
 
 bool
 ObjectIsConstructor(JSObject* obj)
 {
+    AutoUnsafeCallWithABI unsafe;
     return obj->isConstructor();
 }
 
 void
 MarkValueFromIon(JSRuntime* rt, Value* vp)
 {
+    AutoUnsafeCallWithABI unsafe;
     TraceManuallyBarrieredEdge(&rt->gc.marker, vp, "write barrier");
 }
 
 void
 MarkStringFromIon(JSRuntime* rt, JSString** stringp)
 {
-    if (*stringp)
-        TraceManuallyBarrieredEdge(&rt->gc.marker, stringp, "write barrier");
+    AutoUnsafeCallWithABI unsafe;
+    MOZ_ASSERT(*stringp);
+    TraceManuallyBarrieredEdge(&rt->gc.marker, stringp, "write barrier");
 }
 
 void
 MarkObjectFromIon(JSRuntime* rt, JSObject** objp)
 {
-    if (*objp)
-        TraceManuallyBarrieredEdge(&rt->gc.marker, objp, "write barrier");
+    AutoUnsafeCallWithABI unsafe;
+    MOZ_ASSERT(*objp);
+    TraceManuallyBarrieredEdge(&rt->gc.marker, objp, "write barrier");
 }
 
 void
 MarkShapeFromIon(JSRuntime* rt, Shape** shapep)
 {
+    AutoUnsafeCallWithABI unsafe;
     TraceManuallyBarrieredEdge(&rt->gc.marker, shapep, "write barrier");
 }
 
 void
 MarkObjectGroupFromIon(JSRuntime* rt, ObjectGroup** groupp)
 {
+    AutoUnsafeCallWithABI unsafe;
     TraceManuallyBarrieredEdge(&rt->gc.marker, groupp, "write barrier");
 }
 
@@ -1482,6 +1510,12 @@ bool
 BaselineThrowUninitializedThis(JSContext* cx, BaselineFrame* frame)
 {
     return ThrowUninitializedThis(cx, frame);
+}
+
+bool
+BaselineThrowInitializedThis(JSContext* cx, BaselineFrame* frame)
+{
+    return ThrowInitializedThis(cx, frame);
 }
 
 
@@ -1535,7 +1569,7 @@ bool
 EqualStringsHelper(JSString* str1, JSString* str2)
 {
     // IC code calls this directly so we shouldn't GC.
-    JS::AutoCheckCannotGC nogc;
+    AutoUnsafeCallWithABI unsafe;
 
     MOZ_ASSERT(str1->isAtom());
     MOZ_ASSERT(!str2->isAtom());
@@ -1565,7 +1599,7 @@ GetNativeDataProperty(JSContext* cx, NativeObject* obj, jsid id, Value* vp)
     // lookup paths, this is optimized to be as fast as possible for simple
     // data property lookups.
 
-    JS::AutoCheckCannotGC nogc;
+    AutoUnsafeCallWithABI unsafe;
 
     MOZ_ASSERT(JSID_IS_ATOM(id) || JSID_IS_SYMBOL(id));
 
@@ -1580,11 +1614,8 @@ GetNativeDataProperty(JSContext* cx, NativeObject* obj, jsid id, Value* vp)
 
         // Property not found. Watch out for Class hooks.
         if (MOZ_UNLIKELY(!obj->is<PlainObject>())) {
-            if (ClassMayResolveId(cx->names(), obj->getClass(), id, obj) ||
-                obj->getClass()->getGetProperty())
-            {
+            if (ClassMayResolveId(cx->names(), obj->getClass(), id, obj))
                 return false;
-            }
         }
 
         JSObject* proto = obj->staticPrototype();
@@ -1606,8 +1637,8 @@ template <bool HandleMissing>
 bool
 GetNativeDataProperty(JSContext* cx, JSObject* obj, PropertyName* name, Value* vp)
 {
-    if (MOZ_UNLIKELY(!obj->isNative()))
-        return false;
+    // Condition checked by caller.
+    MOZ_ASSERT(obj->isNative());
     return GetNativeDataProperty<HandleMissing>(cx, &obj->as<NativeObject>(), NameToId(name), vp);
 }
 
@@ -1620,7 +1651,7 @@ GetNativeDataProperty<false>(JSContext* cx, JSObject* obj, PropertyName* name, V
 static MOZ_ALWAYS_INLINE bool
 ValueToAtomOrSymbol(JSContext* cx, Value& idVal, jsid* id)
 {
-    JS::AutoCheckCannotGC nogc;
+    AutoUnsafeCallWithABI unsafe;
 
     if (MOZ_LIKELY(idVal.isString())) {
         JSString* s = idVal.toString();
@@ -1653,10 +1684,10 @@ template <bool HandleMissing>
 bool
 GetNativeDataPropertyByValue(JSContext* cx, JSObject* obj, Value* vp)
 {
-    JS::AutoCheckCannotGC nogc;
+    AutoUnsafeCallWithABI unsafe;
 
-    if (MOZ_UNLIKELY(!obj->isNative()))
-        return false;
+    // Condition checked by caller.
+    MOZ_ASSERT(obj->isNative());
 
     // vp[0] contains the id, result will be stored in vp[1].
     Value idVal = vp[0];
@@ -1678,7 +1709,7 @@ template <bool NeedsTypeBarrier>
 bool
 SetNativeDataProperty(JSContext* cx, JSObject* obj, PropertyName* name, Value* val)
 {
-    JS::AutoCheckCannotGC nogc;
+    AutoUnsafeCallWithABI unsafe;
 
     if (MOZ_UNLIKELY(!obj->isNative()))
         return false;
@@ -1710,7 +1741,7 @@ SetNativeDataProperty<false>(JSContext* cx, JSObject* obj, PropertyName* name, V
 bool
 ObjectHasGetterSetter(JSContext* cx, JSObject* objArg, Shape* propShape)
 {
-    JS::AutoCheckCannotGC nogc;
+    AutoUnsafeCallWithABI unsafe;
 
     MOZ_ASSERT(propShape->hasGetterObject() || propShape->hasSetterObject());
 
@@ -1736,11 +1767,8 @@ ObjectHasGetterSetter(JSContext* cx, JSObject* objArg, Shape* propShape)
 
         // Property not found. Watch out for Class hooks.
         if (!nobj->is<PlainObject>()) {
-            if (ClassMayResolveId(cx->names(), nobj->getClass(), id, nobj) ||
-                nobj->getClass()->getGetProperty())
-            {
+            if (ClassMayResolveId(cx->names(), nobj->getClass(), id, nobj))
                 return false;
-            }
         }
 
         JSObject* proto = nobj->staticPrototype();
@@ -1756,7 +1784,7 @@ ObjectHasGetterSetter(JSContext* cx, JSObject* objArg, Shape* propShape)
 bool
 HasOwnNativeDataProperty(JSContext* cx, JSObject* obj, Value* vp)
 {
-    JS::AutoCheckCannotGC nogc;
+    AutoUnsafeCallWithABI unsafe;
 
     // vp[0] contains the id, result will be stored in vp[1].
     Value idVal = vp[0];
@@ -1793,9 +1821,27 @@ HasOwnNativeDataProperty(JSContext* cx, JSObject* obj, Value* vp)
 JSString*
 TypeOfObject(JSObject* obj, JSRuntime* rt)
 {
+    AutoUnsafeCallWithABI unsafe;
     JSType type = js::TypeOfObject(obj);
     return TypeName(type, *rt->commonNames);
 }
+
+bool
+GetPrototypeOf(JSContext* cx, HandleObject target, MutableHandleValue rval)
+{
+    MOZ_ASSERT(target->hasDynamicPrototype());
+
+    RootedObject proto(cx);
+    if (!GetPrototype(cx, target, &proto))
+        return false;
+    rval.setObjectOrNull(proto);
+    return true;
+}
+
+typedef bool (*SetObjectElementFn)(JSContext*, HandleObject, HandleValue,
+                                   HandleValue, HandleValue, bool);
+const VMFunction SetObjectElementInfo =
+    FunctionInfo<SetObjectElementFn>(js::SetObjectElement, "SetObjectElement");
 
 } // namespace jit
 } // namespace js

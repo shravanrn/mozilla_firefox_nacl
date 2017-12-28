@@ -22,8 +22,8 @@ const PREF_TASKBAR_REFRESH   = "refreshInSeconds";
 
 // Hash keys for pendingStatements.
 const LIST_TYPE = {
-  FREQUENT: 0
-, RECENT: 1
+  FREQUENT: 0,
+  RECENT: 1
 }
 
 /**
@@ -53,9 +53,6 @@ XPCOMUtils.defineLazyServiceGetter(this, "_idle",
 XPCOMUtils.defineLazyServiceGetter(this, "_taskbarService",
                                    "@mozilla.org/windows-taskbar;1",
                                    "nsIWinTaskbar");
-XPCOMUtils.defineLazyServiceGetter(this, "_winShellService",
-                                   "@mozilla.org/browser/shell-service;1",
-                                   "nsIWindowsShellService");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
   "resource://gre/modules/PlacesUtils.jsm");
@@ -136,15 +133,6 @@ this.WinTaskbarJumpList =
     if (!this._initTaskbar())
       return;
 
-    // Win shell shortcut maintenance. If we've gone through an update,
-    // this will update any pinned taskbar shortcuts. Not specific to
-    // jump lists, but this was a convienent place to call it.
-    try {
-      // dev builds may not have helper.exe, ignore failures.
-      this._shortcutMaintenance();
-    } catch (ex) {
-    }
-
     // Store our task list config data
     this._tasks = tasksCfg;
 
@@ -178,10 +166,6 @@ this.WinTaskbarJumpList =
     }
 
     this._free();
-  },
-
-  _shortcutMaintenance: function WTBJL__maintenace() {
-    _winShellService.shortcutMaintenance();
   },
 
   /**
@@ -378,7 +362,7 @@ this.WinTaskbarJumpList =
   _getHandlerAppItem: function WTBJL__getHandlerAppItem(name, description,
                                                         args, iconIndex,
                                                         faviconPageUri) {
-    var file = Services.dirsvc.get("XREExeF", Ci.nsILocalFile);
+    var file = Services.dirsvc.get("XREExeF", Ci.nsIFile);
 
     var handlerApp = Cc["@mozilla.org/uriloader/local-handler-app;1"].
                      createInstance(Ci.nsILocalHandlerApp);
@@ -421,8 +405,8 @@ this.WinTaskbarJumpList =
         for (let row; (row = aResultSet.getNextRow());) {
           try {
             aCallback.call(aScope,
-                           { uri: row.getResultByIndex(1)
-                           , title: row.getResultByIndex(2)
+                           { uri: row.getResultByIndex(1),
+                             title: row.getResultByIndex(2)
                            });
           } catch (e) {}
         }
@@ -532,7 +516,7 @@ this.WinTaskbarJumpList =
   notify: function WTBJL_notify(aTimer) {
     // Add idle observer on the first notification so it doesn't hit startup.
     this._updateIdleObserver();
-    this.update();
+    Services.tm.idleDispatchToMainThread(() => { this.update(); });
   },
 
   observe: function WTBJL_observe(aSubject, aTopic, aData) {
@@ -543,7 +527,7 @@ this.WinTaskbarJumpList =
         this._refreshPrefs();
         this._updateTimer();
         this._updateIdleObserver();
-        this.update();
+        Services.tm.idleDispatchToMainThread(() => { this.update(); });
       break;
 
       case "profile-before-change":

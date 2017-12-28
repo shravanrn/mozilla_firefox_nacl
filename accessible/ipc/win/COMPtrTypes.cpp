@@ -9,7 +9,9 @@
 #include "Accessible2_3.h"
 #include "MainThreadUtils.h"
 #include "mozilla/a11y/Accessible.h"
+#include "mozilla/a11y/Platform.h"
 #include "mozilla/a11y/HandlerProvider.h"
+#include "mozilla/Assertions.h"
 #include "mozilla/Move.h"
 #include "mozilla/mscom/MainThreadHandoff.h"
 #include "mozilla/mscom/Utils.h"
@@ -25,22 +27,20 @@ namespace mozilla {
 namespace a11y {
 
 IAccessibleHolder
-CreateHolderFromAccessible(Accessible* aAccToWrap)
+CreateHolderFromAccessible(NotNull<Accessible*> aAccToWrap)
 {
-  MOZ_ASSERT(aAccToWrap && NS_IsMainThread());
-  if (!aAccToWrap) {
-    return nullptr;
-  }
+  MOZ_ASSERT(NS_IsMainThread());
 
   STAUniquePtr<IAccessible> iaToProxy;
   aAccToWrap->GetNativeInterface(mscom::getter_AddRefs(iaToProxy));
-  MOZ_ASSERT(iaToProxy);
+  MOZ_DIAGNOSTIC_ASSERT(iaToProxy);
   if (!iaToProxy) {
     return nullptr;
   }
 
   static const bool useHandler =
-    Preferences::GetBool("accessibility.handler.enabled", false);
+    Preferences::GetBool("accessibility.handler.enabled", false) &&
+    IsHandlerRegistered();
 
   RefPtr<HandlerProvider> payload;
   if (useHandler) {
@@ -51,7 +51,7 @@ CreateHolderFromAccessible(Accessible* aAccToWrap)
   ProxyUniquePtr<IAccessible> intercepted;
   HRESULT hr = MainThreadHandoff::WrapInterface(Move(iaToProxy), payload,
                                                 (IAccessible**) mscom::getter_AddRefs(intercepted));
-  MOZ_ASSERT(SUCCEEDED(hr));
+  MOZ_DIAGNOSTIC_ASSERT(SUCCEEDED(hr));
   if (FAILED(hr)) {
     return nullptr;
   }

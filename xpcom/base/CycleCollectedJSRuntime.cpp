@@ -84,6 +84,8 @@
 #include "nsJSUtils.h"
 #include "nsWrapperCache.h"
 #include "nsStringBuffer.h"
+#include "GeckoProfiler.h"
+#include "ProfilerMarkerPayload.h"
 
 #ifdef MOZ_CRASHREPORTER
 #include "nsExceptionHandler.h"
@@ -507,7 +509,7 @@ CycleCollectedJSRuntime::CycleCollectedJSRuntime(JSContext* aCx)
   , mJSRuntime(JS_GetRuntime(aCx))
   , mPrevGCSliceCallback(nullptr)
   , mPrevGCNurseryCollectionCallback(nullptr)
-  , mJSHolders(256)
+  , mJSHolderMap(256)
   , mOutOfMemoryState(OOMState::OK)
   , mLargeAllocationFailureState(OOMState::OK)
 {
@@ -585,7 +587,8 @@ CycleCollectedJSRuntime::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const
 
   // We're deliberately not measuring anything hanging off the entries in
   // mJSHolders.
-  n += mJSHolders.ShallowSizeOfExcludingThis(aMallocSizeOf);
+  n += mJSHolders.SizeOfExcludingThis(aMallocSizeOf);
+  n += mJSHolderMap.ShallowSizeOfExcludingThis(aMallocSizeOf);
 
   return n;
 }
@@ -594,8 +597,8 @@ void
 CycleCollectedJSRuntime::UnmarkSkippableJSHolders()
 {
   for (auto iter = mJSHolders.Iter(); !iter.Done(); iter.Next()) {
-    void* holder = iter.Key();
-    nsScriptObjectTracer*& tracer = iter.Data();
+    void* holder = iter.Get().mHolder;
+    nsScriptObjectTracer* tracer = iter.Get().mTracer;
     tracer->CanSkip(holder, true);
   }
 }
@@ -774,8 +777,8 @@ CycleCollectedJSRuntime::TraverseNativeRoots(nsCycleCollectionNoteRootCallback& 
   TraverseAdditionalNativeRoots(aCb);
 
   for (auto iter = mJSHolders.Iter(); !iter.Done(); iter.Next()) {
-    void* holder = iter.Key();
-    nsScriptObjectTracer*& tracer = iter.Data();
+    void* holder = iter.Get().mHolder;
+    nsScriptObjectTracer* tracer = iter.Get().mTracer;
 
     bool noteRoot = false;
     if (MOZ_UNLIKELY(aCb.WantAllTraces())) {
@@ -830,23 +833,24 @@ CycleCollectedJSRuntime::GCSliceCallback(JSContext* aContext,
   CycleCollectedJSRuntime* self = CycleCollectedJSRuntime::Get();
   MOZ_ASSERT(CycleCollectedJSContext::Get()->Context() == aContext);
 
-#ifdef MOZ_GECKO_PROFILER
   if (profiler_is_active()) {
     if (aProgress == JS::GC_CYCLE_END) {
-      auto payload = new GCMajorMarkerPayload(aDesc.startTime(aContext),
-                                              aDesc.endTime(aContext),
-                                              aDesc.summaryToJSON(aContext));
-      PROFILER_MARKER_PAYLOAD("GCMajor", payload);
+      profiler_add_marker(
+        "GCMajor",
+        MakeUnique<GCMajorMarkerPayload>(aDesc.startTime(aContext),
+                                         aDesc.endTime(aContext),
+                                         aDesc.summaryToJSON(aContext)));
     } else if (aProgress == JS::GC_SLICE_END) {
-      auto payload = new GCSliceMarkerPayload(aDesc.lastSliceStart(aContext),
-                                              aDesc.lastSliceEnd(aContext),
-                                              aDesc.sliceToJSON(aContext));
-      PROFILER_MARKER_PAYLOAD("GCSlice", payload);
+      profiler_add_marker(
+        "GCSlice",
+        MakeUnique<GCSliceMarkerPayload>(aDesc.lastSliceStart(aContext),
+                                         aDesc.lastSliceEnd(aContext),
+                                         aDesc.sliceToJSON(aContext)));
     }
   }
-#endif
 
-  if (aProgress == JS::GC_CYCLE_END) {
+  if (aProgress == JS::GC_CYCLE_END &&
+      JS::dbg::FireOnGarbageCollectionHookRequired(aContext)) {
     JS::gcreason::Reason reason = aDesc.reason_;
     Unused <<
       NS_WARN_IF(NS_FAILED(DebuggerOnGCRunnable::Enqueue(aContext, aDesc)) &&
@@ -924,19 +928,17 @@ CycleCollectedJSRuntime::GCNurseryCollectionCallback(JSContext* aContext,
     timelines->AddMarkerForAllObservedDocShells(abstractMarker);
   }
 
-#ifdef MOZ_GECKO_PROFILER
   if (aProgress == JS::GCNurseryProgress::GC_NURSERY_COLLECTION_START) {
     self->mLatestNurseryCollectionStart = TimeStamp::Now();
   } else if ((aProgress == JS::GCNurseryProgress::GC_NURSERY_COLLECTION_END) &&
              profiler_is_active())
   {
-    PROFILER_MARKER_PAYLOAD(
+    profiler_add_marker(
       "GCMinor",
-      new GCMinorMarkerPayload(self->mLatestNurseryCollectionStart,
-                               TimeStamp::Now(),
-                               JS::MinorGcToJSON(aContext)));
+      MakeUnique<GCMinorMarkerPayload>(self->mLatestNurseryCollectionStart,
+                                       TimeStamp::Now(),
+                                       JS::MinorGcToJSON(aContext)));
   }
-#endif
 
   if (self->mPrevGCNurseryCollectionCallback) {
     self->mPrevGCNurseryCollectionCallback(aContext, aProgress, aReason);
@@ -1036,8 +1038,8 @@ CycleCollectedJSRuntime::TraceNativeGrayRoots(JSTracer* aTracer)
   TraceAdditionalNativeGrayRoots(aTracer);
 
   for (auto iter = mJSHolders.Iter(); !iter.Done(); iter.Next()) {
-    void* holder = iter.Key();
-    nsScriptObjectTracer*& tracer = iter.Data();
+    void* holder = iter.Get().mHolder;
+    nsScriptObjectTracer* tracer = iter.Get().mTracer;
     tracer->Trace(holder, JsGcTracer(), aTracer);
   }
 }
@@ -1045,7 +1047,16 @@ CycleCollectedJSRuntime::TraceNativeGrayRoots(JSTracer* aTracer)
 void
 CycleCollectedJSRuntime::AddJSHolder(void* aHolder, nsScriptObjectTracer* aTracer)
 {
-  mJSHolders.Put(aHolder, aTracer);
+  auto entry = mJSHolderMap.LookupForAdd(aHolder);
+  if (entry) {
+    JSHolderInfo* info = entry.Data();
+    MOZ_ASSERT(info->mHolder == aHolder);
+    info->mTracer = aTracer;
+    return;
+  }
+
+  mJSHolders.InfallibleAppend(JSHolderInfo {aHolder, aTracer});
+  entry.OrInsert([&] {return &mJSHolders.GetLast();});
 }
 
 struct ClearJSHolder : public TraceCallbacks
@@ -1095,19 +1106,34 @@ struct ClearJSHolder : public TraceCallbacks
 void
 CycleCollectedJSRuntime::RemoveJSHolder(void* aHolder)
 {
-  nsScriptObjectTracer* tracer = mJSHolders.Get(aHolder);
-  if (!tracer) {
-    return;
+  auto entry = mJSHolderMap.Lookup(aHolder);
+  if (entry) {
+    JSHolderInfo* info = entry.Data();
+    MOZ_ASSERT(info->mHolder == aHolder);
+    info->mTracer->Trace(aHolder, ClearJSHolder(), nullptr);
+
+    JSHolderInfo* lastInfo = &mJSHolders.GetLast();
+    bool updateLast = (info != lastInfo);
+    if (updateLast) {
+      *info = *lastInfo;
+    }
+
+    mJSHolders.PopLast();
+    entry.Remove();
+
+    if (updateLast) {
+      // We have to do this after removing the entry above to ensure that we
+      // don't trip over the hashtable generation number assertion.
+      mJSHolderMap.Put(info->mHolder, info);
+    }
   }
-  tracer->Trace(aHolder, ClearJSHolder(), nullptr);
-  mJSHolders.Remove(aHolder);
 }
 
 #ifdef DEBUG
 bool
 CycleCollectedJSRuntime::IsJSHolder(void* aHolder)
 {
-  return mJSHolders.Get(aHolder, nullptr);
+  return mJSHolderMap.Get(aHolder, nullptr);
 }
 
 static void
@@ -1119,10 +1145,13 @@ AssertNoGcThing(JS::GCCellPtr aGCThing, const char* aName, void* aClosure)
 void
 CycleCollectedJSRuntime::AssertNoObjectsToTrace(void* aPossibleJSHolder)
 {
-  nsScriptObjectTracer* tracer = mJSHolders.Get(aPossibleJSHolder);
-  if (tracer) {
-    tracer->Trace(aPossibleJSHolder, TraceCallbackFunc(AssertNoGcThing), nullptr);
+  JSHolderInfo* info = nullptr;
+  if (!mJSHolderMap.Get(aPossibleJSHolder, &info)) {
+    return;
   }
+
+  MOZ_ASSERT(info->mHolder == aPossibleJSHolder);
+  info->mTracer->Trace(aPossibleJSHolder, TraceCallbackFunc(AssertNoGcThing), nullptr);
 }
 #endif
 
@@ -1242,12 +1271,11 @@ CycleCollectedJSRuntime::DeferredFinalize(DeferredFinalizeAppendFunction aAppend
                                           DeferredFinalizeFunction aFunc,
                                           void* aThing)
 {
-  void* thingArray = nullptr;
-  bool hadThingArray = mDeferredFinalizerTable.Get(aFunc, &thingArray);
-
-  thingArray = aAppendFunc(thingArray, aThing);
-  if (!hadThingArray) {
-    mDeferredFinalizerTable.Put(aFunc, thingArray);
+  if (auto entry = mDeferredFinalizerTable.LookupForAdd(aFunc)) {
+    aAppendFunc(entry.Data(), aThing);
+  } else {
+    entry.OrInsert(
+      [aAppendFunc, aThing] () { return aAppendFunc(nullptr, aThing); });
   }
 }
 
@@ -1398,7 +1426,7 @@ CycleCollectedJSRuntime::FinalizeDeferredThings(CycleCollectedJSContext::Deferre
   MOZ_ASSERT(mDeferredFinalizerTable.Count() == 0);
 
   if (aType == CycleCollectedJSContext::FinalizeIncrementally) {
-    NS_DispatchToCurrentThread(mFinalizeRunnable);
+    NS_IdleDispatchToCurrentThread(do_AddRef(mFinalizeRunnable), 2500);
   } else {
     mFinalizeRunnable->ReleaseNow(false);
     MOZ_ASSERT(!mFinalizeRunnable);

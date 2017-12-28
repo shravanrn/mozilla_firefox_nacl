@@ -94,8 +94,8 @@ public:
               ReflowOutput&     aDesiredSize,
               const ReflowInput& aReflowInput,
               nsReflowStatus&          aStatus) override;
-  nscoord GetMinISize(nsRenderingContext* aRenderingContext) override;
-  nscoord GetPrefISize(nsRenderingContext* aRenderingContext) override;
+  nscoord GetMinISize(gfxContext* aRenderingContext) override;
+  nscoord GetPrefISize(gfxContext* aRenderingContext) override;
   void MarkIntrinsicISizesDirty() override;
   bool IsFrameOfType(uint32_t aFlags) const override
   {
@@ -104,7 +104,6 @@ public:
   }
 
   void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                        const nsRect&           aDirtyRect,
                         const nsDisplayListSet& aLists) override;
 
   nscoord GetLogicalBaseline(mozilla::WritingMode aWM) const override
@@ -289,7 +288,7 @@ protected:
   /**
    * Helper for GetMinISize / GetPrefISize.
    */
-  nscoord IntrinsicISize(nsRenderingContext* aRenderingContext,
+  nscoord IntrinsicISize(gfxContext*         aRenderingContext,
                          IntrinsicISizeType  aConstraint);
 
   // Helper for AppendFrames / InsertFrames.

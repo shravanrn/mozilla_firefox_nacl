@@ -37,9 +37,13 @@
         let mut background_color = None;
 
         % for name in "image position_x position_y repeat size attachment origin clip".split():
-            let mut background_${name} = background_${name}::SpecifiedValue(Vec::new());
+            // Vec grows from 0 to 4 by default on first push().  So allocate
+            // with capacity 1, so in the common case of only one item we don't
+            // way overallocate.  Note that we always push at least one item if
+            // parsing succeeds.
+            let mut background_${name} = background_${name}::SpecifiedValue(Vec::with_capacity(1));
         % endfor
-        try!(input.parse_comma_separated(|input| {
+        input.parse_comma_separated(|input| {
             // background-color can only be in the last element, so if it
             // is parsed anywhere before, the value is invalid.
             if background_color.is_some() {
@@ -62,7 +66,7 @@
 
                         // Parse background size, if applicable.
                         size = input.try(|input| {
-                            try!(input.expect_delim('/'));
+                            input.expect_delim('/')?;
                             background_size::single_value::parse(context, input)
                         }).ok();
 
@@ -110,7 +114,7 @@
             } else {
                 Err(StyleParseError::UnspecifiedError.into())
             }
-        }));
+        })?;
 
         Ok(expanded! {
              background_color: background_color.unwrap_or(Color::transparent()),
@@ -148,37 +152,37 @@
                 % endfor
 
                 if i != 0 {
-                    try!(write!(dest, ", "));
+                    dest.write_str(", ")?;
                 }
 
                 if i == len - 1 {
-                    try!(self.background_color.to_css(dest));
-                    try!(write!(dest, " "));
+                    self.background_color.to_css(dest)?;
+                    dest.write_str(" ")?;
                 }
 
-                try!(image.to_css(dest));
+                image.to_css(dest)?;
                 % for name in "repeat attachment".split():
-                    try!(write!(dest, " "));
-                    try!(${name}.to_css(dest));
+                    dest.write_str(" ")?;
+                    ${name}.to_css(dest)?;
                 % endfor
 
-                try!(write!(dest, " "));
+                dest.write_str(" ")?;
                 Position {
                     horizontal: position_x.clone(),
                     vertical: position_y.clone()
                 }.to_css(dest)?;
 
                 if *size != background_size::single_value::get_initial_specified_value() {
-                    try!(write!(dest, " / "));
-                    try!(size.to_css(dest));
+                    dest.write_str(" / ")?;
+                    size.to_css(dest)?;
                 }
 
                 if *origin != Origin::padding_box || *clip != Clip::border_box {
-                    try!(write!(dest, " "));
-                    try!(origin.to_css(dest));
+                    dest.write_str(" ")?;
+                    origin.to_css(dest)?;
                     if *clip != From::from(*origin) {
-                        try!(write!(dest, " "));
-                        try!(clip.to_css(dest));
+                        dest.write_str(" ")?;
+                        clip.to_css(dest)?;
                     }
                 }
             }
@@ -197,8 +201,12 @@
 
     pub fn parse_value<'i, 't>(context: &ParserContext, input: &mut Parser<'i, 't>)
                                -> Result<Longhands, ParseError<'i>> {
-        let mut position_x = background_position_x::SpecifiedValue(Vec::new());
-        let mut position_y = background_position_y::SpecifiedValue(Vec::new());
+        // Vec grows from 0 to 4 by default on first push().  So allocate with
+        // capacity 1, so in the common case of only one item we don't way
+        // overallocate.  Note that we always push at least one item if parsing
+        // succeeds.
+        let mut position_x = background_position_x::SpecifiedValue(Vec::with_capacity(1));
+        let mut position_y = background_position_y::SpecifiedValue(Vec::with_capacity(1));
         let mut any = false;
 
         input.parse_comma_separated(|input| {

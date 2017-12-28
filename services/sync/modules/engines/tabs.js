@@ -35,9 +35,6 @@ Utils.deferGetSet(TabSetRecord, "cleartext", ["clientName", "tabs"]);
 
 this.TabEngine = function TabEngine(service) {
   SyncEngine.call(this, "Tabs", service);
-
-  // Reset the client on every startup so that we fetch recent tabs.
-  this._resetClient();
 }
 TabEngine.prototype = {
   __proto__: SyncEngine.prototype,
@@ -52,7 +49,14 @@ TabEngine.prototype = {
 
   syncPriority: 3,
 
-  getChangedIDs() {
+  async initialize() {
+    await SyncEngine.prototype.initialize.call(this);
+
+    // Reset the client on every startup so that we fetch recent tabs.
+    await this._resetClient();
+  },
+
+  async getChangedIDs() {
     // No need for a proper timestamp (no conflict resolution needed).
     let changedIDs = {};
     if (this._tracker.modified)
@@ -69,9 +73,9 @@ TabEngine.prototype = {
     return this._store._remoteClients[id];
   },
 
-  _resetClient() {
-    SyncEngine.prototype._resetClient.call(this);
-    this._store.wipe();
+  async _resetClient() {
+    await SyncEngine.prototype._resetClient.call(this);
+    await this._store.wipe();
     this._tracker.modified = true;
     this.hasSyncedThisSession = false;
   },
@@ -92,10 +96,10 @@ TabEngine.prototype = {
     return urls;
   },
 
-  _reconcile(item) {
+  async _reconcile(item) {
     // Skip our own record.
     // TabStore.itemExists tests only against our local client ID.
-    if (this._store.itemExists(item.id)) {
+    if ((await this._store.itemExists(item.id))) {
       this._log.trace("Ignoring incoming tab item because of its id: " + item.id);
       return false;
     }
@@ -103,7 +107,7 @@ TabEngine.prototype = {
     return SyncEngine.prototype._reconcile.call(this, item);
   },
 
-  _syncFinish() {
+  async _syncFinish() {
     this.hasSyncedThisSession = true;
     return SyncEngine.prototype._syncFinish.call(this);
   },
@@ -116,7 +120,7 @@ function TabStore(name, engine) {
 TabStore.prototype = {
   __proto__: Store.prototype,
 
-  itemExists(id) {
+  async itemExists(id) {
     return id == this.engine.service.clientsEngine.localID;
   },
 
@@ -166,7 +170,7 @@ TabStore.prototype = {
           continue;
         }
 
-        if (current.url.length >= (MAX_UPLOAD_BYTES - 1000)) {
+        if (current.url.length > URI_LENGTH_MAX) {
           this._log.trace("Skipping over-long URL.");
           continue;
         }
@@ -201,7 +205,14 @@ TabStore.prototype = {
     return allTabs;
   },
 
-  createRecord(id, collection) {
+  getMaxRecordPayloadSize() {
+    // Tabs have a different max size due to being stored using memcached on the
+    // server (See bug 1403052), but we still check the server config to make
+    // sure we respect the global limits it sets.
+    return Math.min(512 * 1024, this.engine.service.getMaxRecordPayloadSize());
+  },
+
+  async createRecord(id, collection) {
     let record = new TabSetRecord(collection, id);
     record.clientName = this.engine.service.clientsEngine.localName;
 
@@ -209,20 +220,21 @@ TabStore.prototype = {
     let tabs = this.getAllTabs(true).sort(function(a, b) {
       return b.lastUsed - a.lastUsed;
     });
-
+    let encoder = new TextEncoder("utf-8");
     // Figure out how many tabs we can pack into a payload.
     // We use byteLength here because the data is not encrypted in ascii yet.
-    let size = new TextEncoder("utf-8").encode(JSON.stringify(tabs)).byteLength;
+    let size = encoder.encode(JSON.stringify(tabs)).byteLength;
     let origLength = tabs.length;
+    const maxPayloadSize = this.getMaxRecordPayloadSize();
     // See bug 535326 comment 8 for an explanation of the estimation
-    const MAX_TAB_SIZE = this.engine.maxRecordPayloadBytes / 4 * 3 - 1500;
+    const MAX_TAB_SIZE = maxPayloadSize / 4 * 3 - 1500;
     if (size > MAX_TAB_SIZE) {
       // Estimate a little more than the direct fraction to maximize packing
       let cutoff = Math.ceil(tabs.length * MAX_TAB_SIZE / size);
       tabs = tabs.slice(0, cutoff + 1);
 
       // Keep dropping off the last entry until the data fits
-      while (JSON.stringify(tabs).length > MAX_TAB_SIZE)
+      while (encoder.encode(JSON.stringify(tabs)).byteLength > MAX_TAB_SIZE)
         tabs.pop();
     }
 
@@ -235,7 +247,7 @@ TabStore.prototype = {
     return record;
   },
 
-  getAllIDs() {
+  async getAllIDs() {
     // Don't report any tabs if all windows are in private browsing for
     // first syncs.
     let ids = {};
@@ -261,18 +273,18 @@ TabStore.prototype = {
     return ids;
   },
 
-  wipe() {
+  async wipe() {
     this._remoteClients = {};
   },
 
-  create(record) {
+  async create(record) {
     this._log.debug("Adding remote tabs from " + record.clientName);
     this._remoteClients[record.id] = Object.assign({}, record.cleartext, {
       lastModified: record.modified
     });
   },
 
-  update(record) {
+  async update(record) {
     this._log.trace("Ignoring tab updates as local ones win");
   },
 };

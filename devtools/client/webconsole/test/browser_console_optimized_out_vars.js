@@ -50,7 +50,7 @@ function test() {
     });
 
     finishTest();
-  }).then(null, aError => {
+  }).catch(aError => {
     ok(false, "Got an error: " + aError.message + "\n" + aError.stack);
   });
 }
@@ -73,7 +73,7 @@ function waitForThreadEvents(aPanel, aEventName, aEventRepeat = 1) {
   info("Waiting for thread event: '" + aEventName + "' to fire: " +
        aEventRepeat + " time(s).");
 
-  let deferred = promise.defer();
+  let deferred = defer();
   let thread = aPanel.panelWin.gThreadClient;
   let count = 0;
 

@@ -14,7 +14,7 @@
 #include "mozilla/Attributes.h"         // for override
 #include "mozilla/ipc/SharedMemory.h"   // for SharedMemory, etc
 #include "mozilla/layers/PLayerTransactionParent.h"
-#include "nsDataHashtable.h"
+#include "nsRefPtrHashtable.h"
 #include "nsTArrayForwardDeclare.h"     // for InfallibleTArray
 
 namespace mozilla {
@@ -33,6 +33,7 @@ class Layer;
 class HostLayerManager;
 class ShadowLayerParent;
 class CompositableParent;
+class CompositorAnimationStorage;
 class CompositorBridgeParentBase;
 
 class LayerTransactionParent final : public PLayerTransactionParent,
@@ -48,6 +49,7 @@ class LayerTransactionParent final : public PLayerTransactionParent,
 public:
   LayerTransactionParent(HostLayerManager* aManager,
                          CompositorBridgeParentBase* aBridge,
+                         CompositorAnimationStorage* aAnimStorage,
                          uint64_t aId);
 
 protected:
@@ -56,9 +58,7 @@ protected:
 public:
   void Destroy();
 
-  HostLayerManager* layer_manager() const { return mLayerManager; }
-
-  void SetLayerManager(HostLayerManager* aLayerManager);
+  void SetLayerManager(HostLayerManager* aLayerManager, CompositorAnimationStorage* aAnimStorage);
 
   uint64_t GetId() const { return mId; }
   Layer* GetRoot() const { return mRoot; }
@@ -81,7 +81,13 @@ public:
   virtual bool IsSameProcess() const override;
 
   const uint64_t& GetPendingTransactionId() { return mPendingTransaction; }
-  void SetPendingTransactionId(uint64_t aId) { mPendingTransaction = aId; }
+  void SetPendingTransactionId(uint64_t aId, const TimeStamp& aTxnStartTime, const TimeStamp& aFwdTime)
+  {
+    mPendingTransaction = aId;
+    mTxnStartTime = aTxnStartTime;
+    mFwdTime = aFwdTime;
+  }
+  uint64_t FlushTransactionId(TimeStamp& aCompositeEnd);
 
   // CompositableParentManager
   virtual void SendAsyncMessage(const InfallibleTArray<AsyncParentMessageData>& aMessage) override;
@@ -174,13 +180,14 @@ private:
 private:
   RefPtr<HostLayerManager> mLayerManager;
   CompositorBridgeParentBase* mCompositorBridge;
+  RefPtr<CompositorAnimationStorage> mAnimStorage;
 
   // Hold the root because it might be grafted under various
   // containers in the "real" layer tree
   RefPtr<Layer> mRoot;
 
   // Mapping from LayerHandles to Layers.
-  nsDataHashtable<nsUint64HashKey, RefPtr<Layer>> mLayerMap;
+  nsRefPtrHashtable<nsUint64HashKey, Layer> mLayerMap;
 
   // When this is nonzero, it refers to a layer tree owned by the
   // compositor thread.  It is always true that
@@ -196,6 +203,8 @@ private:
   uint64_t mParentEpoch;
 
   uint64_t mPendingTransaction;
+  TimeStamp mTxnStartTime;
+  TimeStamp mFwdTime;
 
   // When the widget/frame/browser stuff in this process begins its
   // destruction process, we need to Disconnect() all the currently

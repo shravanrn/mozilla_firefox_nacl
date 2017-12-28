@@ -9,8 +9,7 @@
 extern crate heapsize;
 #[macro_use] extern crate heapsize_derive;
 extern crate num_traits;
-#[macro_use]
-extern crate serde_derive;
+#[macro_use] extern crate serde;
 
 use std::cmp::{self, max, min};
 use std::fmt;
@@ -79,7 +78,7 @@ impl RangeIndex for usize {
 #[macro_export]
 macro_rules! int_range_index {
     ($(#[$attr:meta])* struct $Self_:ident($T:ty)) => (
-        #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Copy)]
+        #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
         $(#[$attr])*
         pub struct $Self_(pub $T);
 

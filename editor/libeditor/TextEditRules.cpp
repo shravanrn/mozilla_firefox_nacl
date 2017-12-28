@@ -25,6 +25,7 @@
 #include "nsError.h"
 #include "nsGkAtoms.h"
 #include "nsIContent.h"
+#include "nsIDocumentEncoder.h"
 #include "nsIDOMDocument.h"
 #include "nsIDOMNode.h"
 #include "nsIDOMNodeFilter.h"
@@ -103,6 +104,7 @@ NS_IMPL_CYCLE_COLLECTION(TextEditRules, mBogusNode, mCachedSelectionNode)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(TextEditRules)
   NS_INTERFACE_MAP_ENTRY(nsIEditRules)
   NS_INTERFACE_MAP_ENTRY(nsITimerCallback)
+  NS_INTERFACE_MAP_ENTRY(nsINamed)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIEditRules)
 NS_INTERFACE_MAP_END
 
@@ -130,11 +132,8 @@ TextEditRules::Init(TextEditor* aTextEditor)
 
   // If the selection hasn't been set up yet, set it up collapsed to the end of
   // our editable content.
-  int32_t rangeCount;
-  rv = selection->GetRangeCount(&rangeCount);
-  NS_ENSURE_SUCCESS(rv, rv);
-  if (!rangeCount) {
-    rv = mTextEditor->EndOfDocument();
+  if (!selection->RangeCount()) {
+    rv = mTextEditor->CollapseSelectionToEnd(selection);
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
@@ -202,7 +201,7 @@ TextEditRules::BeforeEdit(EditAction action,
     mCachedSelectionOffset = 0;
   } else {
     mCachedSelectionNode = selection->GetAnchorNode();
-    selection->GetAnchorOffset(&mCachedSelectionOffset);
+    mCachedSelectionOffset = selection->AnchorOffset();
   }
 
   return NS_OK;
@@ -296,7 +295,7 @@ TextEditRules::WillDoAction(Selection* aSelection,
       return WillRemoveTextProperty(aSelection, aCancel, aHandled);
     case EditAction::outputText:
       return WillOutputText(aSelection, info->outputFormat, info->outString,
-                            aCancel, aHandled);
+                            info->flags, aCancel, aHandled);
     case EditAction::insertElement:
       // i had thought this would be html rules only.  but we put pre elements
       // into plaintext mail when doing quoting for reply!  doh!
@@ -315,7 +314,7 @@ TextEditRules::DidDoAction(Selection* aSelection,
   NS_ENSURE_STATE(mTextEditor);
   // don't let any txns in here move the selection around behind our back.
   // Note that this won't prevent explicit selection setting from working.
-  AutoTransactionsConserveSelection dontSpazMySelection(mTextEditor);
+  AutoTransactionsConserveSelection dontChangeMySelection(mTextEditor);
 
   NS_ENSURE_TRUE(aSelection && aInfo, NS_ERROR_NULL_POINTER);
 
@@ -348,10 +347,20 @@ TextEditRules::DidDoAction(Selection* aSelection,
   }
 }
 
+/**
+ * Return false if the editor has non-empty text nodes or non-text
+ * nodes.  Otherwise, i.e., there is no meaningful content,
+ * return true.
+ */
 NS_IMETHODIMP_(bool)
 TextEditRules::DocumentIsEmpty()
 {
-  return (mBogusNode != nullptr);
+  bool retVal = false;
+  if (!mTextEditor || NS_FAILED(mTextEditor->DocumentIsEmpty(&retVal))) {
+    retVal = true;
+  }
+
+  return retVal;
 }
 
 void
@@ -413,10 +422,7 @@ TextEditRules::WillInsertBreak(Selection* aSelection,
     *aCancel = false;
 
     // if the selection isn't collapsed, delete it.
-    bool bCollapsed;
-    rv = aSelection->GetIsCollapsed(&bCollapsed);
-    NS_ENSURE_SUCCESS(rv, rv);
-    if (!bCollapsed) {
+    if (!aSelection->IsCollapsed()) {
       NS_ENSURE_STATE(mTextEditor);
       rv = mTextEditor->DeleteSelection(nsIEditor::eNone, nsIEditor::eStrip);
       NS_ENSURE_SUCCESS(rv, rv);
@@ -453,7 +459,7 @@ TextEditRules::CollapseSelectionToTrailingBRIfNeeded(Selection* aSelection)
   // This is usually performed in TextEditRules::Init(), however, if the
   // editor is reframed, this may be called by AfterEdit().
   if (!aSelection->RangeCount()) {
-    mTextEditor->EndOfDocument();
+    mTextEditor->CollapseSelectionToEnd(aSelection);
   }
 
   // if we are at the end of the textarea, we need to set the
@@ -476,22 +482,20 @@ TextEditRules::CollapseSelectionToTrailingBRIfNeeded(Selection* aSelection)
     return NS_OK;
   }
 
-  int32_t parentOffset;
-  nsINode* parentNode =
-    EditorBase::GetNodeLocation(selNode, &parentOffset);
-
   NS_ENSURE_STATE(mTextEditor);
   nsINode* root = mTextEditor->GetRoot();
   if (NS_WARN_IF(!root)) {
     return NS_ERROR_NULL_POINTER;
   }
+  nsINode* parentNode = selNode->GetParentNode();
   if (parentNode != root) {
     return NS_OK;
   }
 
-  nsINode* nextNode = parentNode->GetChildAt(parentOffset + 1);
+  nsINode* nextNode = selNode->GetNextSibling();
   if (nextNode && TextEditUtils::IsMozBR(nextNode)) {
-    rv = aSelection->Collapse(parentNode, parentOffset + 1);
+    int32_t offsetInParent = EditorBase::GetChildOffset(selNode, parentNode);
+    rv = aSelection->Collapse(parentNode, offsetInParent + 1);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -660,10 +664,7 @@ TextEditRules::WillInsertText(EditAction aAction,
   }
 
   // if the selection isn't collapsed, delete it.
-  bool bCollapsed;
-  rv = aSelection->GetIsCollapsed(&bCollapsed);
-  NS_ENSURE_SUCCESS(rv, rv);
-  if (!bCollapsed) {
+  if (!aSelection->IsCollapsed()) {
     NS_ENSURE_STATE(mTextEditor);
     rv = mTextEditor->DeleteSelection(nsIEditor::eNone, nsIEditor::eStrip);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -724,7 +725,7 @@ TextEditRules::WillInsertText(EditAction aAction,
 
   // get the (collapsed) selection location
   NS_ENSURE_STATE(aSelection->GetRangeAt(0));
-  nsCOMPtr<nsINode> selNode = aSelection->GetRangeAt(0)->GetStartParent();
+  nsCOMPtr<nsINode> selNode = aSelection->GetRangeAt(0)->GetStartContainer();
   int32_t selOffset = aSelection->GetRangeAt(0)->StartOffset();
   NS_ENSURE_STATE(selNode);
 
@@ -759,9 +760,9 @@ TextEditRules::WillInsertText(EditAction aAction,
     nsCOMPtr<nsINode> curNode = selNode;
     int32_t curOffset = selOffset;
 
-    // don't spaz my selection in subtransactions
+    // don't change my selection in subtransactions
     NS_ENSURE_STATE(mTextEditor);
-    AutoTransactionsConserveSelection dontSpazMySelection(mTextEditor);
+    AutoTransactionsConserveSelection dontChangeMySelection(mTextEditor);
 
     rv = mTextEditor->InsertTextImpl(*outString, address_of(curNode),
                                      &curOffset, doc);
@@ -811,7 +812,7 @@ TextEditRules::WillSetText(Selection& aSelection,
 
   if (!IsPlaintextEditor() || textEditor->IsIMEComposing() ||
       aMaxLength != -1) {
-    // SetTextTransaction only supports plain text editor without IME.
+    // SetTextImpl only supports plain text editor without IME.
     return NS_OK;
   }
 
@@ -852,7 +853,7 @@ TextEditRules::WillSetText(Selection& aSelection,
     if (NS_WARN_IF(!doc)) {
       return NS_OK;
     }
-    RefPtr<nsTextNode> newNode = doc->CreateTextNode(tString);
+    RefPtr<nsTextNode> newNode = EditorBase::CreateTextNode(*doc, tString);
     if (NS_WARN_IF(!newNode)) {
       return NS_OK;
     }
@@ -871,17 +872,11 @@ TextEditRules::WillSetText(Selection& aSelection,
   if (NS_WARN_IF(!EditorBase::IsTextNode(curNode))) {
     return NS_OK;
   }
-  if (tString.IsEmpty()) {
-    nsresult rv = textEditor->DeleteNode(curNode);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
 
-    *aHandled = true;
-    return NS_OK;
-  }
-
-  nsresult rv = textEditor->SetTextImpl(tString, *curNode->GetAsText());
+  // Even if empty text, we don't remove text node and set empty text
+  // for performance
+  nsresult rv = textEditor->SetTextImpl(aSelection, tString,
+                                        *curNode->GetAsText());
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -1023,11 +1018,7 @@ TextEditRules::WillDeleteSelection(Selection* aSelection,
     NS_ENSURE_SUCCESS(rv, rv);
     NS_ENSURE_TRUE(startNode, NS_ERROR_FAILURE);
 
-    bool bCollapsed;
-    rv = aSelection->GetIsCollapsed(&bCollapsed);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    if (!bCollapsed) {
+    if (!aSelection->IsCollapsed()) {
       return NS_OK;
     }
 
@@ -1186,11 +1177,13 @@ nsresult
 TextEditRules::WillOutputText(Selection* aSelection,
                               const nsAString* aOutputFormat,
                               nsAString* aOutString,
+                              uint32_t aFlags,
                               bool* aCancel,
                               bool* aHandled)
 {
   // null selection ok
-  if (!aOutString || !aOutputFormat || !aCancel || !aHandled) {
+  if (NS_WARN_IF(!aOutString) || NS_WARN_IF(!aOutputFormat) ||
+      NS_WARN_IF(!aCancel) || NS_WARN_IF(!aHandled)) {
     return NS_ERROR_NULL_POINTER;
   }
 
@@ -1198,17 +1191,100 @@ TextEditRules::WillOutputText(Selection* aSelection,
   *aCancel = false;
   *aHandled = false;
 
-  if (aOutputFormat->LowerCaseEqualsLiteral("text/plain")) {
-    // Only use these rules for plain text output.
-    if (IsPasswordEditor()) {
-      *aOutString = mPasswordText;
-      *aHandled = true;
-    } else if (mBogusNode) {
-      // This means there's no content, so output null string.
-      aOutString->Truncate();
-      *aHandled = true;
-    }
+  if (!aOutputFormat->LowerCaseEqualsLiteral("text/plain")) {
+    return NS_OK;
   }
+
+  // XXX Looks like that even if it's password field, we need to use the
+  //     expensive path if the caller requests some complicated handling.
+  //     However, changing the behavior for password field might cause
+  //     security issue.  So, be careful when you touch here.
+  if (IsPasswordEditor()) {
+    *aOutString = mPasswordText;
+    *aHandled = true;
+    return NS_OK;
+  }
+
+  // If there is a bogus node, there's no content.  So output empty string.
+  if (mBogusNode) {
+    aOutString->Truncate();
+    *aHandled = true;
+    return NS_OK;
+  }
+
+  // If it's necessary to check selection range or the editor wraps hard,
+  // we need some complicated handling.  In such case, we need to use the
+  // expensive path.
+  // XXX Anything else what we cannot return plain text simply?
+  if (aFlags & nsIDocumentEncoder::OutputSelectionOnly ||
+      aFlags & nsIDocumentEncoder::OutputWrap) {
+    return NS_OK;
+  }
+
+  // If it's neither <input type="text"> nor <textarea>, e.g., an HTML editor
+  // which is in plaintext mode (e.g., plaintext email composer on Thunderbird),
+  // it should be handled by the expensive path.
+  if (NS_WARN_IF(!mTextEditor) || mTextEditor->AsHTMLEditor()) {
+    return NS_OK;
+  }
+
+  Element* root = mTextEditor->GetRoot();
+  if (!root) { // Don't warn it, this is possible, e.g., 997805.html
+    aOutString->Truncate();
+    *aHandled = true;
+    return NS_OK;
+  }
+
+  nsIContent* firstChild = root->GetFirstChild();
+  if (!firstChild) {
+    aOutString->Truncate();
+    *aHandled = true;
+    return NS_OK;
+  }
+
+  // If it's an <input type="text"> element, the DOM tree should be:
+  // <div class="anonymous-div">
+  //   #text
+  // </div>
+  //
+  // If it's a <textarea> element, the DOM tree should be:
+  // <div class="anonymous-div">
+  //   #text (if there is)
+  //   <br type="_moz">
+  //   <scrollbar orient="horizontal">
+  //   ...
+  // </div>
+
+  Text* text = firstChild->GetAsText();
+  nsIContent* firstChildExceptText =
+    text ? firstChild->GetNextSibling() : firstChild;
+  // If the DOM tree is unexpected, fall back to the expensive path.
+  bool isInput = IsSingleLineEditor();
+  bool isTextarea = !isInput;
+  if (NS_WARN_IF(isInput && firstChildExceptText) ||
+      NS_WARN_IF(isTextarea && !firstChildExceptText) ||
+      NS_WARN_IF(isTextarea &&
+                 !TextEditUtils::IsMozBR(firstChildExceptText) &&
+                 !firstChildExceptText->IsXULElement(nsGkAtoms::scrollbar))) {
+    return NS_OK;
+  }
+
+  // If there is no text node in the expected DOM tree, we can say that it's
+  // just empty.
+  if (!text) {
+    aOutString->Truncate();
+    *aHandled = true;
+    return NS_OK;
+  }
+
+  // Otherwise, the text is the value.
+  nsresult rv = text->GetData(*aOutString);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    // Fall back to the expensive path if it fails.
+    return NS_OK;
+  }
+
+  *aHandled = true;
   return NS_OK;
 }
 
@@ -1284,7 +1360,7 @@ TextEditRules::CreateTrailingBRIfNeeded()
   NS_ENSURE_TRUE(lastChild, NS_ERROR_NULL_POINTER);
 
   if (!lastChild->IsHTMLElement(nsGkAtoms::br)) {
-    AutoTransactionsConserveSelection dontSpazMySelection(mTextEditor);
+    AutoTransactionsConserveSelection dontChangeMySelection(mTextEditor);
     nsCOMPtr<nsIDOMNode> domBody = do_QueryInterface(body);
     return CreateMozBR(domBody, body->Length());
   }
@@ -1327,11 +1403,12 @@ TextEditRules::CreateBogusNodeIfNeeded(Selection* aSelection)
   // Now we've got the body element. Iterate over the body element's children,
   // looking for editable content. If no editable content is found, insert the
   // bogus node.
-  for (nsCOMPtr<nsIContent> bodyChild = body->GetFirstChild();
+  bool bodyEditable = mTextEditor->IsEditable(body);
+  for (nsIContent* bodyChild = body->GetFirstChild();
        bodyChild;
        bodyChild = bodyChild->GetNextSibling()) {
     if (mTextEditor->IsMozEditorBogusNode(bodyChild) ||
-        !mTextEditor->IsEditable(body) || // XXX hoist out of the loop?
+        !bodyEditable ||
         mTextEditor->IsEditable(bodyChild) ||
         mTextEditor->IsBlockNode(bodyChild)) {
       return NS_OK;
@@ -1483,6 +1560,13 @@ TextEditRules::Notify(nsITimer* aTimer)
   return rv;
 }
 
+NS_IMETHODIMP
+TextEditRules::GetName(nsACString& aName)
+{
+  aName.AssignLiteral("TextEditRules");
+  return NS_OK;
+}
+
 nsresult
 TextEditRules::HideLastPWInput()
 {
@@ -1530,13 +1614,11 @@ TextEditRules::FillBufWithPWChars(nsAString* aOutString,
   }
 }
 
-/**
- * CreateMozBR() puts a BR node with moz attribute at {inParent, inOffset}.
- */
 nsresult
-TextEditRules::CreateMozBR(nsIDOMNode* inParent,
-                           int32_t inOffset,
-                           nsIDOMNode** outBRNode)
+TextEditRules::CreateBRInternal(nsIDOMNode* inParent,
+                                int32_t inOffset,
+                                bool aMozBR,
+                                nsIDOMNode** outBRNode)
 {
   NS_ENSURE_TRUE(inParent, NS_ERROR_NULL_POINTER);
 
@@ -1547,7 +1629,7 @@ TextEditRules::CreateMozBR(nsIDOMNode* inParent,
 
   // give it special moz attr
   nsCOMPtr<Element> brElem = do_QueryInterface(brNode);
-  if (brElem) {
+  if (aMozBR && brElem) {
     rv = mTextEditor->SetAttribute(brElem, nsGkAtoms::type,
                                    NS_LITERAL_STRING("_moz"));
     NS_ENSURE_SUCCESS(rv, rv);

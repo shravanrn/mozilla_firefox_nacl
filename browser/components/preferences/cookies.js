@@ -214,8 +214,8 @@ var gCookiesWindow = {
       var cacheIndex = Math.min(this._cacheValid, aIndex);
       if (cacheIndex > 0) {
         var cacheItem = this._cacheItems[cacheIndex];
-        start = cacheItem["start"];
-        count = hostIndex = cacheItem["count"];
+        start = cacheItem.start;
+        count = hostIndex = cacheItem.count;
       }
 
       for (let i = start; i < gCookiesWindow._hostOrder.length; ++i) { // var host in gCookiesWindow._hosts) {
@@ -729,11 +729,11 @@ var gCookiesWindow = {
   },
 
   onCookieKeyPress(aEvent) {
-    if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
+    if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE ||
+        (AppConstants.platform == "macosx" &&
+        aEvent.keyCode == KeyEvent.DOM_VK_BACK_SPACE)) {
       this.deleteCookie();
-    } else if (AppConstants.platform == "macosx" &&
-               aEvent.keyCode == KeyEvent.DOM_VK_BACK_SPACE) {
-      this.deleteCookie();
+      aEvent.preventDefault();
     }
   },
 

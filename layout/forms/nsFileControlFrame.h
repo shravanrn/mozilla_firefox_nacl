@@ -33,7 +33,6 @@ public:
                     nsIFrame*         aPrevInFlow) override;
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 
   NS_DECL_QUERYFRAME
@@ -43,7 +42,7 @@ public:
   virtual nsresult SetFormProperty(nsIAtom* aName, const nsAString& aValue) override;
   virtual void SetFocus(bool aOn, bool aRepaint) override;
 
-  virtual nscoord GetMinISize(nsRenderingContext *aRenderingContext) override;
+  virtual nscoord GetMinISize(gfxContext *aRenderingContext) override;
 
   virtual void DestroyFrom(nsIFrame* aDestructRoot) override;
 
@@ -95,7 +94,8 @@ protected:
   {
   public:
     explicit SyncDisabledStateEvent(nsFileControlFrame* aFrame)
-      : mFrame(aFrame)
+      : mozilla::Runnable("nsFileControlFrame::SyncDisabledStateEvent")
+      , mFrame(aFrame)
     {}
 
     NS_IMETHOD Run() override {

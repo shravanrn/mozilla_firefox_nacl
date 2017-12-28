@@ -42,7 +42,22 @@ class CompositorWidgetInitData;
 // transparency). This functionality is controlled through a "host". Since
 // this functionality is platform-dependent, it is only forward declared
 // here.
-class CompositorWidgetDelegate;
+class PlatformCompositorWidgetDelegate;
+
+// Headless mode uses its own, singular CompositorWidget implementation.
+class HeadlessCompositorWidget;
+
+class CompositorWidgetDelegate
+{
+public:
+  virtual PlatformCompositorWidgetDelegate* AsPlatformSpecificDelegate() {
+    return nullptr;
+  }
+
+  virtual HeadlessCompositorWidget* AsHeadlessCompositorWidget() {
+    return nullptr;
+  }
+};
 
 // Platforms that support out-of-process widgets.
 #if defined(XP_WIN) || defined(MOZ_X11)
@@ -255,6 +270,13 @@ public:
    */
   const layers::CompositorOptions& GetCompositorOptions() {
     return mOptions;
+  }
+
+  /**
+   * Return true if the window is hidden and should not be composited.
+   */
+  virtual bool IsHidden() const {
+    return false;
   }
 
   /**

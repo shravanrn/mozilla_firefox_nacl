@@ -4,16 +4,15 @@
 
 //! Common handling for the specified value CSS url() values.
 
-use cssparser::CssStringWriter;
 use parser::ParserContext;
 use servo_url::ServoUrl;
-use std::borrow::Cow;
-use std::fmt::{self, Write};
-// Note: We use std::sync::Arc rather than stylearc::Arc here because the
+use std::fmt;
+// Note: We use std::sync::Arc rather than servo_arc::Arc here because the
 // nonzero optimization is important in keeping the size of SpecifiedUrl below
 // the threshold.
 use std::sync::Arc;
 use style_traits::{ToCss, ParseError};
+use values::computed::{Context, ToComputedValue, ComputedUrl};
 
 /// A specified url() value for servo.
 ///
@@ -23,7 +22,7 @@ use style_traits::{ToCss, ParseError};
 ///
 /// However, this approach is still not necessarily optimal: See
 /// https://bugzilla.mozilla.org/show_bug.cgi?id=1347435#c6
-#[derive(Clone, Debug, HeapSizeOf, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, HeapSizeOf, Serialize)]
 pub struct SpecifiedUrl {
     /// The original URI. This might be optional since we may insert computed
     /// values of images into the cascade directly, and we don't bother to
@@ -41,10 +40,10 @@ impl SpecifiedUrl {
     /// Try to parse a URL from a string value that is a valid CSS token for a
     /// URL. Never fails - the API is only fallible to be compatible with the
     /// gecko version.
-    pub fn parse_from_string<'a>(url: Cow<'a, str>,
+    pub fn parse_from_string<'a>(url: String,
                                  context: &ParserContext)
                                  -> Result<Self, ParseError<'a>> {
-        let serialization = Arc::new(url.into_owned());
+        let serialization = Arc::new(url);
         let resolved = context.url_data.join(&serialization).ok();
         Ok(SpecifiedUrl {
             original: Some(serialization),
@@ -112,7 +111,6 @@ impl PartialEq for SpecifiedUrl {
 
 impl ToCss for SpecifiedUrl {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
-        try!(dest.write_str("url(\""));
         let string = match self.original {
             Some(ref original) => &**original,
             None => match self.resolved {
@@ -124,7 +122,40 @@ impl ToCss for SpecifiedUrl {
             }
         };
 
-        try!(CssStringWriter::new(dest).write_str(string));
-        dest.write_str("\")")
+        dest.write_str("url(")?;
+        string.to_css(dest)?;
+        dest.write_str(")")
     }
 }
+
+impl ToComputedValue for SpecifiedUrl {
+    type ComputedValue = ComputedUrl;
+
+    // If we can't resolve the URL from the specified one, we fall back to the original
+    // but still return it as a ComputedUrl::Invalid
+    fn to_computed_value(&self, _: &Context) -> Self::ComputedValue {
+        match self.resolved {
+            Some(ref url) => ComputedUrl::Valid(url.clone()),
+            None => match self.original {
+                Some(ref url) => ComputedUrl::Invalid(url.clone()),
+                None => {
+                    unreachable!("Found specified url with neither resolved or original URI!");
+                },
+            }
+        }
+    }
+
+    fn from_computed_value(computed: &ComputedUrl) -> Self {
+        match *computed {
+            ComputedUrl::Valid(ref url) => SpecifiedUrl {
+                original: None,
+                resolved: Some(url.clone()),
+            },
+            ComputedUrl::Invalid(ref url) => SpecifiedUrl {
+                original: Some(url.clone()),
+                resolved: None,
+            }
+        }
+    }
+}
+

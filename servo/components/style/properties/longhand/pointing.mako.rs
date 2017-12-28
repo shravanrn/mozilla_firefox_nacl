@@ -6,15 +6,11 @@
 
 <% data.new_style_struct("Pointing", inherited=True, gecko_name="UserInterface") %>
 
-<%helpers:longhand name="cursor" boxed="${product == 'gecko'}" animation_value_type="none"
+<%helpers:longhand name="cursor" boxed="${product == 'gecko'}" animation_value_type="discrete"
   spec="https://drafts.csswg.org/css-ui/#cursor">
     pub use self::computed_value::T as SpecifiedValue;
-    use values::computed::ComputedValueAsSpecified;
     #[cfg(feature = "gecko")]
     use values::specified::url::SpecifiedUrl;
-
-    impl ComputedValueAsSpecified for SpecifiedValue {}
-    no_viewport_percentage!(SpecifiedValue);
 
     pub mod computed_value {
         #[cfg(feature = "gecko")]
@@ -25,8 +21,9 @@
         #[cfg(feature = "gecko")]
         use values::specified::url::SpecifiedUrl;
 
+        #[cfg_attr(feature = "gecko", derive(MallocSizeOf))]
         #[cfg_attr(feature = "servo", derive(HeapSizeOf))]
-        #[derive(Clone, Copy, Debug, PartialEq, ToCss)]
+        #[derive(Clone, Copy, Debug, PartialEq, ToComputedValue, ToCss)]
         pub enum Keyword {
             Auto,
             Cursor(Cursor),
@@ -36,14 +33,14 @@
         pub type T = Keyword;
 
         #[cfg(feature = "gecko")]
-        #[derive(Clone, PartialEq, Debug)]
+        #[derive(Clone, Debug, MallocSizeOf, PartialEq, ToComputedValue)]
         pub struct Image {
             pub url: SpecifiedUrl,
             pub hotspot: Option<(f32, f32)>,
         }
 
         #[cfg(feature = "gecko")]
-        #[derive(Clone, PartialEq, Debug)]
+        #[derive(Clone, Debug, MallocSizeOf, PartialEq, ToComputedValue)]
         pub struct T {
             pub images: Vec<Image>,
             pub keyword: Keyword,
@@ -52,12 +49,12 @@
         #[cfg(feature = "gecko")]
         impl ToCss for Image {
             fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
-                try!(self.url.to_css(dest));
+                self.url.to_css(dest)?;
                 if let Some((x, y)) = self.hotspot {
-                    try!(dest.write_str(" "));
-                    try!(x.to_css(dest));
-                    try!(dest.write_str(" "));
-                    try!(y.to_css(dest));
+                    dest.write_str(" ")?;
+                    x.to_css(dest)?;
+                    dest.write_str(" ")?;
+                    y.to_css(dest)?;
                 }
                 Ok(())
             }
@@ -67,8 +64,8 @@
         impl ToCss for T {
             fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
                 for url in &self.images {
-                    try!(url.to_css(dest));
-                    try!(dest.write_str(", "));
+                    url.to_css(dest)?;
+                    dest.write_str(", ")?;
                 }
                 self.keyword.to_css(dest)
             }
@@ -95,13 +92,13 @@
                          -> Result<computed_value::Keyword, ParseError<'i>> {
             use std::ascii::AsciiExt;
             use style_traits::cursor::Cursor;
-            let ident = try!(input.expect_ident());
+            let ident = input.expect_ident()?;
             if ident.eq_ignore_ascii_case("auto") {
                 Ok(computed_value::Keyword::Auto)
             } else {
                 Cursor::from_css_keyword(&ident)
                     .map(computed_value::Keyword::Cursor)
-                    .map_err(|()| SelectorParseError::UnexpectedIdent(ident).into())
+                    .map_err(|()| SelectorParseError::UnexpectedIdent(ident.clone()).into())
             }
         }
     }
@@ -110,9 +107,9 @@
     fn parse_image<'i, 't>(context: &ParserContext, input: &mut Parser<'i, 't>)
                            -> Result<computed_value::Image, ParseError<'i>> {
         Ok(computed_value::Image {
-            url: try!(SpecifiedUrl::parse(context, input)),
+            url: SpecifiedUrl::parse(context, input)?,
             hotspot: match input.try(|input| input.expect_number()) {
-                Ok(number) => Some((number, try!(input.expect_number()))),
+                Ok(number) => Some((number, input.expect_number()?)),
                 Err(_) => None,
             },
         })
@@ -137,12 +134,12 @@
                 }
                 Err(_) => break,
             }
-            try!(input.expect_comma());
+            input.expect_comma()?;
         }
 
         Ok(computed_value::T {
             images: images,
-            keyword: try!(computed_value::Keyword::parse(context, input)),
+            keyword: computed_value::Keyword::parse(context, input)?,
         })
     }
 </%helpers:longhand>
@@ -152,12 +149,12 @@
 // TODO(pcwalton): SVG-only values.
 ${helpers.single_keyword("pointer-events", "auto none", animation_value_type="discrete",
                          extra_gecko_values="visiblepainted visiblefill visiblestroke visible painted fill stroke all",
+                         flags="APPLIES_TO_PLACEHOLDER",
                          spec="https://www.w3.org/TR/SVG11/interact.html#PointerEventsProperty")}
 
 ${helpers.single_keyword("-moz-user-input", "auto none enabled disabled",
                          products="gecko", gecko_ffi_name="mUserInput",
                          gecko_enum_prefix="StyleUserInput",
-                         gecko_inexhaustive=True,
                          animation_value_type="discrete",
                          spec="Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/-moz-user-input)")}
 
@@ -165,7 +162,6 @@ ${helpers.single_keyword("-moz-user-modify", "read-only read-write write-only",
                          products="gecko", gecko_ffi_name="mUserModify",
                          gecko_enum_prefix="StyleUserModify",
                          needs_conversion=True,
-                         gecko_inexhaustive=True,
                          animation_value_type="discrete",
                          spec="Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/-moz-user-modify)")}
 
@@ -173,15 +169,16 @@ ${helpers.single_keyword("-moz-user-focus",
                          "none ignore normal select-after select-before select-menu select-same select-all",
                          products="gecko", gecko_ffi_name="mUserFocus",
                          gecko_enum_prefix="StyleUserFocus",
-                         gecko_inexhaustive=True,
                          animation_value_type="discrete",
                          spec="Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/-moz-user-focus)")}
 
-${helpers.predefined_type("caret-color",
-                          "ColorOrAuto",
-                          "Either::Second(Auto)",
-                          spec="https://drafts.csswg.org/css-ui/#caret-color",
-                          animation_value_type="Either<IntermediateColor, Auto>",
-                          boxed=True,
-                          ignored_when_colors_disabled=True,
-                          products="gecko")}
+${helpers.predefined_type(
+    "caret-color",
+    "ColorOrAuto",
+    "Either::Second(Auto)",
+    spec="https://drafts.csswg.org/css-ui/#caret-color",
+    animation_value_type="Either<AnimatedColor, Auto>",
+    boxed=True,
+    ignored_when_colors_disabled=True,
+    products="gecko",
+)}

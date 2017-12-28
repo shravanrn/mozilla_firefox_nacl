@@ -2,11 +2,7 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 /*
- * test_save_sorted_engines: Start search engine
- * - without search-metadata.json
- * - without search.sqlite
- *
- * Ensure that search-metadata.json is correct after:
+ * Ensure that metadata are stored correctly on disk after:
  * - moving an engine
  * - removing an engine
  * - adding a new engine
@@ -61,6 +57,6 @@ add_task(async function test_save_sorted_engines() {
   do_print("Commit complete after addEngineWithDetails");
 
   metadata = await promiseEngineMetadata();
-  do_check_eq(metadata["foo"].alias, "foo");
-  do_check_true(metadata["foo"].order > 0);
+  do_check_eq(metadata.foo.alias, "foo");
+  do_check_true(metadata.foo.order > 0);
 });

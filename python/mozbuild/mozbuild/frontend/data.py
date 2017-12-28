@@ -23,6 +23,8 @@ from mozpack.chrome.manifest import ManifestEntry
 import mozpack.path as mozpath
 from .context import FinalTargetValue
 
+from collections import defaultdict, OrderedDict
+
 from ..util import (
     group_unified_files,
 )
@@ -156,6 +158,30 @@ class VariablePassthru(ContextDerived):
     def __init__(self, context):
         ContextDerived.__init__(self, context)
         self.variables = {}
+
+
+class ComputedFlags(ContextDerived):
+    """Aggregate flags for consumption by various backends.
+    """
+    __slots__ = ('flags',)
+
+    def __init__(self, context, reader_flags):
+        ContextDerived.__init__(self, context)
+        self.flags = reader_flags
+
+    def resolve_flags(self, key, value):
+        # Bypass checks done by CompileFlags that would keep us from
+        # setting a value here.
+        dict.__setitem__(self.flags, key, value)
+
+    def get_flags(self):
+        flags = defaultdict(list)
+        for key, _, dest_vars in self.flags.flag_variables:
+            value = self.flags.get(key)
+            if value:
+                for dest_var in dest_vars:
+                    flags[dest_var].extend(value)
+        return flags.items()
 
 class XPIDLFile(ContextDerived):
     """Describes an XPIDL file to be compiled."""
@@ -332,9 +358,6 @@ class Linkable(ContextDerived):
 
     def link_library(self, obj):
         assert isinstance(obj, BaseLibrary)
-        if isinstance(obj, SharedLibrary) and obj.variant == obj.COMPONENT:
-            raise LinkageWrongKindError(
-                'Linkable.link_library() does not take components.')
         if obj.KIND != self.KIND:
             raise LinkageWrongKindError('%s != %s' % (obj.KIND, self.KIND))
         # Linking multiple Rust libraries into an object would result in
@@ -345,7 +368,7 @@ class Linkable(ContextDerived):
             raise LinkageMultipleRustLibrariesError("Cannot link multiple Rust libraries into %s",
                                                     self)
         self.linked_libraries.append(obj)
-        if obj.cxx_link:
+        if obj.cxx_link and not isinstance(obj, SharedLibrary):
             self.cxx_link = True
         obj.refs.append(self)
 
@@ -576,8 +599,7 @@ class SharedLibrary(Library):
     }
 
     FRAMEWORK = 1
-    COMPONENT = 2
-    MAX_VARIANT = 3
+    MAX_VARIANT = 2
 
     def __init__(self, context, basename, real_name=None,
                  soname=None, variant=None, symbols_file=False):

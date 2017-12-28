@@ -31,31 +31,23 @@ WebRenderLayer::WrBridge()
   return WrManager()->WrBridge();
 }
 
-WrImageKey
-WebRenderLayer::GetImageKey()
+wr::WrImageKey
+WebRenderLayer::GenerateImageKey()
 {
-  WrImageKey key;
+  wr::WrImageKey key;
   key.mNamespace = WrBridge()->GetNamespace();
   key.mHandle = WrBridge()->GetNextResourceId();
   return key;
 }
 
-Maybe<WrImageMask>
-WebRenderLayer::BuildWrMaskLayer(const StackingContextHelper* aUnapplySc)
+Maybe<wr::WrImageMask>
+WebRenderLayer::BuildWrMaskLayer(const StackingContextHelper& aRelativeTo,
+                                 wr::IpcResourceUpdateQueue& aResources)
 {
   if (GetLayer()->GetMaskLayer()) {
     WebRenderLayer* maskLayer = ToWebRenderLayer(GetLayer()->GetMaskLayer());
-
-    // If |this| layer is pushing a stacking context, that should be passed in
-    // as |aUnapplySc|. We need to unapply the transform from that stacking
-    // context because the mask layer (according to WR) is outside that stacking
-    // context.
     gfx::Matrix4x4 transform = maskLayer->GetLayer()->GetTransform();
-    if (aUnapplySc) {
-      transform = transform * aUnapplySc->TransformToRoot();
-    }
-
-    return maskLayer->RenderMaskLayer(transform);
+    return maskLayer->RenderMaskLayer(aRelativeTo, transform, aResources);
   }
 
   return Nothing();
@@ -90,53 +82,6 @@ WebRenderLayer::BoundsForStackingContext()
   return bounds;
 }
 
-Maybe<LayerRect>
-WebRenderLayer::ClipRect()
-{
-  Layer* layer = GetLayer();
-  if (!layer->GetClipRect()) {
-    return Nothing();
-  }
-  ParentLayerRect clip(layer->GetClipRect().ref());
-  LayerToParentLayerMatrix4x4 transform = layer->GetLocalTransformTyped();
-  return Some(transform.Inverse().TransformBounds(clip));
-}
-
-Maybe<wr::ImageKey>
-WebRenderLayer::UpdateImageKey(ImageClientSingle* aImageClient,
-                               ImageContainer* aContainer,
-                               Maybe<wr::ImageKey>& aOldKey,
-                               wr::ExternalImageId& aExternalImageId)
-{
-  MOZ_ASSERT(aImageClient);
-  MOZ_ASSERT(aContainer);
-
-  uint32_t oldCounter = aImageClient->GetLastUpdateGenerationCounter();
-
-  bool ret = aImageClient->UpdateImage(aContainer, /* unused */0);
-  if (!ret || aImageClient->IsEmpty()) {
-    // Delete old key
-    if (aOldKey.isSome()) {
-      WrManager()->AddImageKeyForDiscard(aOldKey.value());
-    }
-    return Nothing();
-  }
-
-  // Reuse old key if generation is not updated.
-  if (oldCounter == aImageClient->GetLastUpdateGenerationCounter() && aOldKey.isSome()) {
-    return aOldKey;
-  }
-
-  // Delete old key, we are generating a new key.
-  if (aOldKey.isSome()) {
-    WrManager()->AddImageKeyForDiscard(aOldKey.value());
-  }
-
-  WrImageKey key = GetImageKey();
-  WrBridge()->AddWebRenderParentCommand(OpAddExternalImage(aExternalImageId, key));
-  return Some(key);
-}
-
 void
 WebRenderLayer::DumpLayerInfo(const char* aLayerType, const LayerRect& aRect)
 {
@@ -144,17 +89,18 @@ WebRenderLayer::DumpLayerInfo(const char* aLayerType, const LayerRect& aRect)
     return;
   }
 
-  Matrix4x4 transform = GetLayer()->GetTransform();
+  Layer* layer = GetLayer();
+  Matrix4x4 transform = layer->GetTransform();
   LayerRect bounds = Bounds();
-  WrMixBlendMode mixBlendMode = wr::ToWrMixBlendMode(GetLayer()->GetMixBlendMode());
+  wr::MixBlendMode mixBlendMode = wr::ToMixBlendMode(GetLayer()->GetMixBlendMode());
 
   printf_stderr("%s %p using bounds=%s, transform=%s, rect=%s, clip=%s, mix-blend-mode=%s\n",
                 aLayerType,
-                GetLayer(),
+                layer,
                 Stringify(bounds).c_str(),
                 Stringify(transform).c_str(),
                 Stringify(aRect).c_str(),
-                Stringify(ClipRect().valueOr(aRect)).c_str(),
+                layer->GetClipRect() ? Stringify(layer->GetClipRect().value()).c_str() : "none",
                 Stringify(mixBlendMode).c_str());
 }
 

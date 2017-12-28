@@ -17,7 +17,6 @@ Cu.import("resource://gre/modules/AddonManager.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 
 const URI_EXTENSION_STRINGS  = "chrome://mozapps/locale/extensions/extensions.properties";
-const STRING_TYPE_NAME       = "type.%ID%.name";
 const LIST_UPDATED_TOPIC     = "plugins-list-updated";
 const FLASH_MIME_TYPE        = "application/x-shockwave-flash";
 
@@ -27,29 +26,6 @@ const LOGGER_ID = "addons.plugins";
 // Create a new logger for use by the Addons Plugin Provider
 // (Requires AddonManager.jsm)
 var logger = Log.repository.getLogger(LOGGER_ID);
-
-function getIDHashForString(aStr) {
-  // return the two-digit hexadecimal code for a byte
-  let toHexString = charCode => ("0" + charCode.toString(16)).slice(-2);
-
-  let hasher = Cc["@mozilla.org/security/hash;1"].
-               createInstance(Ci.nsICryptoHash);
-  hasher.init(Ci.nsICryptoHash.MD5);
-  let stringStream = Cc["@mozilla.org/io/string-input-stream;1"].
-                     createInstance(Ci.nsIStringInputStream);
-                     stringStream.data = aStr ? aStr : "null";
-  hasher.updateFromStream(stringStream, -1);
-
-  // convert the binary hash data to a hex string.
-  let binary = hasher.finish(false);
-  let hash = Array.from(binary, c => toHexString(c.charCodeAt(0)));
-  hash = hash.join("").toLowerCase();
-  return "{" + hash.substr(0, 8) + "-" +
-               hash.substr(8, 4) + "-" +
-               hash.substr(12, 4) + "-" +
-               hash.substr(16, 4) + "-" +
-               hash.substr(20) + "}";
-}
 
 var PluginProvider = {
   get name() {
@@ -197,7 +173,7 @@ var PluginProvider = {
         seenPlugins[tag.name] = {};
       if (!(tag.description in seenPlugins[tag.name])) {
         let plugin = {
-          id: getIDHashForString(tag.name + tag.description),
+          id: tag.name + tag.description,
           name: tag.name,
           description: tag.description,
           tags: [tag]
@@ -592,7 +568,7 @@ PluginWrapper.prototype = {
 
 AddonManagerPrivate.registerProvider(PluginProvider, [
   new AddonManagerPrivate.AddonType("plugin", URI_EXTENSION_STRINGS,
-                                    STRING_TYPE_NAME,
+                                    "type.plugin.name",
                                     AddonManager.VIEW_TYPE_LIST, 6000,
                                     AddonManager.TYPE_SUPPORTS_ASK_TO_ACTIVATE)
 ]);

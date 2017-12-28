@@ -142,7 +142,8 @@
   'target_defaults': {
     'include_dirs': [
       'mpi',
-      'ecl'
+      'ecl',
+      'verified',
     ],
     'defines': [
       'SHLIB_SUFFIX=\"<(dll_suffix)\"',
@@ -153,6 +154,31 @@
       'MP_API_COMPATIBLE'
     ],
     'conditions': [
+      [ 'target_arch=="ia32" or target_arch=="x64"', {
+        'cflags_mozilla': [
+          '-mpclmul',
+          '-maes',
+        ],
+        'conditions': [
+          [ 'OS=="dragonfly" or OS=="freebsd" or OS=="netbsd" or OS=="openbsd"', {
+            'cflags': [
+              '-mpclmul',
+              '-maes',
+            ],
+          }],
+        ],
+      }],
+      [ 'OS=="mac"', {
+        'xcode_settings': {
+          # I'm not sure since when this is supported.
+          # But I hope that doesn't matter. We also assume this is x86/x64.
+          'OTHER_CFLAGS': [
+            '-mpclmul',
+            '-maes',
+            '-std=gnu99',
+          ],
+        },
+      }],
       [ 'OS=="win" and target_arch=="ia32"', {
         'msvs_settings': {
           'VCCLCompilerTool': {
@@ -204,10 +230,6 @@
               # The Makefile does version-tests on GCC, but we're not doing that here.
               'HAVE_INT128_SUPPORT',
             ],
-          }, {
-            'sources': [
-              'ecl/uint128.c',
-            ],
           }],
         ],
       }],
@@ -215,6 +237,9 @@
         'defines': [
           'FREEBL_LOWHASH',
           'FREEBL_NO_DEPEND',
+        ],
+        'cflags': [
+          '-std=gnu99',
         ],
       }],
       [ 'OS=="linux" or OS=="android"', {
@@ -241,6 +266,14 @@
               'MP_ASSEMBLY_SQUARE',
               'MP_ASSEMBLY_DIV_2DX1D',
               'MP_USE_UINT_DIGIT',
+            ],
+          }],
+          [ 'target_arch=="ia32" or target_arch=="x64"', {
+            'cflags': [
+              # enable isa option for pclmul am aes-ni; supported since gcc 4.4
+              # This is only support by x84/x64. It's not needed for Windows.
+              '-mpclmul',
+              '-maes',
             ],
           }],
           [ 'target_arch=="arm"', {

@@ -9,6 +9,7 @@
 #include "gfx2DGlue.h"
 #include "mozilla/PodOperations.h"
 #include "mozilla/SyncRunnable.h"
+#include "ImageContainer.h"
 #include "nsError.h"
 #include "prsystem.h"
 
@@ -24,10 +25,8 @@ using namespace layers;
 
 static VPXDecoder::Codec MimeTypeToCodec(const nsACString& aMimeType)
 {
-  if (aMimeType.EqualsLiteral("video/webm; codecs=vp8")) {
+  if (aMimeType.EqualsLiteral("video/vp8")) {
     return VPXDecoder::Codec::VP8;
-  } else if (aMimeType.EqualsLiteral("video/webm; codecs=vp9")) {
-    return VPXDecoder::Codec::VP9;
   } else if (aMimeType.EqualsLiteral("video/vp9")) {
     return VPXDecoder::Codec::VP9;
   }
@@ -68,6 +67,7 @@ InitContext(vpx_codec_ctx_t* aCtx,
 
 VPXDecoder::VPXDecoder(const CreateDecoderParams& aParams)
   : mImageContainer(aParams.mImageContainer)
+  , mImageAllocator(aParams.mKnowsCompositor)
   , mTaskQueue(aParams.mTaskQueue)
   , mInfo(aParams.VideoConfig())
   , mCodec(MimeTypeToCodec(aParams.VideoConfig().mMimeType))
@@ -205,7 +205,8 @@ VPXDecoder::ProcessDecode(MediaRawData* aSample)
                                        aSample->mKeyframe,
                                        aSample->mTimecode,
                                        mInfo.ScaledImageRect(img->d_w,
-                                                             img->d_h));
+                                                             img->d_h),
+                                       mImageAllocator);
     } else {
       VideoData::YCbCrBuffer::Plane alpha_plane;
       alpha_plane.mData = img_alpha->planes[0];
@@ -284,12 +285,10 @@ VPXDecoder::DecodeAlpha(vpx_image_t** aImgAlpha, const MediaRawData* aSample)
 bool
 VPXDecoder::IsVPX(const nsACString& aMimeType, uint8_t aCodecMask)
 {
-  return ((aCodecMask & VPXDecoder::VP8)
-          && aMimeType.EqualsLiteral("video/webm; codecs=vp8"))
-         || ((aCodecMask & VPXDecoder::VP9)
-             && aMimeType.EqualsLiteral("video/webm; codecs=vp9"))
-         || ((aCodecMask & VPXDecoder::VP9)
-             && aMimeType.EqualsLiteral("video/vp9"));
+  return ((aCodecMask & VPXDecoder::VP8) &&
+          aMimeType.EqualsLiteral("video/vp8")) ||
+         ((aCodecMask & VPXDecoder::VP9) &&
+          aMimeType.EqualsLiteral("video/vp9"));
 }
 
 /* static */
@@ -326,7 +325,7 @@ VPXDecoder::IsKeyframe(Span<const uint8_t> aBuffer, Codec aCodec)
 }
 
 /* static */
-nsIntSize
+gfx::IntSize
 VPXDecoder::GetFrameSize(Span<const uint8_t> aBuffer, Codec aCodec)
 {
   vpx_codec_stream_info_t si;
@@ -339,7 +338,7 @@ VPXDecoder::GetFrameSize(Span<const uint8_t> aBuffer, Codec aCodec)
     vpx_codec_peek_stream_info(vpx_codec_vp9_dx(), aBuffer.Elements(), aBuffer.Length(), &si);
   }
 
-  return nsIntSize(si.w, si.h);
+  return gfx::IntSize(si.w, si.h);
 }
 } // namespace mozilla
 #undef LOG

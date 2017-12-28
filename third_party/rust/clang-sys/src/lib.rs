@@ -22,15 +22,13 @@
 //! * 3.8 - [Documentation](https://kylemayes.github.io/clang-sys/3_8/clang_sys)
 //! * 3.9 - [Documentation](https://kylemayes.github.io/clang-sys/3_9/clang_sys)
 //! * 4.0 - [Documentation](https://kylemayes.github.io/clang-sys/4_0/clang_sys)
+//! * 5.0 - [Documentation](https://kylemayes.github.io/clang-sys/5_0/clang_sys)
 
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", warn(clippy))]
-
-#[macro_use]
-extern crate bitflags;
 
 extern crate glob;
 extern crate libc;
@@ -62,6 +60,13 @@ pub type CXInclusionVisitor = extern fn(CXFile, *mut CXSourceLocation, c_uint, C
 macro_rules! cenum {
     ($(#[$meta:meta])* enum $name:ident {
         $($(#[$vmeta:meta])* const $variant:ident = $value:expr), +,
+    }) => (
+        pub type $name = c_int;
+
+        $($(#[$vmeta])* pub const $variant: $name = $value;)+
+    );
+    ($(#[$meta:meta])* enum $name:ident {
+        $($(#[$vmeta:meta])* const $variant:ident = $value:expr); +;
     }) => (
         pub type $name = c_int;
 
@@ -117,6 +122,7 @@ cenum! {
         /// Only produced by `libclang` 4.0 and later.
         const CXCallingConv_X86RegCall = 8,
         const CXCallingConv_IntelOclBicc = 9,
+        const CXCallingConv_Win64 = 10,
         const CXCallingConv_X86_64Win64 = 10,
         const CXCallingConv_X86_64SysV = 11,
         /// Only produced by `libclang` 3.6 and later.
@@ -471,6 +477,21 @@ cenum! {
 }
 
 cenum! {
+    #[cfg(feature="gte_clang_5_0")]
+    enum CXCursor_ExceptionSpecificationKind {
+        const CXCursor_ExceptionSpecificationKind_None = 0,
+        const CXCursor_ExceptionSpecificationKind_DynamicNone = 1,
+        const CXCursor_ExceptionSpecificationKind_Dynamic = 2,
+        const CXCursor_ExceptionSpecificationKind_MSAny = 3,
+        const CXCursor_ExceptionSpecificationKind_BasicNoexcept = 4,
+        const CXCursor_ExceptionSpecificationKind_ComputedNoexcept = 5,
+        const CXCursor_ExceptionSpecificationKind_Unevaluated = 6,
+        const CXCursor_ExceptionSpecificationKind_Uninstantiated = 7,
+        const CXCursor_ExceptionSpecificationKind_Unparsed = 8,
+    }
+}
+
+cenum! {
     enum CXDiagnosticSeverity {
         const CXDiagnostic_Ignored = 0,
         const CXDiagnostic_Note = 1,
@@ -558,6 +579,8 @@ cenum! {
         const CXIdxEntityLang_C = 1,
         const CXIdxEntityLang_ObjC = 2,
         const CXIdxEntityLang_CXX = 3,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXIdxEntityLang_Swift = 4,
     }
 }
 
@@ -708,6 +731,8 @@ cenum! {
         const CXType_ObjCSel = 29,
         /// Only produced by `libclang` 3.9 and later.
         const CXType_Float128 = 30,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_Half = 31,
         const CXType_Complex = 100,
         const CXType_Pointer = 101,
         const CXType_BlockPointer = 102,
@@ -730,6 +755,88 @@ cenum! {
         const CXType_Auto = 118,
         /// Only produced by `libclang` 3.9 and later.
         const CXType_Elaborated = 119,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_Pipe = 120,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage1dRO = 121,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage1dArrayRO = 122,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage1dBufferRO = 123,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dRO = 124,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dArrayRO = 125,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dDepthRO = 126,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dArrayDepthRO = 127,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dMSAARO = 128,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dArrayMSAARO = 129,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dMSAADepthRO = 130,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dArrayMSAADepthRO = 131,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage3dRO = 132,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage1dWO = 133,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage1dArrayWO = 134,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage1dBufferWO = 135,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dWO = 136,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dArrayWO = 137,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dDepthWO = 138,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dArrayDepthWO = 139,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dMSAAWO = 140,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dArrayMSAAWO = 141,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dMSAADepthWO = 142,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dArrayMSAADepthWO = 143,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage3dWO = 144,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage1dRW = 145,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage1dArrayRW = 146,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage1dBufferRW = 147,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dRW = 148,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dArrayRW = 149,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dDepthRW = 150,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dArrayDepthRW = 151,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dMSAARW = 152,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dArrayMSAARW = 153,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dMSAADepthRW = 154,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage2dArrayMSAADepthRW = 155,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLImage3dRW = 156,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLSampler = 157,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLEvent = 158,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLQueue = 159,
+        /// Only produced by `libclang` 5.0 and later.
+        const CXType_OCLReserveID = 160,
     }
 }
 
@@ -787,159 +894,149 @@ cenum! {
 // Flags
 //================================================
 
-bitflags! {
-    #[repr(C)]
-    pub flags CXCodeComplete_Flags: c_uint {
-        const CXCodeComplete_IncludeMacros = 1,
-        const CXCodeComplete_IncludeCodePatterns = 2,
-        const CXCodeComplete_IncludeBriefComments = 4,
+cenum! {
+    enum CXCodeComplete_Flags {
+        const CXCodeComplete_IncludeMacros = 1;
+        const CXCodeComplete_IncludeCodePatterns = 2;
+        const CXCodeComplete_IncludeBriefComments = 4;
     }
 }
 
-bitflags! {
-    #[repr(C)]
-    pub flags CXCompletionContext: c_uint {
-        const CXCompletionContext_Unexposed = 0,
-        const CXCompletionContext_AnyType = 1,
-        const CXCompletionContext_AnyValue = 2,
-        const CXCompletionContext_ObjCObjectValue = 4,
-        const CXCompletionContext_ObjCSelectorValue = 8,
-        const CXCompletionContext_CXXClassTypeValue = 16,
-        const CXCompletionContext_DotMemberAccess = 32,
-        const CXCompletionContext_ArrowMemberAccess = 64,
-        const CXCompletionContext_ObjCPropertyAccess = 128,
-        const CXCompletionContext_EnumTag = 256,
-        const CXCompletionContext_UnionTag = 512,
-        const CXCompletionContext_StructTag = 1024,
-        const CXCompletionContext_ClassTag = 2048,
-        const CXCompletionContext_Namespace = 4096,
-        const CXCompletionContext_NestedNameSpecifier = 8192,
-        const CXCompletionContext_ObjCInterface = 16384,
-        const CXCompletionContext_ObjCProtocol = 32768,
-        const CXCompletionContext_ObjCCategory = 65536,
-        const CXCompletionContext_ObjCInstanceMessage = 131072,
-        const CXCompletionContext_ObjCClassMessage = 262144,
-        const CXCompletionContext_ObjCSelectorName = 524288,
-        const CXCompletionContext_MacroName = 1048576,
-        const CXCompletionContext_NaturalLanguage = 2097152,
-        const CXCompletionContext_Unknown = 4194303,
+cenum! {
+    enum CXCompletionContext {
+        const CXCompletionContext_Unexposed = 0;
+        const CXCompletionContext_AnyType = 1;
+        const CXCompletionContext_AnyValue = 2;
+        const CXCompletionContext_ObjCObjectValue = 4;
+        const CXCompletionContext_ObjCSelectorValue = 8;
+        const CXCompletionContext_CXXClassTypeValue = 16;
+        const CXCompletionContext_DotMemberAccess = 32;
+        const CXCompletionContext_ArrowMemberAccess = 64;
+        const CXCompletionContext_ObjCPropertyAccess = 128;
+        const CXCompletionContext_EnumTag = 256;
+        const CXCompletionContext_UnionTag = 512;
+        const CXCompletionContext_StructTag = 1024;
+        const CXCompletionContext_ClassTag = 2048;
+        const CXCompletionContext_Namespace = 4096;
+        const CXCompletionContext_NestedNameSpecifier = 8192;
+        const CXCompletionContext_ObjCInterface = 16384;
+        const CXCompletionContext_ObjCProtocol = 32768;
+        const CXCompletionContext_ObjCCategory = 65536;
+        const CXCompletionContext_ObjCInstanceMessage = 131072;
+        const CXCompletionContext_ObjCClassMessage = 262144;
+        const CXCompletionContext_ObjCSelectorName = 524288;
+        const CXCompletionContext_MacroName = 1048576;
+        const CXCompletionContext_NaturalLanguage = 2097152;
+        const CXCompletionContext_Unknown = 4194303;
     }
 }
 
-bitflags! {
-    #[repr(C)]
-    pub flags CXDiagnosticDisplayOptions: c_uint {
-        const CXDiagnostic_DisplaySourceLocation = 1,
-        const CXDiagnostic_DisplayColumn = 2,
-        const CXDiagnostic_DisplaySourceRanges = 4,
-        const CXDiagnostic_DisplayOption = 8,
-        const CXDiagnostic_DisplayCategoryId = 16,
-        const CXDiagnostic_DisplayCategoryName = 32,
+cenum! {
+    enum CXDiagnosticDisplayOptions {
+        const CXDiagnostic_DisplaySourceLocation = 1;
+        const CXDiagnostic_DisplayColumn = 2;
+        const CXDiagnostic_DisplaySourceRanges = 4;
+        const CXDiagnostic_DisplayOption = 8;
+        const CXDiagnostic_DisplayCategoryId = 16;
+        const CXDiagnostic_DisplayCategoryName = 32;
     }
 }
 
-bitflags! {
-    #[repr(C)]
-    pub flags CXGlobalOptFlags: c_uint {
-        const CXGlobalOpt_None = 0,
-        const CXGlobalOpt_ThreadBackgroundPriorityForIndexing = 1,
-        const CXGlobalOpt_ThreadBackgroundPriorityForEditing = 2,
-        const CXGlobalOpt_ThreadBackgroundPriorityForAll = 3,
+cenum! {
+    enum CXGlobalOptFlags {
+        const CXGlobalOpt_None = 0;
+        const CXGlobalOpt_ThreadBackgroundPriorityForIndexing = 1;
+        const CXGlobalOpt_ThreadBackgroundPriorityForEditing = 2;
+        const CXGlobalOpt_ThreadBackgroundPriorityForAll = 3;
     }
 }
 
-bitflags! {
-    #[repr(C)]
-    pub flags CXIdxDeclInfoFlags: c_uint {
-        const CXIdxDeclFlag_Skipped = 1,
+cenum! {
+    enum CXIdxDeclInfoFlags {
+        const CXIdxDeclFlag_Skipped = 1;
     }
 }
 
-bitflags! {
-    #[repr(C)]
-    pub flags CXIndexOptFlags: c_uint {
-        const CXIndexOptNone = 0,
-        const CXIndexOptSuppressRedundantRefs = 1,
-        const CXIndexOptIndexFunctionLocalSymbols = 2,
-        const CXIndexOptIndexImplicitTemplateInstantiations = 4,
-        const CXIndexOptSuppressWarnings = 8,
-        const CXIndexOptSkipParsedBodiesInSession = 16,
+cenum! {
+    enum CXIndexOptFlags {
+        const CXIndexOptNone = 0;
+        const CXIndexOptSuppressRedundantRefs = 1;
+        const CXIndexOptIndexFunctionLocalSymbols = 2;
+        const CXIndexOptIndexImplicitTemplateInstantiations = 4;
+        const CXIndexOptSuppressWarnings = 8;
+        const CXIndexOptSkipParsedBodiesInSession = 16;
     }
 }
 
-bitflags! {
-    #[repr(C)]
-    pub flags CXNameRefFlags: c_uint {
-        const CXNameRange_WantQualifier = 1,
-        const CXNameRange_WantTemplateArgs = 2,
-        const CXNameRange_WantSinglePiece = 4
+cenum! {
+    enum CXNameRefFlags {
+        const CXNameRange_WantQualifier = 1;
+        const CXNameRange_WantTemplateArgs = 2;
+        const CXNameRange_WantSinglePiece = 4;
     }
 }
 
-bitflags! {
-    #[repr(C)]
-    pub flags CXObjCDeclQualifierKind: c_uint {
-        const CXObjCDeclQualifier_None = 0,
-        const CXObjCDeclQualifier_In = 1,
-        const CXObjCDeclQualifier_Inout = 2,
-        const CXObjCDeclQualifier_Out = 4,
-        const CXObjCDeclQualifier_Bycopy = 8,
-        const CXObjCDeclQualifier_Byref = 16,
-        const CXObjCDeclQualifier_Oneway = 32,
+cenum! {
+    enum CXObjCDeclQualifierKind {
+        const CXObjCDeclQualifier_None = 0;
+        const CXObjCDeclQualifier_In = 1;
+        const CXObjCDeclQualifier_Inout = 2;
+        const CXObjCDeclQualifier_Out = 4;
+        const CXObjCDeclQualifier_Bycopy = 8;
+        const CXObjCDeclQualifier_Byref = 16;
+        const CXObjCDeclQualifier_Oneway = 32;
     }
 }
 
-bitflags! {
-    #[repr(C)]
-    pub flags CXObjCPropertyAttrKind: c_uint {
-        const CXObjCPropertyAttr_noattr = 0,
-        const CXObjCPropertyAttr_readonly = 1,
-        const CXObjCPropertyAttr_getter = 2,
-        const CXObjCPropertyAttr_assign = 4,
-        const CXObjCPropertyAttr_readwrite = 8,
-        const CXObjCPropertyAttr_retain = 16,
-        const CXObjCPropertyAttr_copy = 32,
-        const CXObjCPropertyAttr_nonatomic = 64,
-        const CXObjCPropertyAttr_setter = 128,
-        const CXObjCPropertyAttr_atomic = 256,
-        const CXObjCPropertyAttr_weak = 512,
-        const CXObjCPropertyAttr_strong = 1024,
-        const CXObjCPropertyAttr_unsafe_unretained = 2048,
+cenum! {
+    enum CXObjCPropertyAttrKind {
+        const CXObjCPropertyAttr_noattr = 0;
+        const CXObjCPropertyAttr_readonly = 1;
+        const CXObjCPropertyAttr_getter = 2;
+        const CXObjCPropertyAttr_assign = 4;
+        const CXObjCPropertyAttr_readwrite = 8;
+        const CXObjCPropertyAttr_retain = 16;
+        const CXObjCPropertyAttr_copy = 32;
+        const CXObjCPropertyAttr_nonatomic = 64;
+        const CXObjCPropertyAttr_setter = 128;
+        const CXObjCPropertyAttr_atomic = 256;
+        const CXObjCPropertyAttr_weak = 512;
+        const CXObjCPropertyAttr_strong = 1024;
+        const CXObjCPropertyAttr_unsafe_unretained = 2048;
         #[cfg(feature="gte_clang_3_9")]
-        const CXObjCPropertyAttr_class = 4096,
+        const CXObjCPropertyAttr_class = 4096;
     }
 }
 
-bitflags! {
-    #[repr(C)]
-    pub flags CXReparse_Flags: c_uint {
-        const CXReparse_None = 0,
+cenum! {
+    enum CXReparse_Flags {
+        const CXReparse_None = 0;
     }
 }
 
-bitflags! {
-    #[repr(C)]
-    pub flags CXSaveTranslationUnit_Flags: c_uint {
-        const CXSaveTranslationUnit_None = 0,
+cenum! {
+    enum CXSaveTranslationUnit_Flags {
+        const CXSaveTranslationUnit_None = 0;
     }
 }
 
-bitflags! {
-    #[repr(C)]
-    pub flags CXTranslationUnit_Flags: c_uint {
-        const CXTranslationUnit_None = 0,
-        const CXTranslationUnit_DetailedPreprocessingRecord = 1,
-        const CXTranslationUnit_Incomplete = 2,
-        const CXTranslationUnit_PrecompiledPreamble = 4,
-        const CXTranslationUnit_CacheCompletionResults = 8,
-        const CXTranslationUnit_ForSerialization = 16,
-        const CXTranslationUnit_CXXChainedPCH = 32,
-        const CXTranslationUnit_SkipFunctionBodies = 64,
-        const CXTranslationUnit_IncludeBriefCommentsInCodeCompletion = 128,
+cenum! {
+    enum CXTranslationUnit_Flags {
+        const CXTranslationUnit_None = 0;
+        const CXTranslationUnit_DetailedPreprocessingRecord = 1;
+        const CXTranslationUnit_Incomplete = 2;
+        const CXTranslationUnit_PrecompiledPreamble = 4;
+        const CXTranslationUnit_CacheCompletionResults = 8;
+        const CXTranslationUnit_ForSerialization = 16;
+        const CXTranslationUnit_CXXChainedPCH = 32;
+        const CXTranslationUnit_SkipFunctionBodies = 64;
+        const CXTranslationUnit_IncludeBriefCommentsInCodeCompletion = 128;
         #[cfg(feature="gte_clang_3_8")]
-        const CXTranslationUnit_CreatePreambleOnFirstParse = 256,
+        const CXTranslationUnit_CreatePreambleOnFirstParse = 256;
         #[cfg(feature="gte_clang_3_9")]
-        const CXTranslationUnit_KeepGoing = 512,
+        const CXTranslationUnit_KeepGoing = 512;
+        #[cfg(feature="gte_clang_5_0")]
+        const CXTranslationUnit_SingleFileParse = 1024;
     }
 }
 
@@ -969,6 +1066,8 @@ opaque!(CXIndex);
 opaque!(CXIndexAction);
 opaque!(CXModule);
 opaque!(CXRemapping);
+#[cfg(feature="gte_clang_5_0")]
+opaque!(CXTargetInfo);
 opaque!(CXTranslationUnit);
 
 // Transparent ___________________________________
@@ -1428,6 +1527,8 @@ link! {
     pub fn clang_Cursor_isAnonymous(cursor: CXCursor) -> c_uint;
     pub fn clang_Cursor_isBitField(cursor: CXCursor) -> c_uint;
     pub fn clang_Cursor_isDynamicCall(cursor: CXCursor) -> c_int;
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn clang_Cursor_isExternalSymbol(cursor: CXCursor, language: *mut CXString, from: *mut CXString, generated: *mut c_uint) -> c_uint;
     #[cfg(feature="gte_clang_3_9")]
     pub fn clang_Cursor_isFunctionInlined(cursor: CXCursor) -> c_uint;
     #[cfg(feature="gte_clang_3_9")]
@@ -1437,6 +1538,8 @@ link! {
     pub fn clang_Cursor_isNull(cursor: CXCursor) -> c_int;
     pub fn clang_Cursor_isObjCOptional(cursor: CXCursor) -> c_uint;
     pub fn clang_Cursor_isVariadic(cursor: CXCursor) -> c_uint;
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn clang_EnumDecl_isScoped(cursor: CXCursor) -> c_uint;
     #[cfg(feature="gte_clang_3_9")]
     pub fn clang_EvalResult_dispose(result: CXEvalResult);
     #[cfg(feature="gte_clang_3_9")]
@@ -1467,6 +1570,12 @@ link! {
     pub fn clang_Module_getTopLevelHeader(tu: CXTranslationUnit, module: CXModule, index: c_uint) -> CXFile;
     pub fn clang_Module_isSystem(module: CXModule) -> c_int;
     pub fn clang_Range_isNull(range: CXSourceRange) -> c_int;
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn clang_TargetInfo_dispose(info: CXTargetInfo);
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn clang_TargetInfo_getPointerWidth(info: CXTargetInfo) -> c_int;
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn clang_TargetInfo_getTriple(info: CXTargetInfo) -> CXString;
     pub fn clang_Type_getAlignOf(type_: CXType) -> c_longlong;
     pub fn clang_Type_getCXXRefQualifier(type_: CXType) -> CXRefQualifierKind;
     pub fn clang_Type_getClassType(type_: CXType) -> CXType;
@@ -1478,6 +1587,8 @@ link! {
     pub fn clang_Type_getOffsetOf(type_: CXType, field: *const c_char) -> c_longlong;
     pub fn clang_Type_getSizeOf(type_: CXType) -> c_longlong;
     pub fn clang_Type_getTemplateArgumentAsType(type_: CXType, index: c_uint) -> CXType;
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn clang_Type_isTransparentTagTypedef(type_: CXType) -> c_uint;
     #[cfg(feature="gte_clang_3_7")]
     pub fn clang_Type_visitFields(type_: CXType, visitor: CXFieldVisitor, data: CXClientData) -> CXVisitorResult;
     pub fn clang_annotateTokens(tu: CXTranslationUnit, tokens: *mut CXToken, n_tokens: c_uint, cursors: *mut CXCursor);
@@ -1529,6 +1640,8 @@ link! {
     pub fn clang_formatDiagnostic(diagnostic: CXDiagnostic, flags: CXDiagnosticDisplayOptions) -> CXString;
     #[cfg(feature="gte_clang_3_7")]
     pub fn clang_free(buffer: *mut c_void);
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn clang_getAddressSpace(type_: CXType) -> c_uint;
     #[cfg(feature="gte_clang_4_0")]
     pub fn clang_getAllSkippedRanges(tu: CXTranslationUnit) -> *mut CXSourceRangeList;
     pub fn clang_getArgType(type_: CXType, index: c_uint) -> CXType;
@@ -1555,6 +1668,8 @@ link! {
     pub fn clang_getCursorCompletionString(cursor: CXCursor) -> CXCompletionString;
     pub fn clang_getCursorDefinition(cursor: CXCursor) -> CXCursor;
     pub fn clang_getCursorDisplayName(cursor: CXCursor) -> CXString;
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn clang_getCursorExceptionSpecificationType(cursor: CXCursor) -> CXCursor_ExceptionSpecificationKind;
     pub fn clang_getCursorExtent(cursor: CXCursor) -> CXSourceRange;
     pub fn clang_getCursorKind(cursor: CXCursor) -> CXCursorKind;
     pub fn clang_getCursorKindSpelling(kind: CXCursorKind) -> CXString;
@@ -1592,6 +1707,8 @@ link! {
     pub fn clang_getEnumConstantDeclUnsignedValue(cursor: CXCursor) -> c_ulonglong;
     pub fn clang_getEnumConstantDeclValue(cursor: CXCursor) -> c_longlong;
     pub fn clang_getEnumDeclIntegerType(cursor: CXCursor) -> CXType;
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn clang_getExceptionSpecificationType(type_: CXType) -> CXCursor_ExceptionSpecificationKind;
     pub fn clang_getExpansionLocation(location: CXSourceLocation, file: *mut CXFile, line: *mut c_uint, column: *mut c_uint, offset: *mut c_uint);
     pub fn clang_getFieldDeclBitWidth(cursor: CXCursor) -> c_int;
     pub fn clang_getFile(tu: CXTranslationUnit, file: *const c_char) -> CXFile;
@@ -1630,6 +1747,8 @@ link! {
     pub fn clang_getSpecializedCursorTemplate(cursor: CXCursor) -> CXCursor;
     pub fn clang_getSpellingLocation(location: CXSourceLocation, file: *mut CXFile, line: *mut c_uint, column: *mut c_uint, offset: *mut c_uint);
     pub fn clang_getTUResourceUsageName(kind: CXTUResourceUsageKind) -> *const c_char;
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn clang_getTranslationUnitTargetInfo(tu: CXTranslationUnit) -> CXTargetInfo;
     pub fn clang_getTemplateCursorKind(cursor: CXCursor) -> CXCursorKind;
     pub fn clang_getTokenExtent(tu: CXTranslationUnit, token: CXToken) -> CXSourceRange;
     pub fn clang_getTokenKind(token: CXToken) -> CXTokenKind;
@@ -1641,6 +1760,8 @@ link! {
     pub fn clang_getTypeKindSpelling(type_: CXTypeKind) -> CXString;
     pub fn clang_getTypeSpelling(type_: CXType) -> CXString;
     pub fn clang_getTypedefDeclUnderlyingType(cursor: CXCursor) -> CXType;
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn clang_getTypedefName(type_: CXType) -> CXString;
     pub fn clang_hashCursor(cursor: CXCursor) -> c_uint;
     pub fn clang_indexLoc_getCXSourceLocation(location: CXIdxLoc) -> CXSourceLocation;
     pub fn clang_indexLoc_getFileLocation(location: CXIdxLoc, index_file: *mut CXIdxClientFile, file: *mut CXFile, line: *mut c_uint, column: *mut c_uint, offset: *mut c_uint);
@@ -1688,6 +1809,8 @@ link! {
     pub fn clang_reparseTranslationUnit(tu: CXTranslationUnit, n_unsaved: c_uint, unsaved: *mut CXUnsavedFile, flags: CXReparse_Flags) -> CXErrorCode;
     pub fn clang_saveTranslationUnit(tu: CXTranslationUnit, file: *const c_char, options: CXSaveTranslationUnit_Flags) -> CXSaveError;
     pub fn clang_sortCodeCompletionResults(results: *mut CXCompletionResult, n_results: c_uint);
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn clang_suspendTranslationUnit(tu: CXTranslationUnit) -> c_uint;
     pub fn clang_toggleCrashRecovery(recovery: c_uint);
     pub fn clang_tokenize(tu: CXTranslationUnit, range: CXSourceRange, tokens: *mut *mut CXToken, n_tokens: *mut c_uint);
     pub fn clang_visitChildren(cursor: CXCursor, visitor: CXCursorVisitor, data: CXClientData) -> c_uint;

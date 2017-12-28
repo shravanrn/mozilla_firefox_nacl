@@ -288,6 +288,7 @@ COMPUTED_STYLE_PROP(_moz_box_orient,               BoxOrient)
 COMPUTED_STYLE_PROP(_moz_box_pack,                 BoxPack)
 COMPUTED_STYLE_PROP(_moz_context_properties,       ContextProperties)
 COMPUTED_STYLE_PROP(_moz_float_edge,               FloatEdge)
+COMPUTED_STYLE_PROP(_moz_font_smoothing_background_color, FontSmoothingBackgroundColor)
 COMPUTED_STYLE_PROP(_moz_force_broken_image_icon,  ForceBrokenImageIcon)
 COMPUTED_STYLE_PROP(_moz_image_region,             ImageRegion)
 COMPUTED_STYLE_PROP(_moz_orient,                   Orient)
@@ -305,6 +306,9 @@ COMPUTED_STYLE_PROP(_moz_user_modify,              UserModify)
 COMPUTED_STYLE_PROP(_moz_user_select,              UserSelect)
 COMPUTED_STYLE_PROP(_moz_window_dragging,          WindowDragging)
 COMPUTED_STYLE_PROP(_moz_window_shadow,            WindowShadow)
+COMPUTED_STYLE_PROP(_moz_window_opacity,           WindowOpacity)
+COMPUTED_STYLE_PROP(_moz_window_transform,         WindowTransform)
+COMPUTED_STYLE_PROP(_moz_window_transform_origin,  WindowTransformOrigin)
 
 /* ********************************** *\
  * Implementations of -webkit- styles *

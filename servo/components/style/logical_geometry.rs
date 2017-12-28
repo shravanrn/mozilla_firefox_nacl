@@ -4,9 +4,8 @@
 
 //! Geometry in flow-relative space.
 
-use euclid::{Point2D, Rect, Size2D};
+use euclid::{Point2D, Rect, Size2D, SideOffsets2D};
 use euclid::num::Zero;
-use euclid::side_offsets::SideOffsets2D;
 use std::cmp::{max, min};
 use std::fmt::{self, Debug, Error, Formatter};
 use std::ops::{Add, Sub};
@@ -145,20 +144,20 @@ impl WritingMode {
 impl fmt::Display for WritingMode {
     fn fmt(&self, formatter: &mut Formatter) -> Result<(), Error> {
         if self.is_vertical() {
-            try!(write!(formatter, "V"));
+            write!(formatter, "V")?;
             if self.is_vertical_lr() {
-                try!(write!(formatter, " LR"));
+                write!(formatter, " LR")?;
             } else {
-                try!(write!(formatter, " RL"));
+                write!(formatter, " RL")?;
             }
             if self.intersects(FLAG_SIDEWAYS) {
-                try!(write!(formatter, " Sideways"));
+                write!(formatter, " Sideways")?;
             }
             if self.intersects(FLAG_LINE_INVERTED) {
-                try!(write!(formatter, " Inverted"));
+                write!(formatter, " Inverted")?;
             }
         } else {
-            try!(write!(formatter, "H"));
+            write!(formatter, "H")?;
         }
         if self.is_bidi_ltr() {
             write!(formatter, " LTR")
@@ -176,12 +175,12 @@ impl fmt::Display for WritingMode {
 /// (in addition to taking it as a parameter to methods) and check it.
 /// In non-debug builds, make this storage zero-size and the checks no-ops.
 #[cfg(not(debug_assertions))]
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "servo", derive(Serialize))]
 struct DebugWritingMode;
 
 #[cfg(debug_assertions)]
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "servo", derive(Serialize))]
 struct DebugWritingMode {
     mode: WritingMode
@@ -233,7 +232,7 @@ impl Debug for DebugWritingMode {
 
 
 // Used to specify the logical direction.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "servo", derive(Serialize))]
 pub enum Direction {
     Inline,
@@ -241,7 +240,7 @@ pub enum Direction {
 }
 
 /// A 2D size in flow-relative dimensions
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "servo", derive(Serialize))]
 pub struct LogicalSize<T> {
     pub inline: T,  // inline-size, a.k.a. logical width, a.k.a. measure
@@ -378,7 +377,7 @@ impl<T: Sub<T, Output=T>> Sub for LogicalSize<T> {
 
 
 /// A 2D point in flow-relative dimensions
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "servo", derive(Serialize))]
 pub struct LogicalPoint<T> {
     /// inline-axis coordinate
@@ -551,7 +550,7 @@ impl<T: Copy + Sub<T, Output=T>> Sub<LogicalSize<T>> for LogicalPoint<T> {
 /// Represents the four sides of the margins, borders, or padding of a CSS box,
 /// or a combination of those.
 /// A positive "margin" can be added to a rectangle to obtain a bigger rectangle.
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "servo", derive(Serialize))]
 pub struct LogicalMargin<T> {
     pub block_start: T,
@@ -855,7 +854,7 @@ impl<T: Sub<T, Output=T>> Sub for LogicalMargin<T> {
 
 
 /// A rectangle in flow-relative dimensions
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "servo", derive(Serialize))]
 pub struct LogicalRect<T> {
     pub start: LogicalPoint<T>,
@@ -1103,7 +1102,7 @@ impl<T: Copy + Add<T, Output=T> + Sub<T, Output=T>> Sub<LogicalMargin<T>> for Lo
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PhysicalSide {
     Top,
     Right,

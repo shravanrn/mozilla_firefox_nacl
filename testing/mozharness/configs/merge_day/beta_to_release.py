@@ -15,17 +15,10 @@ config = {
         ("{}{}".format(d, f),
         "ac_add_options --with-branding=mobile/android/branding/beta",
         "ac_add_options --with-branding=mobile/android/branding/official")
-        for d in ["mobile/android/config/mozconfigs/android-api-15/",
+        for d in ["mobile/android/config/mozconfigs/android-api-16/",
                   "mobile/android/config/mozconfigs/android-x86/",
                   "mobile/android/config/mozconfigs/android-aarch64/"]
         for f in ["debug", "nightly", "l10n-nightly"]
-    ] + [
-        # File, from, to
-        (f, "ac_add_options --with-l10n-base=../../mozilla-beta",
-        "ac_add_options --with-l10n-base=../../mozilla-release")
-        for f in ["mobile/android/config/mozconfigs/android-api-15/l10n-nightly",
-                  "mobile/android/config/mozconfigs/android-x86/l10n-nightly",
-                  "mobile/android/config/mozconfigs/android-aarch64/l10n-nightly"]
     ] + [
         # File, from, to
         ("browser/confvars.sh",
@@ -52,10 +45,5 @@ config = {
 
     "virtualenv_modules": [
         "requests==2.8.1",
-    ],
-
-    "post_merge_builders": [],
-    "post_merge_nightly_branches": [
-        # No nightlies on mozilla-release
     ],
 }

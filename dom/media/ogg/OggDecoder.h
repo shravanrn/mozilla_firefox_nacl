@@ -6,27 +6,13 @@
 #if !defined(OggDecoder_h_)
 #define OggDecoder_h_
 
-#include "MediaDecoder.h"
-
 namespace mozilla {
 
 class MediaContainerType;
 
-class OggDecoder : public MediaDecoder
+class OggDecoder
 {
 public:
-  explicit OggDecoder(MediaDecoderInit& aInit)
-    : MediaDecoder(aInit)
-  {}
-
-  MediaDecoder* Clone(MediaDecoderInit& aInit) override {
-    if (!IsOggEnabled()) {
-      return nullptr;
-    }
-    return new OggDecoder(aInit);
-  }
-  MediaDecoderStateMachine* CreateStateMachine() override;
-
   // Returns true if aContainerType is an Ogg type that we think we can render
   // with an enabled platform decoder backend.
   // If provided, codecs are checked for support.

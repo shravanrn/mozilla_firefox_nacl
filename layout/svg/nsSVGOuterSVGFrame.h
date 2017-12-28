@@ -40,14 +40,14 @@ public:
 #endif
 
   // nsIFrame:
-  virtual nscoord GetMinISize(nsRenderingContext *aRenderingContext) override;
-  virtual nscoord GetPrefISize(nsRenderingContext *aRenderingContext) override;
+  virtual nscoord GetMinISize(gfxContext *aRenderingContext) override;
+  virtual nscoord GetPrefISize(gfxContext *aRenderingContext) override;
 
   virtual mozilla::IntrinsicSize GetIntrinsicSize() override;
   virtual nsSize  GetIntrinsicRatio() override;
 
   virtual mozilla::LogicalSize
-  ComputeSize(nsRenderingContext *aRenderingContext,
+  ComputeSize(gfxContext *aRenderingContext,
               mozilla::WritingMode aWritingMode,
               const mozilla::LogicalSize& aCBSize,
               nscoord aAvailableISize,
@@ -68,7 +68,6 @@ public:
   virtual void UnionChildOverflow(nsOverflowAreas& aOverflowAreas) override;
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 
   virtual void Init(nsIContent*       aContent,
@@ -99,10 +98,8 @@ public:
   bool IsSVGTransformed(Matrix* aOwnTransform,
                         Matrix* aFromParentTransform) const override;
 
-  // Update the style on our anonymous box child.
-  void DoUpdateStyleOfOwnedAnonBoxes(mozilla::ServoStyleSet& aStyleSet,
-                                     nsStyleChangeList& aChangeList,
-                                     nsChangeHint aHintForThisFrame) override;
+  // Return our anonymous box child.
+  void AppendDirectlyOwnedAnonBoxes(nsTArray<OwnedAnonBox>& aResult) override;
 
   // nsISVGSVGFrame interface:
   virtual void NotifyViewportOrTransformChanged(uint32_t aFlags) override;
@@ -155,7 +152,7 @@ public:
       InvalidateFrame();
     }
   }
-  
+
   void ClearInvalidRegion() { mInvalidRegion.SetEmpty(); }
 
   const nsRegion& GetInvalidRegion() {
@@ -173,7 +170,7 @@ protected:
   bool mCallingReflowSVG;
 
   /* Returns true if our content is the document element and our document is
-   * embedded in an HTML 'object', 'embed' or 'applet' element. Set
+   * embedded in an HTML 'object' or 'embed' element. Set
    * aEmbeddingFrame to obtain the nsIFrame for the embedding HTML element.
    */
   bool IsRootOfReplacedElementSubDoc(nsIFrame **aEmbeddingFrame = nullptr);
@@ -190,9 +187,7 @@ protected:
   // subtree if we were to use a list (see bug 381285 comment 20).
   nsAutoPtr<nsTHashtable<nsPtrHashKey<nsSVGForeignObjectFrame> > > mForeignObjectHash;
 
-  nsAutoPtr<gfxMatrix> mCanvasTM;
-
-  nsRegion mInvalidRegion; 
+  nsRegion mInvalidRegion;
 
   float mFullZoom;
 

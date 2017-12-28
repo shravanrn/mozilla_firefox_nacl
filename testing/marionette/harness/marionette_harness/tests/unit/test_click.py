@@ -9,8 +9,8 @@ from marionette_driver import By, errors
 from marionette_harness import (
     MarionetteTestCase,
     run_if_e10s,
-    skip_if_e10s,
     skip_if_mobile,
+    WindowManagerMixin,
 )
 
 
@@ -83,7 +83,6 @@ class TestLegacyClick(MarionetteTestCase):
         self.marionette.delete_session()
         self.marionette.start_session()
 
-    @skip_if_e10s("bug 1360446")
     def test_click(self):
         self.marionette.navigate(inline("""
             <button>click me</button>
@@ -101,8 +100,8 @@ class TestLegacyClick(MarionetteTestCase):
         test_html = self.marionette.absolute_url("clicks.html")
         self.marionette.navigate(test_html)
         self.marionette.find_element(By.LINK_TEXT, "333333").click()
-        self.marionette.find_element(By.ID, "username")
-        self.assertEqual(self.marionette.title, "XHTML Test Page")
+        self.marionette.find_element(By.ID, "testDiv")
+        self.assertEqual(self.marionette.title, "Marionette Test")
 
     def test_clicking_an_element_that_is_not_displayed_raises(self):
         test_html = self.marionette.absolute_url("hidden.html")
@@ -115,13 +114,73 @@ class TestLegacyClick(MarionetteTestCase):
         test_html = self.marionette.absolute_url("clicks.html")
         self.marionette.navigate(test_html)
         self.marionette.find_element(By.ID, "overflowLink").click()
-        self.marionette.find_element(By.ID, "username")
-        self.assertEqual(self.marionette.title, "XHTML Test Page")
+        self.marionette.find_element(By.ID, "testDiv")
+        self.assertEqual(self.marionette.title, "Marionette Test")
 
     def test_scroll_into_view_near_end(self):
         self.marionette.navigate(fixed_overlay)
         link = self.marionette.find_element(By.TAG_NAME, "a")
         link.click()
+        self.assertTrue(self.marionette.execute_script("return window.clicked", sandbox=None))
+
+    def test_inclusive_descendant(self):
+        self.marionette.navigate(inline("""
+            <select multiple>
+              <option>first
+              <option>second
+              <option>third
+             </select>"""))
+        select = self.marionette.find_element(By.TAG_NAME, "select")
+
+        # This tests that the pointer-interactability test does not
+        # cause an ElementClickInterceptedException.
+        #
+        # At a <select multiple>'s in-view centre point, you might
+        # find a fully rendered <option>.  Marionette should test that
+        # the paint tree at this point _contains_ <option>, not that the
+        # first element of the paint tree is _equal_ to <select>.
+        select.click()
+
+        # Bug 1413821 - Click does not select an option on Android
+        if self.marionette.session_capabilities["browserName"] != "fennec":
+            self.assertNotEqual(select.get_property("selectedIndex"), -1)
+
+    def test_container_is_select(self):
+        self.marionette.navigate(inline("""
+            <select>
+              <option>foo</option>
+            </select>"""))
+        option = self.marionette.find_element(By.TAG_NAME, "option")
+        option.click()
+        self.assertTrue(option.get_property("selected"))
+
+    def test_container_is_button(self):
+        self.marionette.navigate(inline("""
+          <button onclick="window.clicked = true;">
+            <span><em>foo</em></span>
+          </button>"""))
+        span = self.marionette.find_element(By.TAG_NAME, "span")
+        span.click()
+        self.assertTrue(self.marionette.execute_script("return window.clicked", sandbox=None))
+
+    def test_container_element_outside_view(self):
+        self.marionette.navigate(inline("""
+            <select style="margin-top: 100vh">
+              <option>foo</option>
+            </select>"""))
+        option = self.marionette.find_element(By.TAG_NAME, "option")
+        option.click()
+        self.assertTrue(option.get_property("selected"))
+
+    def test_table_tr(self):
+        self.marionette.navigate(inline("""
+          <table>
+            <tr><td onclick="window.clicked = true;">
+              foo
+            </td></tr>
+          </table>"""))
+        tr = self.marionette.find_element(By.TAG_NAME, "tr")
+        tr.click()
         self.assertTrue(self.marionette.execute_script("return window.clicked", sandbox=None))
 
 
@@ -133,8 +192,7 @@ class TestClick(TestLegacyClick):
     def setUp(self):
         TestLegacyClick.setUp(self)
         self.marionette.delete_session()
-        self.marionette.start_session(
-            {"requiredCapabilities": {"specificationLevel": 1}})
+        self.marionette.start_session({"moz:webdriverClick": True})
 
     def test_click_element_obscured_by_absolute_positioned_element(self):
         self.marionette.navigate(obscured_overlay)
@@ -161,9 +219,10 @@ class TestClick(TestLegacyClick):
             }
             </style>
 
-            <div></div>"""))
+            <div onclick="window.clicked = true;"></div>"""))
 
         self.marionette.find_element(By.TAG_NAME, "div").click()
+        self.assertTrue(self.marionette.execute_script("return window.clicked", sandbox=None))
 
     def test_centre_outside_viewport_horizontally(self):
         self.marionette.navigate(inline("""
@@ -181,9 +240,10 @@ class TestClick(TestLegacyClick):
             }
             </style>
 
-            <div></div>"""))
+            <div onclick="window.clicked = true;"></div>"""))
 
         self.marionette.find_element(By.TAG_NAME, "div").click()
+        self.assertTrue(self.marionette.execute_script("return window.clicked", sandbox=None))
 
     def test_centre_outside_viewport(self):
         self.marionette.navigate(inline("""
@@ -202,9 +262,10 @@ class TestClick(TestLegacyClick):
             }
             </style>
 
-            <div></div>"""))
+            <div onclick="window.clicked = true;"></div>"""))
 
         self.marionette.find_element(By.TAG_NAME, "div").click()
+        self.assertTrue(self.marionette.execute_script("return window.clicked", sandbox=None))
 
     def test_css_transforms(self):
         self.marionette.navigate(inline("""
@@ -220,32 +281,15 @@ class TestClick(TestLegacyClick):
             }
             </style>
 
-            <div></div>"""))
+            <div onclick="window.clicked = true;"></div>"""))
 
         self.marionette.find_element(By.TAG_NAME, "div").click()
+        self.assertTrue(self.marionette.execute_script("return window.clicked", sandbox=None))
 
     def test_input_file(self):
         self.marionette.navigate(inline("<input type=file>"))
         with self.assertRaises(errors.InvalidArgumentException):
             self.marionette.find_element(By.TAG_NAME, "input").click()
-
-    def test_container_element(self):
-        self.marionette.navigate(inline("""
-            <select>
-              <option>foo</option>
-            </select>"""))
-        option = self.marionette.find_element(By.TAG_NAME, "option")
-        option.click()
-        self.assertTrue(option.get_property("selected"))
-
-    def test_container_element_outside_view(self):
-        self.marionette.navigate(inline("""
-            <select style="margin-top: 100vh">
-              <option>foo</option>
-            </select>"""))
-        option = self.marionette.find_element(By.TAG_NAME, "option")
-        option.click()
-        self.assertTrue(option.get_property("selected"))
 
     def test_obscured_element(self):
         self.marionette.navigate(obscured_overlay)
@@ -274,23 +318,6 @@ class TestClick(TestLegacyClick):
             button.click()
         self.assertFalse(self.marionette.execute_script("return window.clicked", sandbox=None))
 
-    def test_inclusive_descendant(self):
-        self.marionette.navigate(inline("""
-            <select multiple>
-              <option>first
-              <option>second
-              <option>third
-             </select>"""))
-        select = self.marionette.find_element(By.TAG_NAME, "select")
-
-        # This tests that the pointer-interactability test does not
-        # cause an ElementClickInterceptedException.
-        #
-        # At a <select multiple>'s in-view centre point, you might
-        # find a fully rendered <option>.  Marionette should test that
-        # the paint tree at this point _contains_ <option>, not that the
-        # first element of the paint tree is _equal_ to <select>.
-        select.click()
 
 
 class TestClickNavigation(MarionetteTestCase):
@@ -314,7 +341,7 @@ class TestClickNavigation(MarionetteTestCase):
     def test_click_link_page_load(self):
         self.marionette.find_element(By.LINK_TEXT, "333333").click()
         self.assertNotEqual(self.marionette.get_url(), self.test_page)
-        self.assertEqual(self.marionette.title, "XHTML Test Page")
+        self.assertEqual(self.marionette.title, "Marionette Test")
 
     @skip_if_mobile("Bug 1325738 - Modal dialogs block execution of code for Fennec")
     def test_click_link_page_load_aborted_by_beforeunload(self):
@@ -340,7 +367,7 @@ class TestClickNavigation(MarionetteTestCase):
             self.close_notification()
 
     def test_click_no_link(self):
-        self.marionette.find_element(By.ID, "showbutton").click()
+        self.marionette.find_element(By.ID, "links").click()
         self.assertEqual(self.marionette.get_url(), self.test_page)
 
     def test_click_option_navigate(self):
@@ -363,3 +390,35 @@ class TestClickNavigation(MarionetteTestCase):
         self.marionette.find_element(By.ID, "history-back").click()
         with self.assertRaises(errors.NoSuchElementException):
             self.marionette.find_element(By.ID, "anchor")
+
+
+class TestClickCloseContext(WindowManagerMixin, MarionetteTestCase):
+
+    def setUp(self):
+        super(TestClickCloseContext, self).setUp()
+
+        self.test_page = self.marionette.absolute_url("clicks.html")
+
+    def tearDown(self):
+        self.close_all_tabs()
+
+        super(TestClickCloseContext, self).tearDown()
+
+    def test_click_close_tab(self):
+        self.marionette.navigate(self.marionette.absolute_url("windowHandles.html"))
+        tab = self.open_tab(
+            lambda: self.marionette.find_element(By.ID, "new-tab").click())
+        self.marionette.switch_to_window(tab)
+
+        self.marionette.navigate(self.test_page)
+        self.marionette.find_element(By.ID, "close-window").click()
+
+    @skip_if_mobile("Fennec doesn't support other chrome windows")
+    def test_click_close_window(self):
+        self.marionette.navigate(self.marionette.absolute_url("windowHandles.html"))
+        win = self.open_window(
+            lambda: self.marionette.find_element(By.ID, "new-window").click())
+        self.marionette.switch_to_window(win)
+
+        self.marionette.navigate(self.test_page)
+        self.marionette.find_element(By.ID, "close-window").click()

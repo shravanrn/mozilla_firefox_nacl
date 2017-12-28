@@ -348,7 +348,7 @@ js::StaticStrings::getUnitStringForElement(JSContext* cx, JSString* str, size_t 
         return nullptr;
     if (c < UNIT_STATIC_LIMIT)
         return getUnit(c);
-    return NewDependentString(cx, str, index, 1);
+    return js::NewInlineString<CanGC>(cx, mozilla::Range<const char16_t>(&c, 1));
 }
 
 MOZ_ALWAYS_INLINE void
@@ -407,7 +407,7 @@ JSExternalString::finalize(js::FreeOp* fop)
     }
 
     const JSStringFinalizer* fin = externalFinalizer();
-    fin->finalize(zone(), fin, const_cast<char16_t*>(rawTwoByteChars()));
+    fin->finalize(fin, const_cast<char16_t*>(rawTwoByteChars()));
 }
 
 #endif /* vm_String_inl_h */

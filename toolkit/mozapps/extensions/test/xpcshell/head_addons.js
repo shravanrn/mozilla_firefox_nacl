@@ -24,6 +24,8 @@ const PREF_SYSTEM_ADDON_SET           = "extensions.systemAddonSet";
 const PREF_SYSTEM_ADDON_UPDATE_URL    = "extensions.systemAddon.update.url";
 const PREF_APP_UPDATE_ENABLED         = "app.update.enabled";
 const PREF_ALLOW_NON_MPC              = "extensions.allow-non-mpc-extensions";
+const PREF_DISABLE_SECURITY = ("security.turn_off_all_security_so_that_" +
+                               "viruses_can_take_over_this_computer");
 
 // Forcibly end the test if it runs longer than 15 minutes
 const TIMEOUT_MS = 900000;
@@ -42,7 +44,6 @@ Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/FileUtils.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
 Components.utils.import("resource://gre/modules/NetUtil.jsm");
-Components.utils.import("resource://gre/modules/Promise.jsm");
 const { OS } = Components.utils.import("resource://gre/modules/osfile.jsm", {});
 Components.utils.import("resource://gre/modules/AsyncShutdown.jsm");
 
@@ -75,6 +76,7 @@ const {
   createUpdateRDF,
   getFileForAddon,
   manuallyUninstall,
+  overrideBuiltIns,
   promiseAddonEvent,
   promiseCompleteAllInstalls,
   promiseCompleteInstall,
@@ -86,6 +88,7 @@ const {
   promiseSetExtensionModifiedTime,
   promiseShutdownManager,
   promiseStartupManager,
+  promiseWebExtensionStartup,
   promiseWriteProxyFileToDir,
   registerDirectory,
   setExtensionModifiedTime,
@@ -802,7 +805,7 @@ function getExpectedInstall(aAddon) {
   if (gExpectedInstalls instanceof Array)
     return gExpectedInstalls.shift();
   if (!aAddon || !aAddon.id)
-    return gExpectedInstalls["NO_ID"].shift();
+    return gExpectedInstalls.NO_ID.shift();
   let id = aAddon.id;
   if (!(id in gExpectedInstalls) || !(gExpectedInstalls[id] instanceof Array))
     do_throw("Wasn't expecting events for " + id);
@@ -1066,19 +1069,6 @@ const EXTENSIONS_DB = "extensions.json";
 var gExtensionsJSON = gProfD.clone();
 gExtensionsJSON.append(EXTENSIONS_DB);
 
-function promiseWebExtensionStartup() {
-  const {Management} = Components.utils.import("resource://gre/modules/Extension.jsm", {});
-
-  return new Promise(resolve => {
-    let listener = (evt, extension) => {
-      Management.off("ready", listener);
-      resolve(extension);
-    };
-
-    Management.on("ready", listener);
-  });
-}
-
 function promiseInstallWebExtension(aData) {
   let addonFile = createTempWebExtensionFile(aData);
 
@@ -1207,7 +1197,7 @@ function interpolateAndServeFile(request, response) {
  * @param  url
  *         the actual URL
  * @param  file
- *         nsILocalFile representing a static file
+ *         nsIFile representing a static file
  */
 function mapUrlToFile(url, file, server) {
   server.registerPathHandler(url, interpolateAndServeFile);
@@ -1289,7 +1279,7 @@ function saveJSON(aData, aFile) {
   let stream = FileUtils.openSafeFileOutputStream(aFile);
   let converter = AM_Cc["@mozilla.org/intl/converter-output-stream;1"].
     createInstance(AM_Ci.nsIConverterOutputStream);
-  converter.init(stream, "UTF-8", 0, 0x0000);
+  converter.init(stream, "UTF-8");
   // XXX pretty print the JSON while debugging
   converter.writeString(JSON.stringify(aData, null, 2));
   converter.flush();
@@ -1348,8 +1338,8 @@ async function updateAllSystemAddons(xml, testserver) {
 
   await serveSystemUpdate(xml, function() {
     return new Promise(resolve => {
-      Services.obs.addObserver(function() {
-        Services.obs.removeObserver(arguments.callee, "addons-background-update-complete");
+      Services.obs.addObserver(function observer() {
+        Services.obs.removeObserver(observer, "addons-background-update-complete");
 
         resolve();
       }, "addons-background-update-complete");
@@ -1542,12 +1532,23 @@ async function setupSystemAddonConditions(setup, distroDir) {
   do_print("Clearing existing database.");
   Services.prefs.clearUserPref(PREF_SYSTEM_ADDON_SET);
   distroDir.leafName = "empty";
+
+  let updateList = [];
+  awaitPromise(overrideBuiltIns({ "system": updateList }));
   startupManager(false);
   await promiseShutdownManager();
 
   do_print("Setting up conditions.");
   await setup.setup();
 
+  if (distroDir) {
+    if (distroDir.path.endsWith("hidden")) {
+      updateList = ["system1@tests.mozilla.org", "system2@tests.mozilla.org"];
+    } else if (distroDir.path.endsWith("prefilled")) {
+      updateList = ["system2@tests.mozilla.org", "system3@tests.mozilla.org"];
+    }
+  }
+  awaitPromise(overrideBuiltIns({ "system": updateList }));
   startupManager(false);
 
   // Make sure the initial state is correct
@@ -1593,7 +1594,19 @@ async function verifySystemAddonState(initialState, finalState = undefined, alre
   await checkInstalledSystemAddons(...finalState, distroDir);
 
   // Check that the new state is active after a restart
-  await promiseRestartManager();
+  await promiseShutdownManager();
+
+  let updateList = [];
+
+  if (distroDir) {
+    if (distroDir.path.endsWith("hidden")) {
+      updateList = ["system1@tests.mozilla.org", "system2@tests.mozilla.org"];
+    } else if (distroDir.path.endsWith("prefilled")) {
+      updateList = ["system2@tests.mozilla.org", "system3@tests.mozilla.org"];
+    }
+  }
+  awaitPromise(overrideBuiltIns({ "system": updateList }));
+  startupManager();
   await checkInstalledSystemAddons(finalState, distroDir);
 }
 

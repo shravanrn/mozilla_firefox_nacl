@@ -24,13 +24,13 @@
 #include "mozilla/Maybe.h"
 #include "mozilla/TypeTraits.h"
 #include "mozilla/dom/Element.h"
-#include "mozilla/dom/EncodingUtils.h"
 #include "mozilla/dom/PermissionMessageUtils.h"
 #include "mozilla/dom/TabChild.h"
 #include "mozilla/dom/indexedDB/PBackgroundIDBDatabaseFileChild.h"
 #include "mozilla/dom/indexedDB/PIndexedDBPermissionRequestChild.h"
 #include "mozilla/dom/ipc/PendingIPCBlobChild.h"
 #include "mozilla/dom/IPCBlobUtils.h"
+#include "mozilla/Encoding.h"
 #include "mozilla/ipc/BackgroundUtils.h"
 #include "mozilla/TaskQueue.h"
 #include "nsCOMPtr.h"
@@ -733,9 +733,7 @@ DispatchErrorEvent(IDBRequest* aRequest,
   MOZ_ASSERT(NS_FAILED(aErrorCode));
   MOZ_ASSERT(NS_ERROR_GET_MODULE(aErrorCode) == NS_ERROR_MODULE_DOM_INDEXEDDB);
 
-  PROFILER_LABEL("IndexedDB",
-                 "DispatchErrorEvent",
-                 js::ProfileEntry::Category::STORAGE);
+  AUTO_PROFILER_LABEL("IndexedDB:DispatchErrorEvent", STORAGE);
 
   RefPtr<IDBRequest> request = aRequest;
   RefPtr<IDBTransaction> transaction = aTransaction;
@@ -808,9 +806,7 @@ DispatchSuccessEvent(ResultHelper* aResultHelper,
 {
   MOZ_ASSERT(aResultHelper);
 
-  PROFILER_LABEL("IndexedDB",
-                 "DispatchSuccessEvent",
-                 js::ProfileEntry::Category::STORAGE);
+  AUTO_PROFILER_LABEL("IndexedDB:DispatchSuccessEvent", STORAGE);
 
   RefPtr<IDBRequest> request = aResultHelper->Request();
   MOZ_ASSERT(request);
@@ -1330,28 +1326,22 @@ private:
       return NS_OK;
     }
 
-    nsAutoCString encoding;
-    // The BOM sniffing is baked into the "decode" part of the Encoding
-    // Standard, which the File API references.
-    if (!nsContentUtils::CheckForBOM(
-          reinterpret_cast<const unsigned char *>(data.get()),
-          data.Length(),
-          encoding)) {
-      // BOM sniffing failed. Try the API argument.
-      if (!EncodingUtils::FindEncodingForLabel(mFileRequest->GetEncoding(),
-                                               encoding)) {
-        // API argument failed. Since we are dealing with a file system file,
-        // we don't have a meaningful type attribute for the blob available,
-        // so proceeding to the next step, which is defaulting to UTF-8.
-        encoding.AssignLiteral("UTF-8");
-      }
+    // Try the API argument.
+    const Encoding* encoding =
+      Encoding::ForLabel(mFileRequest->GetEncoding());
+    if (!encoding) {
+      // API argument failed. Since we are dealing with a file system file,
+      // we don't have a meaningful type attribute for the blob available,
+      // so proceeding to the next step, which is defaulting to UTF-8.
+      encoding = UTF_8_ENCODING;
     }
 
     nsString tmpString;
-    rv = nsContentUtils::ConvertStringFromEncoding(encoding, data, tmpString);
+    Tie(rv, encoding) = encoding->Decode(data, tmpString);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return NS_ERROR_DOM_FILEHANDLE_UNKNOWN_ERR;
     }
+    rv = NS_OK;
 
     if (NS_WARN_IF(!xpc::StringToJsval(aCx, tmpString, aResult))) {
       return NS_ERROR_DOM_FILEHANDLE_UNKNOWN_ERR;
@@ -1487,11 +1477,12 @@ DispatchFileHandleSuccessEvent(FileHandleResultHelper* aResultHelper)
 class BackgroundRequestChild::PreprocessHelper final
   : public CancelableRunnable
   , public nsIInputStreamCallback
+  , public nsIFileMetadataCallback
 {
   typedef std::pair<nsCOMPtr<nsIInputStream>,
                     nsCOMPtr<nsIInputStream>> StreamPair;
 
-  nsCOMPtr<nsIEventTarget> mOwningThread;
+  nsCOMPtr<nsIEventTarget> mOwningEventTarget;
   nsTArray<StreamPair> mStreamPairs;
   nsTArray<RefPtr<JS::WasmModule>> mModuleSet;
   BackgroundRequestChild* mActor;
@@ -1509,7 +1500,7 @@ class BackgroundRequestChild::PreprocessHelper final
 public:
   PreprocessHelper(uint32_t aModuleSetIndex, BackgroundRequestChild* aActor)
     : CancelableRunnable("indexedDB::BackgroundRequestChild::PreprocessHelper")
-    , mOwningThread(aActor->GetActorEventTarget())
+    , mOwningEventTarget(aActor->GetActorEventTarget())
     , mActor(aActor)
     , mCurrentBytecodeFileDesc(nullptr)
     , mCurrentCompiledFileDesc(nullptr)
@@ -1524,10 +1515,10 @@ public:
   bool
   IsOnOwningThread() const
   {
-    MOZ_ASSERT(mOwningThread);
+    MOZ_ASSERT(mOwningEventTarget);
 
     bool current;
-    return NS_SUCCEEDED(mOwningThread->IsOnCurrentThread(&current)) && current;
+    return NS_SUCCEEDED(mOwningEventTarget->IsOnCurrentThread(&current)) && current;
   }
 
   void
@@ -1570,9 +1561,13 @@ private:
   void
   ContinueWithStatus(nsresult aStatus);
 
+  nsresult
+  DataIsReady(nsIInputStream* aInputStream);
+
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_NSIRUNNABLE
   NS_DECL_NSIINPUTSTREAMCALLBACK
+  NS_DECL_NSIFILEMETADATACALLBACK
 
   virtual nsresult
   Cancel() override;
@@ -1760,6 +1755,7 @@ BackgroundFactoryRequestChild::BackgroundFactoryRequestChild(
                                                uint64_t aRequestedVersion)
   : BackgroundRequestChildBase(aOpenRequest)
   , mFactory(aFactory)
+  , mDatabaseActor(nullptr)
   , mRequestedVersion(aRequestedVersion)
   , mIsDeleteOp(aIsDeleteOp)
 {
@@ -1784,6 +1780,15 @@ BackgroundFactoryRequestChild::GetOpenDBRequest() const
   return static_cast<IDBOpenDBRequest*>(mRequest.get());
 }
 
+void
+BackgroundFactoryRequestChild::SetDatabaseActor(BackgroundDatabaseChild* aActor)
+{
+  AssertIsOnOwningThread();
+  MOZ_ASSERT(!aActor || !mDatabaseActor);
+
+  mDatabaseActor = aActor;
+}
+
 bool
 BackgroundFactoryRequestChild::HandleResponse(nsresult aResponse)
 {
@@ -1794,6 +1799,11 @@ BackgroundFactoryRequestChild::HandleResponse(nsresult aResponse)
   mRequest->Reset();
 
   DispatchErrorEvent(mRequest, aResponse);
+
+  if (mDatabaseActor) {
+    mDatabaseActor->ReleaseDOMObject();
+    MOZ_ASSERT(!mDatabaseActor);
+  }
 
   return true;
 }
@@ -1813,12 +1823,15 @@ BackgroundFactoryRequestChild::HandleResponse(
   IDBDatabase* database = databaseActor->GetDOMObject();
   if (!database) {
     databaseActor->EnsureDOMObject();
+    MOZ_ASSERT(mDatabaseActor);
 
     database = databaseActor->GetDOMObject();
     MOZ_ASSERT(database);
 
     MOZ_ASSERT(!database->IsClosed());
   }
+
+  MOZ_ASSERT(mDatabaseActor == databaseActor);
 
   if (database->IsClosed()) {
     // If the database was closed already, which is only possible if we fired an
@@ -1832,6 +1845,7 @@ BackgroundFactoryRequestChild::HandleResponse(
   }
 
   databaseActor->ReleaseDOMObject();
+  MOZ_ASSERT(!mDatabaseActor);
 
   return true;
 }
@@ -1851,6 +1865,8 @@ BackgroundFactoryRequestChild::HandleResponse(
   MOZ_ASSERT(successEvent);
 
   DispatchSuccessEvent(&helper, successEvent);
+
+  MOZ_ASSERT(!mDatabaseActor);
 
   return true;
 }
@@ -2100,6 +2116,8 @@ BackgroundDatabaseChild::EnsureDOMObject()
 
   mDatabase = mTemporaryStrongDatabase;
   mSpec.forget();
+
+  mOpenRequestActor->SetDatabaseActor(this);
 }
 
 void
@@ -2110,6 +2128,8 @@ BackgroundDatabaseChild::ReleaseDOMObject()
   mTemporaryStrongDatabase->AssertIsOnOwningThread();
   MOZ_ASSERT(mOpenRequestActor);
   MOZ_ASSERT(mDatabase == mTemporaryStrongDatabase);
+
+  mOpenRequestActor->SetDatabaseActor(nullptr);
 
   mOpenRequestActor = nullptr;
 
@@ -2233,17 +2253,7 @@ BackgroundDatabaseChild::RecvPBackgroundIDBVersionChangeTransactionConstructor(
                                         request,
                                         aNextObjectStoreId,
                                         aNextIndexId);
-  if (NS_WARN_IF(!transaction)) {
-    // This can happen if we receive events after a worker has begun its
-    // shutdown process.
-    MOZ_ASSERT(!NS_IsMainThread());
-
-    // Report this to the console.
-    IDB_REPORT_INTERNAL_ERR();
-
-    MOZ_ALWAYS_TRUE(aActor->SendDeleteMe());
-    return IPC_OK();
-  }
+  MOZ_ASSERT(transaction);
 
   transaction->AssertIsOnOwningThread();
 
@@ -3538,6 +3548,17 @@ PreprocessHelper::WaitForStreamReady(nsIInputStream* aInputStream)
   MOZ_ASSERT(!IsOnOwningThread());
   MOZ_ASSERT(aInputStream);
 
+  nsCOMPtr<nsIAsyncFileMetadata> asyncFileMetadata =
+    do_QueryInterface(aInputStream);
+  if (asyncFileMetadata) {
+    nsresult rv = asyncFileMetadata->AsyncWait(this, mTaskQueueEventTarget);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    return NS_OK;
+  }
+
   nsCOMPtr<nsIAsyncInputStream> asyncStream = do_QueryInterface(aInputStream);
   if (!asyncStream) {
     return NS_ERROR_NO_INTERFACE;
@@ -3569,11 +3590,11 @@ PreprocessHelper::ContinueWithStatus(nsresult aStatus)
     MOZ_ASSERT(mResultCode == NS_OK);
     mResultCode = aStatus;
 
-    eventTarget = mOwningThread;
+    eventTarget = mOwningEventTarget;
   } else if (mStreamPairs.IsEmpty()) {
     // If all the streams have been processed, we can go back to the owning
     // thread.
-    eventTarget = mOwningThread;
+    eventTarget = mOwningEventTarget;
   } else {
     // Continue the processing.
     eventTarget = mTaskQueueEventTarget;
@@ -3584,7 +3605,8 @@ PreprocessHelper::ContinueWithStatus(nsresult aStatus)
 }
 
 NS_IMPL_ISUPPORTS_INHERITED(BackgroundRequestChild::PreprocessHelper,
-                            CancelableRunnable, nsIInputStreamCallback)
+                            CancelableRunnable, nsIInputStreamCallback,
+                            nsIFileMetadataCallback)
 
 NS_IMETHODIMP
 BackgroundRequestChild::
@@ -3602,6 +3624,23 @@ PreprocessHelper::Run()
 NS_IMETHODIMP
 BackgroundRequestChild::
 PreprocessHelper::OnInputStreamReady(nsIAsyncInputStream* aStream)
+{
+  return DataIsReady(aStream);
+}
+
+NS_IMETHODIMP
+BackgroundRequestChild::
+PreprocessHelper::OnFileMetadataReady(nsIAsyncFileMetadata* aObject)
+{
+  nsCOMPtr<nsIInputStream> stream = do_QueryInterface(aObject);
+  MOZ_ASSERT(stream, "It was a stream before!");
+
+  return DataIsReady(stream);
+}
+
+nsresult
+BackgroundRequestChild::
+PreprocessHelper::DataIsReady(nsIInputStream* aStream)
 {
   MOZ_ASSERT(!IsOnOwningThread());
   MOZ_ASSERT(aStream);

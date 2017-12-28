@@ -3,24 +3,18 @@
 Cu.import("resource://services-common/blocklist-updater.js");
 Cu.import("resource://testing-common/httpd.js");
 
-const { Kinto } = Cu.import("resource://services-common/kinto-offline-client.js", {});
-const { FirefoxAdapter } = Cu.import("resource://services-common/kinto-storage-adapter.js", {});
 const { NetUtil } = Cu.import("resource://gre/modules/NetUtil.jsm", {});
 const { OneCRLBlocklistClient } = Cu.import("resource://services-common/blocklist-clients.js", {});
 const { UptakeTelemetry } = Cu.import("resource://services-common/uptake-telemetry.js", {});
 
 let server;
 
-const PREF_BLOCKLIST_BUCKET            = "services.blocklist.bucket";
 const PREF_BLOCKLIST_ENFORCE_SIGNING   = "services.blocklist.signing.enforced";
-const PREF_BLOCKLIST_ONECRL_COLLECTION = "services.blocklist.onecrl.collection";
 const PREF_SETTINGS_SERVER             = "services.settings.server";
 const PREF_SIGNATURE_ROOT              = "security.content.signature.root_hash";
 
 // Telemetry reports.
 const TELEMETRY_HISTOGRAM_KEY = OneCRLBlocklistClient.identifier;
-
-const kintoFilename = "kinto.sqlite";
 
 const CERT_DIR = "test_blocklist_signatures/";
 const CHAIN_FILES =
@@ -59,35 +53,17 @@ function getCertChain() {
   return chain.join("\n");
 }
 
-function* checkRecordCount(count) {
-  // open the collection manually
-  const base = Services.prefs.getCharPref(PREF_SETTINGS_SERVER);
-  const bucket = Services.prefs.getCharPref(PREF_BLOCKLIST_BUCKET);
-  const collectionName =
-      Services.prefs.getCharPref(PREF_BLOCKLIST_ONECRL_COLLECTION);
-
-  const sqliteHandle = yield FirefoxAdapter.openConnection({path: kintoFilename});
-  const config = {
-    remote: base,
-    bucket,
-    adapter: FirefoxAdapter,
-    adapterOptions: {sqliteHandle},
-  };
-
-  const db = new Kinto(config);
-  const collection = db.collection(collectionName);
-
-  // Check we have the expected number of records
-  let records = yield collection.list();
-  do_check_eq(count, records.data.length);
-
-  // Close the collection so the test can exit cleanly
-  yield sqliteHandle.close();
+async function checkRecordCount(count) {
+  await OneCRLBlocklistClient.openCollection(async (collection) => {
+    // Check we have the expected number of records
+    const records = await collection.list();
+    do_check_eq(count, records.data.length);
+  });
 }
 
 // Check to ensure maybeSync is called with correct values when a changes
 // document contains information on when a collection was last modified
-add_task(function* test_check_signatures() {
+add_task(async function test_check_signatures() {
   const port = server.identity.primaryPort;
 
   // a response to give the client when the cert chain is expected
@@ -310,7 +286,7 @@ add_task(function* test_check_signatures() {
   // With all of this set up, we attempt a sync. This will resolve if all is
   // well and throw if something goes wrong.
   // We don't want to load initial json dumps in this test suite.
-  yield OneCRLBlocklistClient.maybeSync(1000, startTime, {loadDump: false});
+  await OneCRLBlocklistClient.maybeSync(1000, startTime, {loadDump: false});
 
   let endHistogram = getUptakeTelemetrySnapshot(TELEMETRY_HISTOGRAM_KEY);
 
@@ -347,7 +323,7 @@ add_task(function* test_check_signatures() {
       [RESPONSE_META_TWO_ITEMS_SIG]
   };
   registerHandlers(twoItemsResponses);
-  yield OneCRLBlocklistClient.maybeSync(3000, startTime);
+  await OneCRLBlocklistClient.maybeSync(3000, startTime);
 
   // Check the collection with one addition and one removal has a valid
   // signature
@@ -378,7 +354,7 @@ add_task(function* test_check_signatures() {
       [RESPONSE_META_THREE_ITEMS_SIG]
   };
   registerHandlers(oneAddedOneRemovedResponses);
-  yield OneCRLBlocklistClient.maybeSync(4000, startTime);
+  await OneCRLBlocklistClient.maybeSync(4000, startTime);
 
   // Check the signature is still valid with no operation (no changes)
 
@@ -400,7 +376,7 @@ add_task(function* test_check_signatures() {
       [RESPONSE_META_THREE_ITEMS_SIG]
   };
   registerHandlers(noOpResponses);
-  yield OneCRLBlocklistClient.maybeSync(4100, startTime);
+  await OneCRLBlocklistClient.maybeSync(4100, startTime);
 
   // Check the collection is reset when the signature is invalid
 
@@ -457,7 +433,7 @@ add_task(function* test_check_signatures() {
 
   startHistogram = getUptakeTelemetrySnapshot(TELEMETRY_HISTOGRAM_KEY);
 
-  yield OneCRLBlocklistClient.maybeSync(5000, startTime);
+  await OneCRLBlocklistClient.maybeSync(5000, startTime);
 
   endHistogram = getUptakeTelemetrySnapshot(TELEMETRY_HISTOGRAM_KEY);
 
@@ -486,10 +462,10 @@ add_task(function* test_check_signatures() {
   };
 
   // ensure our collection hasn't been replaced with an older, empty one
-  yield checkRecordCount(2);
+  await checkRecordCount(2);
 
   registerHandlers(badSigGoodOldResponses);
-  yield OneCRLBlocklistClient.maybeSync(5000, startTime);
+  await OneCRLBlocklistClient.maybeSync(5000, startTime);
 
   const allBadSigResponses = {
     // In this test, we deliberately serve only a bad signature.
@@ -509,10 +485,10 @@ add_task(function* test_check_signatures() {
   startHistogram = getUptakeTelemetrySnapshot(TELEMETRY_HISTOGRAM_KEY);
   registerHandlers(allBadSigResponses);
   try {
-    yield OneCRLBlocklistClient.maybeSync(6000, startTime);
+    await OneCRLBlocklistClient.maybeSync(6000, startTime);
     do_throw("Sync should fail (the signature is intentionally bad)");
   } catch (e) {
-    yield checkRecordCount(2);
+    await checkRecordCount(2);
   }
 
   // Ensure that the failure is reflected in the accumulated telemetry:

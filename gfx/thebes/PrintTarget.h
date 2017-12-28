@@ -9,6 +9,7 @@
 #include "mozilla/RefPtr.h"
 #include "mozilla/gfx/2D.h"
 #include "nsISupportsImpl.h"
+#include "nsStringFwd.h"
 
 namespace mozilla {
 namespace gfx {
@@ -144,8 +145,8 @@ protected:
   virtual ~PrintTarget();
 
   static already_AddRefed<DrawTarget>
-  CreateRecordingDrawTarget(DrawEventRecorder* aRecorder,
-                            DrawTarget* aDrawTarget);
+  CreateWrapAndRecordDrawTarget(DrawEventRecorder* aRecorder,
+                                DrawTarget* aDrawTarget);
 
   cairo_surface_t* mCairoSurface;
   RefPtr<DrawTarget> mRefDT; // reference DT

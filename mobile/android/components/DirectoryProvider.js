@@ -18,10 +18,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "JNI", "resource://gre/modules/JNI.jsm")
 // -----------------------------------------------------------------------
 
 const NS_APP_CACHE_PARENT_DIR = "cachePDir";
-const NS_APP_SEARCH_DIR       = "SrchPlugns";
-const NS_APP_SEARCH_DIR_LIST  = "SrchPluginsDL";
 const NS_APP_DISTRIBUTION_SEARCH_DIR_LIST = "SrchPluginsDistDL";
-const NS_APP_USER_SEARCH_DIR  = "UsrSrchPlugns";
 const NS_XPCOM_CURRENT_PROCESS_DIR = "XCurProcD";
 const XRE_APP_DISTRIBUTION_DIR = "XREAppDist";
 const XRE_UPDATE_ROOT_DIR     = "UpdRootD";
@@ -113,7 +110,7 @@ DirectoryProvider.prototype = {
       return;
 
     let curLocale = "";
-    let reqLocales = Services.locales.getRequestedLocales();
+    let reqLocales = Services.locale.getRequestedLocales();
     if (reqLocales.length > 0) {
       curLocale = reqLocales[0];
     }
@@ -134,37 +131,16 @@ DirectoryProvider.prototype = {
       defLocalePlugins.append(defLocale);
       if (defLocalePlugins.exists())
         array.push(defLocalePlugins);
-    } catch(e) {
+    } catch (e) {
     }
   },
 
   getFiles: function(prop) {
-    if (prop != NS_APP_SEARCH_DIR_LIST &&
-        prop != NS_APP_DISTRIBUTION_SEARCH_DIR_LIST)
+    if (prop != NS_APP_DISTRIBUTION_SEARCH_DIR_LIST)
       return null;
 
     let result = [];
-
-    if (prop == NS_APP_DISTRIBUTION_SEARCH_DIR_LIST) {
-      this._appendDistroSearchDirs(result);
-    }
-    else {
-      /**
-       * We want to preserve the following order, since the search service
-       * loads engines in first-loaded-wins order.
-       *   - distro search plugin locations (loaded separately by the search
-       *     service)
-       *   - user search plugin locations (profile)
-       *   - app search plugin location (shipped engines)
-       */
-      let appUserSearchDir = FileUtils.getDir(NS_APP_USER_SEARCH_DIR, [], false);
-      if (appUserSearchDir.exists())
-        result.push(appUserSearchDir);
-
-      let appSearchDir = FileUtils.getDir(NS_APP_SEARCH_DIR, [], false);
-      if (appSearchDir.exists())
-        result.push(appSearchDir);
-    }
+    this._appendDistroSearchDirs(result);
 
     return {
       QueryInterface: XPCOMUtils.generateQI([Ci.nsISimpleEnumerator]),

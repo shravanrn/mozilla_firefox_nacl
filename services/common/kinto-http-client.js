@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+"use strict";
 
 /*
  * This file is generated from kinto-http.js - do not modify directly.
@@ -811,10 +812,10 @@ let KintoClientBase = (_dec = (0, _utils.nobatch)("This operation is not support
       return processNextPage(nextPage);
     };
 
-    const processNextPage = async function (nextPage) {
+    const processNextPage = async nextPage => {
       const { headers } = options;
       return handleResponse((await this.http.request(nextPage, { headers })));
-    }.bind(this);
+    };
 
     const pageResults = (results, nextPage, etag, totalRecords) => {
       // ETag string is supposed to be opaque and stored «as-is».

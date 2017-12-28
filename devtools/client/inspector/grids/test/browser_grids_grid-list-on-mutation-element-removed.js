@@ -25,7 +25,7 @@ add_task(function* () {
   let { highlighters, store } = inspector;
 
   yield selectNode("#grid", inspector);
-  let gridList = doc.querySelector("#grid-list");
+  let gridList = doc.getElementById("grid-list");
   let checkbox = gridList.children[0].querySelector("input");
 
   info("Checking the initial state of the Grid Inspector.");
@@ -51,13 +51,13 @@ add_task(function* () {
   let onHighlighterHidden = highlighters.once("grid-highlighter-hidden");
   onCheckboxChange = waitUntilState(store, state => state.grids.length == 0);
   testActor.eval(`
-    content.document.getElementById("grid").remove();
+    document.getElementById("grid").remove();
   `);
   yield onHighlighterHidden;
   yield onCheckboxChange;
 
   info("Checking the CSS grid highlighter is not shown.");
   ok(!highlighters.gridHighlighterShown, "No CSS grid highlighter is shown.");
-  let noGridList = doc.querySelector(".layout-no-grids");
+  let noGridList = doc.querySelector(".grid-pane .devtools-sidepanel-no-result");
   ok(noGridList, "The message no grid containers is displayed.");
 });

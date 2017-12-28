@@ -96,27 +96,20 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLObjectElement,
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mValidity)
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
-NS_IMPL_ADDREF_INHERITED(HTMLObjectElement, Element)
-NS_IMPL_RELEASE_INHERITED(HTMLObjectElement, Element)
-
-NS_INTERFACE_TABLE_HEAD_CYCLE_COLLECTION_INHERITED(HTMLObjectElement)
-  NS_INTERFACE_TABLE_INHERITED(HTMLObjectElement,
-                               nsIDOMHTMLObjectElement,
-                               imgINotificationObserver,
-                               nsIRequestObserver,
-                               nsIStreamListener,
-                               nsIFrameLoaderOwner,
-                               nsIObjectLoadingContent,
-                               nsIImageLoadingContent,
-                               imgIOnloadBlocker,
-                               nsIChannelEventSink,
-                               nsIConstraintValidation)
-NS_INTERFACE_TABLE_TAIL_INHERITING(nsGenericHTMLFormElement)
+NS_IMPL_ISUPPORTS_CYCLE_COLLECTION_INHERITED(HTMLObjectElement,
+                                             nsGenericHTMLFormElement,
+                                             nsIDOMHTMLObjectElement,
+                                             imgINotificationObserver,
+                                             nsIRequestObserver,
+                                             nsIStreamListener,
+                                             nsIFrameLoaderOwner,
+                                             nsIObjectLoadingContent,
+                                             nsIImageLoadingContent,
+                                             imgIOnloadBlocker,
+                                             nsIChannelEventSink,
+                                             nsIConstraintValidation)
 
 NS_IMPL_ELEMENT_CLONE(HTMLObjectElement)
-
-// nsIConstraintValidation
-NS_IMPL_NSICONSTRAINTVALIDATION(HTMLObjectElement)
 
 #ifdef XP_MACOSX
 
@@ -131,7 +124,9 @@ class PluginFocusSetter : public Runnable
 {
 public:
   PluginFocusSetter(nsIWidget* aWidget, Element* aElement)
-  : mWidget(aWidget), mElement(aElement)
+    : Runnable("PluginFocusSetter")
+    , mWidget(aWidget)
+    , mElement(aElement)
   {
   }
 
@@ -269,7 +264,8 @@ HTMLObjectElement::BindToTree(nsIDocument *aDocument,
   // If we already have all the children, start the load.
   if (mIsDoneAddingChildren && !pluginDoc) {
     void (HTMLObjectElement::*start)() = &HTMLObjectElement::StartObjectLoad;
-    nsContentUtils::AddScriptRunner(NewRunnableMethod(this, start));
+    nsContentUtils::AddScriptRunner(
+      NewRunnableMethod("dom::HTMLObjectElement::BindToTree", this, start));
   }
 
   return NS_OK;
@@ -358,7 +354,7 @@ HTMLObjectElement::IsHTMLFocusable(bool aWithMouse,
   nsIDocument *doc = GetComposedDoc();
   if (!doc || doc->HasFlag(NODE_IS_EDITABLE)) {
     if (aTabIndex) {
-      GetTabIndex(aTabIndex);
+      *aTabIndex = TabIndex();
     }
 
     *aIsFocusable = false;
@@ -374,7 +370,7 @@ HTMLObjectElement::IsHTMLFocusable(bool aWithMouse,
     // Has plugin content: let the plugin decide what to do in terms of
     // internal focus from mouse clicks
     if (aTabIndex) {
-      GetTabIndex(aTabIndex);
+      *aTabIndex = TabIndex();
     }
 
     *aIsFocusable = true;
@@ -560,7 +556,7 @@ HTMLObjectElement::IntrinsicState() const
 uint32_t
 HTMLObjectElement::GetCapabilities() const
 {
-  return nsObjectLoadingContent::GetCapabilities() | eSupportClassID;
+  return nsObjectLoadingContent::GetCapabilities();
 }
 
 void

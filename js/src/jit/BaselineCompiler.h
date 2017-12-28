@@ -33,6 +33,7 @@ namespace jit {
     _(JSOP_NOP)                \
     _(JSOP_NOP_DESTRUCTURING)  \
     _(JSOP_LABEL)              \
+    _(JSOP_ITERNEXT)           \
     _(JSOP_POP)                \
     _(JSOP_POPN)               \
     _(JSOP_DUPAT)              \
@@ -122,6 +123,9 @@ namespace jit {
     _(JSOP_CALLELEM)           \
     _(JSOP_DELELEM)            \
     _(JSOP_STRICTDELELEM)      \
+    _(JSOP_GETELEM_SUPER)      \
+    _(JSOP_SETELEM_SUPER)      \
+    _(JSOP_STRICTSETELEM_SUPER) \
     _(JSOP_IN)                 \
     _(JSOP_HASOWN)             \
     _(JSOP_GETGNAME)           \
@@ -136,6 +140,9 @@ namespace jit {
     _(JSOP_CALLPROP)           \
     _(JSOP_DELPROP)            \
     _(JSOP_STRICTDELPROP)      \
+    _(JSOP_GETPROP_SUPER)      \
+    _(JSOP_SETPROP_SUPER)      \
+    _(JSOP_STRICTSETPROP_SUPER) \
     _(JSOP_LENGTH)             \
     _(JSOP_GETBOUNDNAME)       \
     _(JSOP_GETALIASEDVAR)      \
@@ -216,6 +223,8 @@ namespace jit {
     _(JSOP_FINALYIELDRVAL)     \
     _(JSOP_RESUME)             \
     _(JSOP_CALLEE)             \
+    _(JSOP_SUPERBASE)          \
+    _(JSOP_SUPERFUN)           \
     _(JSOP_GETRVAL)            \
     _(JSOP_SETRVAL)            \
     _(JSOP_RETRVAL)            \
@@ -225,6 +234,7 @@ namespace jit {
     _(JSOP_CHECKISOBJ)         \
     _(JSOP_CHECKISCALLABLE)    \
     _(JSOP_CHECKTHIS)          \
+    _(JSOP_CHECKTHISREINIT)    \
     _(JSOP_CHECKRETURN)        \
     _(JSOP_NEWTARGET)          \
     _(JSOP_SUPERCALL)          \
@@ -243,9 +253,12 @@ namespace jit {
     _(JSOP_IS_CONSTRUCTING)    \
     _(JSOP_TRY_DESTRUCTURING_ITERCLOSE) \
     _(JSOP_CHECKCLASSHERITAGE) \
+    _(JSOP_INITHOMEOBJECT)     \
     _(JSOP_BUILTINPROTO)       \
     _(JSOP_OBJWITHPROTO)       \
-    _(JSOP_FUNWITHPROTO)
+    _(JSOP_FUNWITHPROTO)       \
+    _(JSOP_CLASSCONSTRUCTOR)   \
+    _(JSOP_DERIVEDCONSTRUCTOR)
 
 class BaselineCompiler : public BaselineCompilerSpecific
 {
@@ -291,7 +304,7 @@ class BaselineCompiler : public BaselineCompilerSpecific
   private:
     MethodStatus emitBody();
 
-    MOZ_MUST_USE bool emitCheckThis(ValueOperand val);
+    MOZ_MUST_USE bool emitCheckThis(ValueOperand val, bool reinit=false);
     void emitLoadReturnValue(ValueOperand val);
 
     void emitInitializeLocals();
@@ -363,6 +376,8 @@ class BaselineCompiler : public BaselineCompilerSpecific
     void getEnvironmentCoordinateObject(Register reg);
     Address getEnvironmentCoordinateAddressFromObject(Register objReg, Register reg);
     Address getEnvironmentCoordinateAddress(Register reg);
+
+    void getThisEnvironmentCallee(Register reg);
 };
 
 extern const VMFunction NewArrayCopyOnWriteInfo;

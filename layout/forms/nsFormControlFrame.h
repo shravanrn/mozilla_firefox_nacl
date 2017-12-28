@@ -38,7 +38,6 @@ public:
 
   // nsIFrame replacements
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override {
     DO_GLOBAL_REFLOW_COUNT_DSP("nsFormControlFrame");
     DisplayBorderBackgroundOutline(aBuilder, aLists);
@@ -48,14 +47,14 @@ public:
    * Both GetMinISize and GetPrefISize will return whatever GetIntrinsicISize
    * returns.
    */
-  virtual nscoord GetMinISize(nsRenderingContext *aRenderingContext) override;
-  virtual nscoord GetPrefISize(nsRenderingContext *aRenderingContext) override;
+  virtual nscoord GetMinISize(gfxContext *aRenderingContext) override;
+  virtual nscoord GetPrefISize(gfxContext *aRenderingContext) override;
 
   /**
    * Our auto size is just intrinsic width and intrinsic height.
    */
   virtual mozilla::LogicalSize
-  ComputeAutoSize(nsRenderingContext*         aRenderingContext,
+  ComputeAutoSize(gfxContext*                 aRenderingContext,
                   mozilla::WritingMode        aWM,
                   const mozilla::LogicalSize& aCBSize,
                   nscoord                     aAvailableISize,

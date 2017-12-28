@@ -1,16 +1,53 @@
 //! Intermediate representation for C/C++ functions and methods.
 
+use super::comp::MethodKind;
 use super::context::{BindgenContext, ItemId};
 use super::dot::DotAttributes;
 use super::item::Item;
 use super::traversal::{EdgeKind, Trace, Tracer};
 use super::ty::TypeKind;
 use clang;
-use clang_sys::CXCallingConv;
-use ir::derive::CanDeriveDebug;
+use clang_sys::{self, CXCallingConv};
+use ir::derive::{CanTriviallyDeriveDebug, CanTriviallyDeriveHash,
+                 CanTriviallyDerivePartialEq};
 use parse::{ClangItemParser, ClangSubItemParser, ParseError, ParseResult};
 use std::io;
 use syntax::abi;
+
+const RUST_DERIVE_FUNPTR_LIMIT: usize = 12;
+
+/// What kind of a function are we looking at?
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum FunctionKind {
+    /// A plain, free function.
+    Function,
+    /// A method of some kind.
+    Method(MethodKind),
+}
+
+impl FunctionKind {
+    fn from_cursor(cursor: &clang::Cursor) -> Option<FunctionKind> {
+        Some(match cursor.kind() {
+            clang_sys::CXCursor_FunctionDecl => FunctionKind::Function,
+            clang_sys::CXCursor_Constructor => FunctionKind::Method(
+                MethodKind::Constructor,
+            ),
+            clang_sys::CXCursor_Destructor => FunctionKind::Method(
+                MethodKind::Destructor,
+            ),
+            clang_sys::CXCursor_CXXMethod => {
+                if cursor.method_is_virtual() {
+                    FunctionKind::Method(MethodKind::Virtual)
+                } else if cursor.method_is_static() {
+                    FunctionKind::Method(MethodKind::Static)
+                } else {
+                    FunctionKind::Method(MethodKind::Normal)
+                }
+            }
+            _ => return None,
+        })
+    }
+}
 
 /// A function declaration, with a signature, arguments, and argument names.
 ///
@@ -29,20 +66,26 @@ pub struct Function {
 
     /// The doc comment on the function, if any.
     comment: Option<String>,
+
+    /// The kind of function this is.
+    kind: FunctionKind,
 }
 
 impl Function {
     /// Construct a new function.
-    pub fn new(name: String,
-               mangled_name: Option<String>,
-               sig: ItemId,
-               comment: Option<String>)
-               -> Self {
+    pub fn new(
+        name: String,
+        mangled_name: Option<String>,
+        sig: ItemId,
+        comment: Option<String>,
+        kind: FunctionKind,
+    ) -> Self {
         Function {
             name: name,
             mangled_name: mangled_name,
             signature: sig,
             comment: comment,
+            kind: kind,
         }
     }
 
@@ -60,22 +103,52 @@ impl Function {
     pub fn signature(&self) -> ItemId {
         self.signature
     }
+
+    /// Get this function's kind.
+    pub fn kind(&self) -> FunctionKind {
+        self.kind
+    }
 }
 
 impl DotAttributes for Function {
-    fn dot_attributes<W>(&self,
-                         _ctx: &BindgenContext,
-                         out: &mut W)
-                         -> io::Result<()>
-        where W: io::Write,
+    fn dot_attributes<W>(
+        &self,
+        _ctx: &BindgenContext,
+        out: &mut W,
+    ) -> io::Result<()>
+    where
+        W: io::Write,
     {
         if let Some(ref mangled) = self.mangled_name {
-            try!(writeln!(out,
-                          "<tr><td>mangled name</td><td>{}</td></tr>",
-                          mangled));
+            let mangled: String =
+                mangled.chars().flat_map(|c| c.escape_default()).collect();
+            try!(writeln!(
+                out,
+                "<tr><td>mangled name</td><td>{}</td></tr>",
+                mangled
+            ));
         }
 
         Ok(())
+    }
+}
+
+/// An ABI extracted from a clang cursor.
+#[derive(Debug, Copy, Clone)]
+pub enum Abi {
+    /// A known ABI, that rust also understand.
+    Known(abi::Abi),
+    /// An unknown or invalid ABI.
+    Unknown(CXCallingConv),
+}
+
+impl Abi {
+    /// Returns whether this Abi is known or not.
+    fn is_unknown(&self) -> bool {
+        match *self {
+            Abi::Unknown(..) => true,
+            _ => false,
+        }
     }
 }
 
@@ -93,37 +166,44 @@ pub struct FunctionSig {
     is_variadic: bool,
 
     /// The ABI of this function.
-    abi: Option<abi::Abi>,
+    abi: Abi,
 }
 
-fn get_abi(cc: CXCallingConv) -> Option<abi::Abi> {
+fn get_abi(cc: CXCallingConv) -> Abi {
     use clang_sys::*;
-    match cc {
-        CXCallingConv_Default => Some(abi::Abi::C),
-        CXCallingConv_C => Some(abi::Abi::C),
-        CXCallingConv_X86StdCall => Some(abi::Abi::Stdcall),
-        CXCallingConv_X86FastCall => Some(abi::Abi::Fastcall),
-        CXCallingConv_AAPCS => Some(abi::Abi::Aapcs),
-        CXCallingConv_X86_64Win64 => Some(abi::Abi::Win64),
-        _ => None,
-    }
+    Abi::Known(match cc {
+        CXCallingConv_Default => abi::Abi::C,
+        CXCallingConv_C => abi::Abi::C,
+        CXCallingConv_X86StdCall => abi::Abi::Stdcall,
+        CXCallingConv_X86FastCall => abi::Abi::Fastcall,
+        CXCallingConv_AAPCS => abi::Abi::Aapcs,
+        CXCallingConv_X86_64Win64 => abi::Abi::Win64,
+        other => return Abi::Unknown(other),
+    })
 }
 
-// Mac os needs __ for mangled symbols but rust will automatically prepend the extra _.
-// We need to make sure that we don't include __ because rust will turn into ___.
-//
-// TODO(emilio): This is wrong when the target system is not the host
-// system. See https://github.com/servo/rust-bindgen/issues/593
-fn macos_mangling(symbol: &mut String) {
-    if cfg!(target_os = "macos") && symbol.starts_with("_") {
-        symbol.remove(0);
+fn mangling_hack_if_needed(ctx: &BindgenContext, symbol: &mut String) {
+    if ctx.needs_mangling_hack() {
+        match symbol.chars().next().unwrap() {
+            // Stripping leading underscore for all names on Darwin and
+            // C linkage functions on Win32.
+            '_' => {
+                symbol.remove(0);
+            }
+            // Stop Rust from prepending underscore for variables on Win32.
+            '?' => {
+                symbol.insert(0, '\x01');
+            }
+            _ => {}
+        }
     }
 }
 
 /// Get the mangled name for the cursor's referent.
-pub fn cursor_mangling(ctx: &BindgenContext,
-                       cursor: &clang::Cursor)
-                       -> Option<String> {
+pub fn cursor_mangling(
+    ctx: &BindgenContext,
+    cursor: &clang::Cursor,
+) -> Option<String> {
     use clang_sys;
     if !ctx.options().enable_mangling {
         return None;
@@ -131,14 +211,14 @@ pub fn cursor_mangling(ctx: &BindgenContext,
 
     // We early return here because libclang may crash in some case
     // if we pass in a variable inside a partial specialized template.
-    // See servo/rust-bindgen#67, and servo/rust-bindgen#462.
+    // See rust-lang-nursery/rust-bindgen#67, and rust-lang-nursery/rust-bindgen#462.
     if cursor.is_in_non_fully_specialized_template() {
         return None;
     }
 
     if let Ok(mut manglings) = cursor.cxx_manglings() {
         if let Some(mut m) = manglings.pop() {
-            macos_mangling(&mut m);
+            mangling_hack_if_needed(ctx, &mut m);
             return Some(m);
         }
     }
@@ -148,7 +228,7 @@ pub fn cursor_mangling(ctx: &BindgenContext,
         return None;
     }
 
-    macos_mangling(&mut mangling);
+    mangling_hack_if_needed(ctx, &mut mangling);
 
     if cursor.kind() == clang_sys::CXCursor_Destructor {
         // With old (3.8-) libclang versions, and the Itanium ABI, clang returns
@@ -182,11 +262,12 @@ pub fn cursor_mangling(ctx: &BindgenContext,
 
 impl FunctionSig {
     /// Construct a new function signature.
-    pub fn new(return_type: ItemId,
-               arguments: Vec<(Option<String>, ItemId)>,
-               is_variadic: bool,
-               abi: Option<abi::Abi>)
-               -> Self {
+    pub fn new(
+        return_type: ItemId,
+        arguments: Vec<(Option<String>, ItemId)>,
+        is_variadic: bool,
+        abi: Abi,
+    ) -> Self {
         FunctionSig {
             return_type: return_type,
             argument_types: arguments,
@@ -196,10 +277,11 @@ impl FunctionSig {
     }
 
     /// Construct a new function signature from the given Clang type.
-    pub fn from_ty(ty: &clang::Type,
-                   cursor: &clang::Cursor,
-                   ctx: &mut BindgenContext)
-                   -> Result<Self, ParseError> {
+    pub fn from_ty(
+        ty: &clang::Type,
+        cursor: &clang::Cursor,
+        ctx: &mut BindgenContext,
+    ) -> Result<Self, ParseError> {
         use clang_sys::*;
         debug!("FunctionSig::from_ty {:?} {:?}", ty, cursor);
 
@@ -228,7 +310,8 @@ impl FunctionSig {
             CXCursor_ObjCClassMethodDecl => {
                 // For CXCursor_FunctionDecl, cursor.args() is the reliable way
                 // to get parameter names and types.
-                cursor.args()
+                cursor
+                    .args()
                     .unwrap()
                     .iter()
                     .map(|arg| {
@@ -264,7 +347,8 @@ impl FunctionSig {
         let is_constructor = cursor.kind() == CXCursor_Constructor;
         let is_destructor = cursor.kind() == CXCursor_Destructor;
         if (is_constructor || is_destructor || is_method) &&
-           cursor.lexical_parent() != cursor.semantic_parent() {
+            cursor.lexical_parent() != cursor.semantic_parent()
+        {
             // Only parse constructors once.
             return Err(ParseError::Continue);
         }
@@ -288,10 +372,11 @@ impl FunctionSig {
         }
 
         let ty_ret_type = if cursor.kind() == CXCursor_ObjCInstanceMethodDecl ||
-                             cursor.kind() == CXCursor_ObjCClassMethodDecl {
-            try!(ty.ret_type()
-                   .or_else(|| cursor.ret_type())
-                   .ok_or(ParseError::Continue))
+            cursor.kind() == CXCursor_ObjCClassMethodDecl
+        {
+            try!(ty.ret_type().or_else(|| cursor.ret_type()).ok_or(
+                ParseError::Continue,
+            ))
         } else {
             try!(ty.ret_type().ok_or(ParseError::Continue))
         };
@@ -299,7 +384,7 @@ impl FunctionSig {
         let call_conv = ty.call_conv();
         let abi = get_abi(call_conv);
 
-        if abi.is_none() {
+        if abi.is_unknown() {
             warn!("Unknown calling convention: {:?}", call_conv);
         }
 
@@ -317,7 +402,7 @@ impl FunctionSig {
     }
 
     /// Get this function signature's ABI.
-    pub fn abi(&self) -> Option<abi::Abi> {
+    pub fn abi(&self) -> Abi {
         self.abi
     }
 
@@ -331,16 +416,15 @@ impl FunctionSig {
 }
 
 impl ClangSubItemParser for Function {
-    fn parse(cursor: clang::Cursor,
-             context: &mut BindgenContext)
-             -> Result<ParseResult<Self>, ParseError> {
+    fn parse(
+        cursor: clang::Cursor,
+        context: &mut BindgenContext,
+    ) -> Result<ParseResult<Self>, ParseError> {
         use clang_sys::*;
-        match cursor.kind() {
-            CXCursor_FunctionDecl |
-            CXCursor_Constructor |
-            CXCursor_Destructor |
-            CXCursor_CXXMethod => {}
-            _ => return Err(ParseError::Continue),
+
+        let kind = match FunctionKind::from_cursor(&cursor) {
+            None => return Err(ParseError::Continue),
+            Some(k) => k,
         };
 
         debug!("Function::parse({:?}, {:?})", cursor, cursor.cur_type());
@@ -355,13 +439,15 @@ impl ClangSubItemParser for Function {
         }
 
         if !context.options().generate_inline_functions &&
-            cursor.is_inlined_function() {
+            cursor.is_inlined_function()
+        {
             return Err(ParseError::Continue);
         }
 
         let linkage = cursor.linkage();
         if linkage != CXLinkage_External &&
-           linkage != CXLinkage_UniqueExternal {
+            linkage != CXLinkage_UniqueExternal
+        {
             return Err(ParseError::Continue);
         }
 
@@ -393,7 +479,7 @@ impl ClangSubItemParser for Function {
 
         let comment = cursor.raw_comment();
 
-        let function = Self::new(name, mangled_name, sig, comment);
+        let function = Self::new(name, mangled_name, sig, comment, kind);
         Ok(ParseResult::New(function, Some(cursor)))
     }
 }
@@ -402,7 +488,8 @@ impl Trace for FunctionSig {
     type Extra = ();
 
     fn trace<T>(&self, _: &BindgenContext, tracer: &mut T, _: &())
-        where T: Tracer,
+    where
+        T: Tracer,
     {
         tracer.visit_kind(self.return_type(), EdgeKind::FunctionReturn);
 
@@ -414,23 +501,48 @@ impl Trace for FunctionSig {
 
 // Function pointers follow special rules, see:
 //
-// https://github.com/servo/rust-bindgen/issues/547,
+// https://github.com/rust-lang-nursery/rust-bindgen/issues/547,
 // https://github.com/rust-lang/rust/issues/38848,
 // and https://github.com/rust-lang/rust/issues/40158
 //
 // Note that copy is always derived, so we don't need to implement it.
-impl CanDeriveDebug for FunctionSig {
-    type Extra = ();
-
-    fn can_derive_debug(&self, _ctx: &BindgenContext, _: ()) -> bool {
-        const RUST_DERIVE_FUNPTR_LIMIT: usize = 12;
+impl CanTriviallyDeriveDebug for FunctionSig {
+    fn can_trivially_derive_debug(&self) -> bool {
         if self.argument_types.len() > RUST_DERIVE_FUNPTR_LIMIT {
             return false;
         }
 
         match self.abi {
-            Some(abi::Abi::C) |
-            None => true,
+            Abi::Known(abi::Abi::C) |
+            Abi::Unknown(..) => true,
+            _ => false,
+        }
+    }
+}
+
+impl CanTriviallyDeriveHash for FunctionSig {
+    fn can_trivially_derive_hash(&self) -> bool {
+        if self.argument_types.len() > RUST_DERIVE_FUNPTR_LIMIT {
+            return false;
+        }
+
+        match self.abi {
+            Abi::Known(abi::Abi::C) |
+            Abi::Unknown(..) => true,
+            _ => false,
+        }
+    }
+}
+
+impl CanTriviallyDerivePartialEq for FunctionSig {
+    fn can_trivially_derive_partialeq(&self) -> bool {
+        if self.argument_types.len() > RUST_DERIVE_FUNPTR_LIMIT {
+            return false;
+        }
+
+        match self.abi {
+            Abi::Known(abi::Abi::C) |
+            Abi::Unknown(..) => true,
             _ => false,
         }
     }

@@ -59,22 +59,6 @@ ALL_FLAVORS = {
             'flavor': 'browser',
         }
     },
-    'jetpack-package': {
-        'suite': 'jetpack-package',
-        'aliases': ('jetpack-package', 'mochitest-jetpack-package', 'jpp'),
-        'enabled_apps': ('firefox',),
-        'extra_args': {
-            'flavor': 'jetpack-package',
-        }
-    },
-    'jetpack-addon': {
-        'suite': 'jetpack-addon',
-        'aliases': ('jetpack-addon', 'mochitest-jetpack-addon', 'jpa'),
-        'enabled_apps': ('firefox',),
-        'extra_args': {
-            'flavor': 'jetpack-addon',
-        }
-    },
     'a11y': {
         'suite': 'a11y',
         'aliases': ('a11y', 'mochitest-a11y', 'accessibility'),
@@ -229,11 +213,12 @@ class MochitestArguments(ArgumentContainer):
                   "chunkByDir directories.",
           "default": 0,
           }],
-        [["--run-by-dir"],
+        [["--run-by-manifest"],
          {"action": "store_true",
-          "dest": "runByDir",
-          "help": "Run each directory in a single browser instance with a fresh profile.",
+          "dest": "runByManifest",
+          "help": "Run each manifest in a single browser instance with a fresh profile.",
           "default": False,
+          "suppress": True,
           }],
         [["--shuffle"],
          {"action": "store_true",
@@ -439,13 +424,6 @@ class MochitestArguments(ArgumentContainer):
           "default": None,
           "suppress": True,
           }],
-        [["--strict-content-sandbox"],
-         {"action": "store_true",
-          "default": False,
-          "dest": "strictContentSandbox",
-          "help": "Run tests with a more strict content sandbox (Windows only).",
-          "suppress": not mozinfo.isWin,
-          }],
         [["--nested_oop"],
          {"action": "store_true",
           "default": False,
@@ -574,11 +552,6 @@ class MochitestArguments(ArgumentContainer):
          {"default": None,
           "help": "host:port to use when connecting to Marionette",
           }],
-        [["--marionette-port-timeout"],
-         {"default": None,
-          "help": "Timeout while waiting for the marionette port to open.",
-          "suppress": True,
-          }],
         [["--marionette-socket-timeout"],
          {"default": None,
           "help": "Timeout while waiting to receive a message from the marionette server.",
@@ -607,6 +580,30 @@ class MochitestArguments(ArgumentContainer):
           "help": "File describes all failure patterns of the tests.",
           "suppress": True,
           }],
+        [["--work-path"],
+         {"default": None,
+          "dest": "workPath",
+          "help": "Path to the base dir of all source files.",
+          "suppress": True,
+          }],
+        [["--obj-path"],
+         {"default": None,
+          "dest": "objPath",
+          "help": "Path to the base dir of all object files.",
+          "suppress": True,
+          }],
+        [["--verify"],
+         {"action": "store_true",
+          "default": False,
+          "help": "Test verification mode.",
+          "suppress": True,
+          }],
+        [["--verify-max-time"],
+         {"type": int,
+          "default": 3600,
+          "help": "Maximum time, in seconds, to run in --verify mode.",
+          "suppress": True,
+          }],
     ]
 
     defaults = {
@@ -628,8 +625,6 @@ class MochitestArguments(ArgumentContainer):
     def validate(self, parser, options, context):
         """Validate generic options."""
 
-        # for test manifest parsing.
-        mozinfo.update({"strictContentSandbox": options.strictContentSandbox})
         # for test manifest parsing.
         mozinfo.update({"nested_oop": options.nested_oop})
 
@@ -747,7 +742,7 @@ class MochitestArguments(ArgumentContainer):
         if options.valgrind or options.debugger:
             # valgrind and some debuggers may cause Gecko to start slowly. Make sure
             # marionette waits long enough to connect.
-            options.marionette_port_timeout = 900
+            options.marionette_startup_timeout = 900
             options.marionette_socket_timeout = 540
 
         if options.store_chrome_manifest:
@@ -1022,7 +1017,7 @@ class AndroidArguments(ArgumentContainer):
                 if build_obj.substs.get('MOZ_BUILD_MOBILE_ANDROID_WITH_GRADLE'):
                     options.robocopApk = os.path.join(build_obj.topobjdir, 'gradle', 'build',
                                                       'mobile', 'android', 'app', 'outputs', 'apk',
-                                                      'app-official-australis-debug-androidTest-'
+                                                      'app-official-photon-debug-androidTest-'
                                                       'unaligned.apk')
                 else:
                     options.robocopApk = os.path.join(build_obj.topobjdir, 'mobile', 'android',

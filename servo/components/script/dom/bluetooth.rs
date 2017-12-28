@@ -14,7 +14,6 @@ use dom::bindings::codegen::Bindings::BluetoothBinding::{BluetoothMethods, Reque
 use dom::bindings::codegen::Bindings::BluetoothPermissionResultBinding::BluetoothPermissionDescriptor;
 use dom::bindings::codegen::Bindings::BluetoothRemoteGATTServerBinding::BluetoothRemoteGATTServerBinding::
     BluetoothRemoteGATTServerMethods;
-use dom::bindings::codegen::Bindings::EventHandlerBinding::EventHandlerNonNull;
 use dom::bindings::codegen::Bindings::PermissionStatusBinding::{PermissionName, PermissionState};
 use dom::bindings::codegen::UnionTypes::StringOrUnsignedLong;
 use dom::bindings::error::Error::{self, Network, Security, Type};
@@ -36,12 +35,12 @@ use ipc_channel::router::ROUTER;
 use js::conversions::ConversionResult;
 use js::jsapi::{JSAutoCompartment, JSContext, JSObject};
 use js::jsval::{ObjectValue, UndefinedValue};
-use script_thread::Runnable;
 use std::cell::Ref;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use task::TaskOnce;
 
 const KEY_CONVERSION_ERROR: &'static str = "This `manufacturerData` key can not be parsed as unsigned short:";
 const FILTER_EMPTY_ERROR: &'static str = "'filters' member, if present, must be nonempty to find any devices.";
@@ -225,25 +224,27 @@ pub fn response_async<T: AsyncBluetoothListener + DomObject + 'static>(
         receiver: Trusted::new(receiver),
     }));
     ROUTER.add_route(action_receiver.to_opaque(), box move |message| {
-        struct ListenerRunnable<T: AsyncBluetoothListener + DomObject> {
+        struct ListenerTask<T: AsyncBluetoothListener + DomObject> {
             context: Arc<Mutex<BluetoothContext<T>>>,
             action: BluetoothResponseResult,
         }
 
-        impl<T: AsyncBluetoothListener + DomObject> Runnable for ListenerRunnable<T> {
-            fn handler(self: Box<Self>) {
-                let this = *self;
-                let mut context = this.context.lock().unwrap();
-                context.response(this.action);
+        impl<T> TaskOnce for ListenerTask<T>
+        where
+            T: AsyncBluetoothListener + DomObject,
+        {
+            fn run_once(self) {
+                let mut context = self.context.lock().unwrap();
+                context.response(self.action);
             }
         }
 
-        let runnable = box ListenerRunnable {
+        let task = ListenerTask {
             context: context.clone(),
             action: message.to().unwrap(),
         };
 
-        let result = task_source.queue_wrapperless(runnable);
+        let result = task_source.queue_unconditionally(task);
         if let Err(err) = result {
             warn!("failed to deliver network data: {:?}", err);
         }
@@ -328,7 +329,7 @@ fn canonicalize_filter(filter: &BluetoothLEScanFilterInit) -> Fallible<Bluetooth
 
             for service in services {
                 // Step 3.2 - 3.3.
-                let uuid = try!(BluetoothUUID::service(service.clone())).to_string();
+                let uuid = BluetoothUUID::service(service.clone())?.to_string();
 
                 // Step 3.4.
                 if uuid_is_blocklisted(uuid.as_ref(), Blocklist::All) {
@@ -393,7 +394,7 @@ fn canonicalize_filter(filter: &BluetoothLEScanFilterInit) -> Fallible<Bluetooth
                 // Step 7.3: No need to convert to IDL values since this is only used by native code.
 
                 // Step 7.4 - 7.5.
-                map.insert(manufacturer_id, try!(canonicalize_bluetooth_data_filter_init(bdfi)));
+                map.insert(manufacturer_id, canonicalize_bluetooth_data_filter_init(bdfi)?);
             }
             Some(map)
         },
@@ -417,7 +418,7 @@ fn canonicalize_filter(filter: &BluetoothLEScanFilterInit) -> Fallible<Bluetooth
                 };
 
                 // Step 9.3 - 9.4.
-                let service = try!(BluetoothUUID::service(service_name)).to_string();
+                let service = BluetoothUUID::service(service_name)?.to_string();
 
                 // Step 9.5.
                 if uuid_is_blocklisted(service.as_ref(), Blocklist::All) {
@@ -427,7 +428,7 @@ fn canonicalize_filter(filter: &BluetoothLEScanFilterInit) -> Fallible<Bluetooth
                 // Step 9.6: No need to convert to IDL values since this is only used by native code.
 
                 // Step 9.7 - 9.8.
-                map.insert(service, try!(canonicalize_bluetooth_data_filter_init(bdfi)));
+                map.insert(service, canonicalize_bluetooth_data_filter_init(bdfi)?);
             }
             Some(map)
         },

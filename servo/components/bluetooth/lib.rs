@@ -7,7 +7,6 @@ extern crate bitflags;
 extern crate bluetooth_traits;
 extern crate device;
 extern crate ipc_channel;
-#[cfg(target_os = "linux")]
 extern crate servo_config;
 extern crate servo_rand;
 #[cfg(target_os = "linux")]
@@ -26,6 +25,7 @@ use device::bluetooth::{BluetoothGATTDescriptor, BluetoothGATTService};
 use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
 #[cfg(target_os = "linux")]
 use servo_config::opts;
+use servo_config::prefs::PREFS;
 use servo_rand::Rng;
 use std::borrow::ToOwned;
 use std::collections::{HashMap, HashSet};
@@ -75,7 +75,11 @@ pub trait BluetoothThreadFactory {
 impl BluetoothThreadFactory for IpcSender<BluetoothRequest> {
     fn new() -> IpcSender<BluetoothRequest> {
         let (sender, receiver) = ipc::channel().unwrap();
-        let adapter = BluetoothAdapter::init().ok();
+        let adapter = if Some(true) == PREFS.get("dom.bluetooth.enabled").as_boolean() {
+            BluetoothAdapter::init()
+        } else {
+            BluetoothAdapter::init_mock()
+        }.ok();
         thread::Builder::new().name("BluetoothThread".to_owned()).spawn(move || {
             BluetoothManager::new(receiver, adapter).start();
         }).expect("Thread spawning failed");
@@ -436,7 +440,7 @@ impl BluetoothManager {
                              device_id: &str,
                              filters: &BluetoothScanfilterSequence)
                              -> BluetoothResult<bool> {
-        let mut adapter = try!(self.get_adapter());
+        let mut adapter = self.get_adapter()?;
         match self.get_device(&mut adapter, device_id) {
             Some(ref device) => Ok(matches_filters(device, filters)),
             None => Ok(false),
@@ -578,7 +582,7 @@ impl BluetoothManager {
                       options: RequestDeviceoptions)
                       -> BluetoothResponseResult {
         // Step 6.
-        let mut adapter = try!(self.get_adapter());
+        let mut adapter = self.get_adapter()?;
 
         // Step 7.
         // Note: There are no requiredServiceUUIDS, we scan for all devices.
@@ -630,7 +634,7 @@ impl BluetoothManager {
         if !self.device_is_cached(&device_id) {
             return Err(BluetoothError::Network);
         }
-        let mut adapter = try!(self.get_adapter());
+        let mut adapter = self.get_adapter()?;
 
         // Step 5.1.1.
         match self.get_device(&mut adapter, &device_id) {
@@ -660,7 +664,7 @@ impl BluetoothManager {
 
     // https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothremotegattserver-disconnect
     fn gatt_server_disconnect(&mut self, device_id: String) -> BluetoothResult<()> {
-        let mut adapter = try!(self.get_adapter());
+        let mut adapter = self.get_adapter()?;
         match self.get_device(&mut adapter, &device_id) {
             Some(d) => {
                 // Step 2.
@@ -687,7 +691,7 @@ impl BluetoothManager {
                          single: bool,
                          child_type: GATTType)
                          -> BluetoothResponseResult {
-        let mut adapter = try!(self.get_adapter());
+        let mut adapter = self.get_adapter()?;
         match child_type {
             GATTType::PrimaryService => {
                 // Step 5.
@@ -839,7 +843,7 @@ impl BluetoothManager {
     fn read_value(&mut self, id: String) -> BluetoothResponseResult {
         // (Characteristic) Step 5.2: Missing because it is optional.
         // (Descriptor)     Step 5.1: Missing because it is optional.
-        let mut adapter = try!(self.get_adapter());
+        let mut adapter = self.get_adapter()?;
 
         // (Characteristic) Step 5.3.
         let mut value = self.get_gatt_characteristic(&mut adapter, &id)
@@ -871,7 +875,7 @@ impl BluetoothManager {
     fn write_value(&mut self, id: String, value: Vec<u8>) -> BluetoothResponseResult {
         // (Characteristic) Step 7.2: Missing because it is optional.
         // (Descriptor)     Step 7.1: Missing because it is optional.
-        let mut adapter = try!(self.get_adapter());
+        let mut adapter = self.get_adapter()?;
 
         // (Characteristic) Step 7.3.
         let mut result = self.get_gatt_characteristic(&mut adapter, &id)
@@ -913,7 +917,7 @@ impl BluetoothManager {
         }
 
         // (StartNotification) TODO: Step 7: Missing because it is optional.
-        let mut adapter = try!(self.get_adapter());
+        let mut adapter = self.get_adapter()?;
         match self.get_gatt_characteristic(&mut adapter, &id) {
             Some(c) => {
                 let result = match enable {

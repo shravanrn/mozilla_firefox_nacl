@@ -11,6 +11,9 @@
 #include "mozilla/webrender/WebRenderAPI.h"
 
 namespace mozilla {
+namespace wr {
+class IpcResourceUpdateQueue;
+}
 namespace layers {
 
 class ImageClientSingle;
@@ -25,8 +28,11 @@ class WebRenderLayer
 public:
   virtual Layer* GetLayer() = 0;
   virtual void RenderLayer(wr::DisplayListBuilder& aBuilder,
+                           wr::IpcResourceUpdateQueue& aResources,
                            const StackingContextHelper& aSc) = 0;
-  virtual Maybe<WrImageMask> RenderMaskLayer(const gfx::Matrix4x4& aTransform)
+  virtual Maybe<wr::WrImageMask> RenderMaskLayer(const StackingContextHelper& aSc,
+                                                 const gfx::Matrix4x4& aTransform,
+                                                 wr::IpcResourceUpdateQueue& aResources)
   {
     MOZ_ASSERT(false);
     return Nothing();
@@ -39,29 +45,25 @@ public:
     return static_cast<WebRenderLayer*>(aLayer->ImplData());
   }
 
-  Maybe<wr::ImageKey> UpdateImageKey(ImageClientSingle* aImageClient,
-                                     ImageContainer* aContainer,
-                                     Maybe<wr::ImageKey>& aOldKey,
-                                     wr::ExternalImageId& aExternalImageId);
-
   WebRenderLayerManager* WrManager();
   WebRenderBridgeChild* WrBridge();
-  WrImageKey GetImageKey();
+  wr::WrImageKey GenerateImageKey();
 
   LayerRect Bounds();
   LayerRect BoundsForStackingContext();
-protected:
-  BoundsTransformMatrix BoundsTransform();
-  Maybe<LayerRect> ClipRect();
-
-  void DumpLayerInfo(const char* aLayerType, const LayerRect& aRect);
 
   // Builds a WrImageMask from the mask layer on this layer, if there is one.
-  // If this layer is pushing a stacking context, then the WrImageMask will be
-  // interpreted as relative to that stacking context by WR. The caller needs
-  // to pass in the StackingContextHelper for *this* layer, if there is one, in
-  // order for this function to make the necessary adjustments.
-  Maybe<WrImageMask> BuildWrMaskLayer(const StackingContextHelper* aUnapplySc);
+  // The |aRelativeTo| parameter should be a reference to the stacking context
+  // that we want this mask to be relative to. This is usually the stacking
+  // context of the *parent* layer of |this|, because that is what the mask
+  // is relative to in the layer tree.
+  Maybe<wr::WrImageMask> BuildWrMaskLayer(const StackingContextHelper& aRelativeTo,
+                                          wr::IpcResourceUpdateQueue& aResources);
+
+protected:
+  BoundsTransformMatrix BoundsTransform();
+
+  void DumpLayerInfo(const char* aLayerType, const LayerRect& aRect);
 };
 
 } // namespace layers

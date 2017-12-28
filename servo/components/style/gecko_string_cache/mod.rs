@@ -10,8 +10,8 @@ use gecko_bindings::bindings::Gecko_AddRefAtom;
 use gecko_bindings::bindings::Gecko_Atomize;
 use gecko_bindings::bindings::Gecko_Atomize16;
 use gecko_bindings::bindings::Gecko_ReleaseAtom;
-use gecko_bindings::structs::nsIAtom;
-use nsstring::nsAString;
+use gecko_bindings::structs::{nsIAtom, nsIAtom_AtomKind};
+use nsstring::{nsAString, nsString};
 use precomputed_hash::PrecomputedHash;
 use std::ascii::AsciiExt;
 use std::borrow::{Cow, Borrow};
@@ -39,7 +39,7 @@ macro_rules! local_name {
 }
 
 /// A strong reference to a Gecko atom.
-#[derive(PartialEq, Eq)]
+#[derive(Eq, PartialEq)]
 pub struct Atom(*mut WeakAtom);
 
 /// An atom *without* a strong reference.
@@ -94,7 +94,7 @@ unsafe impl Sync for WeakAtom {}
 impl WeakAtom {
     /// Construct a `WeakAtom` from a raw `nsIAtom`.
     #[inline]
-    pub unsafe fn new<'a>(atom: *mut nsIAtom) -> &'a mut Self {
+    pub unsafe fn new<'a>(atom: *const nsIAtom) -> &'a mut Self {
         &mut *(atom as *mut WeakAtom)
     }
 
@@ -149,18 +149,15 @@ impl WeakAtom {
     #[inline]
     pub fn is_static(&self) -> bool {
         unsafe {
-            (*self.as_ptr()).mIsStatic() != 0
+            (*self.as_ptr()).mKind() == nsIAtom_AtomKind::StaticAtom as u32
         }
     }
 
     /// Returns the length of the atom string.
     #[inline]
     pub fn len(&self) -> u32 {
-        // FIXME(emilio): re-introduce bitfield accessors:
-        //
-        // https://github.com/servo/rust-bindgen/issues/519
         unsafe {
-            (*self.as_ptr())._bitfield_1 & 0x7FFFFFFF
+            (*self.as_ptr()).mLength()
         }
     }
 
@@ -176,6 +173,54 @@ impl WeakAtom {
         let const_ptr: *const nsIAtom = &self.0;
         const_ptr as *mut nsIAtom
     }
+
+    /// Convert this atom to ASCII lower-case
+    pub fn to_ascii_lowercase(&self) -> Atom {
+        let slice = self.as_slice();
+        match slice.iter().position(|&char16| (b'A' as u16) <= char16 && char16 <= (b'Z' as u16)) {
+            None => self.clone(),
+            Some(i) => {
+                let mut buffer: [u16; 64] = unsafe { mem::uninitialized() };
+                let mut vec;
+                let mutable_slice = if let Some(buffer_prefix) = buffer.get_mut(..slice.len()) {
+                    buffer_prefix.copy_from_slice(slice);
+                    buffer_prefix
+                } else {
+                    vec = slice.to_vec();
+                    &mut vec
+                };
+                for char16 in &mut mutable_slice[i..] {
+                    if *char16 <= 0x7F {
+                        *char16 = (*char16 as u8).to_ascii_lowercase() as u16
+                    }
+                }
+                Atom::from(&*mutable_slice)
+            }
+        }
+    }
+
+    /// Return whether two atoms are ASCII-case-insensitive matches
+    pub fn eq_ignore_ascii_case(&self, other: &Self) -> bool {
+        if self == other {
+            return true;
+        }
+
+        let a = self.as_slice();
+        let b = other.as_slice();
+        a.len() == b.len() && a.iter().zip(b).all(|(&a16, &b16)| {
+            if a16 <= 0x7F && b16 <= 0x7F {
+                (a16 as u8).eq_ignore_ascii_case(&(b16 as u8))
+            } else {
+                a16 == b16
+            }
+        })
+    }
+
+    /// Return whether this atom is an ASCII-case-insensitive match for the given string
+    pub fn eq_str_ignore_ascii_case(&self, other: &str) -> bool {
+        self.chars().map(|r| r.map(|c: char| c.to_ascii_lowercase()))
+        .eq(other.chars().map(|c: char| Ok(c.to_ascii_lowercase())))
+    }
 }
 
 impl fmt::Debug for WeakAtom {
@@ -187,7 +232,7 @@ impl fmt::Debug for WeakAtom {
 impl fmt::Display for WeakAtom {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         for c in self.chars() {
-            try!(w.write_char(c.unwrap_or(char::REPLACEMENT_CHARACTER)))
+            w.write_char(c.unwrap_or(char::REPLACEMENT_CHARACTER))?
         }
         Ok(())
     }
@@ -220,7 +265,7 @@ impl Atom {
     /// called on it.
     #[inline]
     pub unsafe fn from_addrefed(ptr: *mut nsIAtom) -> Self {
-        debug_assert!(!ptr.is_null());
+        assert!(!ptr.is_null());
         unsafe {
             Atom(WeakAtom::new(ptr))
         }
@@ -232,29 +277,6 @@ impl Atom {
         let ptr = self.as_ptr();
         mem::forget(self);
         ptr
-    }
-
-    /// Return whether two atoms are ASCII-case-insensitive matches
-    pub fn eq_ignore_ascii_case(&self, other: &Self) -> bool {
-        if self == other {
-            return true;
-        }
-
-        let a = self.as_slice();
-        let b = other.as_slice();
-        a.len() == b.len() && a.iter().zip(b).all(|(&a16, &b16)| {
-            if a16 <= 0x7F && b16 <= 0x7F {
-                (a16 as u8).eq_ignore_ascii_case(&(b16 as u8))
-            } else {
-                a16 == b16
-            }
-        })
-    }
-
-    /// Return whether this atom is an ASCII-case-insensitive match for the given string
-    pub fn eq_str_ignore_ascii_case(&self, other: &str) -> bool {
-        self.chars().map(|r| r.map(|c: char| c.to_ascii_lowercase()))
-        .eq(other.chars().map(|c: char| Ok(c.to_ascii_lowercase())))
     }
 }
 
@@ -321,6 +343,13 @@ impl<'a> From<&'a str> for Atom {
     }
 }
 
+impl<'a> From<&'a [u16]> for Atom {
+    #[inline]
+    fn from(slice: &[u16]) -> Atom {
+        Atom::from(&*nsString::from(slice))
+    }
+}
+
 impl<'a> From<&'a nsAString> for Atom {
     #[inline]
     fn from(string: &nsAString) -> Atom {
@@ -349,7 +378,7 @@ impl From<String> for Atom {
 impl From<*mut nsIAtom> for Atom {
     #[inline]
     fn from(ptr: *mut nsIAtom) -> Atom {
-        debug_assert!(!ptr.is_null());
+        assert!(!ptr.is_null());
         unsafe {
             let ret = Atom(WeakAtom::new(ptr));
             if !ret.is_static() {
@@ -359,3 +388,5 @@ impl From<*mut nsIAtom> for Atom {
         }
     }
 }
+
+size_of_is_0!(Atom);

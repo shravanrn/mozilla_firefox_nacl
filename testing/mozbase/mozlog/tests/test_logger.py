@@ -233,7 +233,7 @@ class TestLoggingMixin(unittest.TestCase):
         self.assertTrue(not hasattr(loggable, "_logger"))
         loggable.log(mozlog.INFO, "This will instantiate the logger")
         self.assertTrue(hasattr(loggable, "_logger"))
-        self.assertEqual(loggable._logger.name, "__main__.Loggable")
+        self.assertEqual(loggable._logger.name, "test_logger.Loggable")
 
         self.assertRaises(ValueError, loggable.set_logger,
                           "not a logger")
@@ -260,6 +260,7 @@ class TestLoggingMixin(unittest.TestCase):
 
         actual_messages = loggable._logger.handlers[0].messages
         self.assertEqual(expected_messages, actual_messages)
+
 
 if __name__ == '__main__':
     mozunit.main()

@@ -11,12 +11,12 @@ interface nsIDOMDocument;
 interface nsINode;
 interface nsIPrincipal;
 interface nsIRedirectHistoryEntry;
+interface nsIURI;
 %{C++
 #include "nsTArray.h"
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/LoadTainting.h"
-
-class nsCString;
+#include "nsStringFwd.h"
 %}
 
 [ref] native nsIRedirectHistoryEntryArray(const nsTArray<nsCOMPtr<nsIRedirectHistoryEntry>>);
@@ -332,6 +332,16 @@ interface nsILoadInfo : nsISupports
   nsINode binaryLoadingNode();
 
   /**
+   * A C++ friendly version of the loadingContext for toplevel loads.
+   * Most likely you want to query the ownerDocument or LoadingNode
+   * and not this context only available for TYPE_DOCUMENT loads.
+   * Please note that except for loads of TYPE_DOCUMENT, this
+   * ContextForTopLevelLoad will always return null.
+   */
+  [noscript, notxpcom, nostdcall, binaryname(ContextForTopLevelLoad)]
+  nsISupports binaryContextForTopLevelLoad();
+
+  /**
    * The securityFlags of that channel.
    */
   readonly attribute nsSecurityFlags securityFlags;
@@ -497,15 +507,17 @@ interface nsILoadInfo : nsISupports
   /**
    * These are the window IDs of the window in which the element being
    * loaded lives. parentOuterWindowID is the window ID of this window's
-   * parent.
+   * parent. topOuterWindowID is the ID of the top-level window of the same
+   * docShell type.
    *
    * Note that these window IDs can be 0 if the window is not
-   * available. parentOuterWindowID will be the same as outerWindowID if the
-   * window has no parent.
+   * available. parentOuterWindowID and topOuterWindowID will be the same as
+   * outerWindowID if the window has no parent.
    */
   [infallible] readonly attribute unsigned long long innerWindowID;
   [infallible] readonly attribute unsigned long long outerWindowID;
   [infallible] readonly attribute unsigned long long parentOuterWindowID;
+  [infallible] readonly attribute unsigned long long topOuterWindowID;
 
   /**
    * Only when the element being loaded is <frame src="foo.html">
@@ -676,6 +688,16 @@ interface nsILoadInfo : nsISupports
   [noscript, infallible] readonly attribute boolean mixedContentWouldBlock;
 
   /**
+   * True if this load is an HSTS priming request.
+   */
+  [noscript, infallible] attribute boolean isHSTSPriming;
+
+  /**
+   * True if this load was upgraded from HSTS priming
+   */
+  [noscript, infallible] attribute boolean isHSTSPrimingUpgrade;
+
+  /**
    * Mark this LoadInfo as needing HSTS Priming
    *
    * @param wouldBlock Carry the decision of Mixed Content Blocking to be
@@ -741,6 +763,14 @@ interface nsILoadInfo : nsISupports
    * Note that the load for a sub-frame's document will return false here.
    */
   [infallible] readonly attribute boolean isTopLevelLoad;
+
+  /**
+   * If this is non-null, this property represents two things: (1) the
+   * URI to be used for the principal if the channel with this loadinfo
+   * gets a principal based on URI and (2) the URI to use for a document
+   * created from the channel with this loadinfo.
+   */
+  attribute nsIURI resultPrincipalURI;
 
   /**
    * Returns the null principal of the resulting resource if the SEC_SANDBOXED

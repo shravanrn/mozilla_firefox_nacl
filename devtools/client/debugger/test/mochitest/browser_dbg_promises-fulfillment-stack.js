@@ -11,7 +11,7 @@
 
 const TAB_URL = EXAMPLE_URL + "doc_promise-get-fulfillment-stack.html";
 const { PromisesFront } = require("devtools/shared/fronts/promises");
-var events = require("sdk/event/core");
+var EventEmitter = require("devtools/shared/event-emitter");
 
 const TEST_DATA = [
   {
@@ -53,7 +53,7 @@ function test() {
 
     yield close(client);
     yield closeDebuggerAndFinish(panel);
-  }).then(null, error => {
+  }).catch(error => {
     ok(false, "Got an error: " + error.message + "\n" + error.stack);
   });
 }
@@ -66,7 +66,7 @@ function* testGetFulfillmentStack(client, form, tab) {
 
   // Get the grip for promise p
   let onNewPromise = new Promise(resolve => {
-    events.on(front, "new-promises", promises => {
+    EventEmitter.on(front, "new-promises", promises => {
       for (let p of promises) {
         if (p.preview.ownProperties.name &&
             p.preview.ownProperties.name.value === "p") {

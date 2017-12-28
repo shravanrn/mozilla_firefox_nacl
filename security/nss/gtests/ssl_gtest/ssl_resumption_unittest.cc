@@ -258,6 +258,30 @@ TEST_P(TlsConnectGeneric, ConnectWithExpiredTicketAtServer) {
   CheckConnected();
 }
 
+TEST_P(TlsConnectGeneric, ConnectResumeCorruptTicket) {
+  // This causes a ticket resumption.
+  ConfigureSessionCache(RESUME_BOTH, RESUME_TICKET);
+  Connect();
+  SendReceive();
+
+  Reset();
+  static const uint8_t kHmacKey1Buf[32] = {0};
+  static const DataBuffer kHmacKey1(kHmacKey1Buf, sizeof(kHmacKey1Buf));
+
+  SECItem key_item = {siBuffer, const_cast<uint8_t*>(kHmacKey1Buf),
+                      sizeof(kHmacKey1Buf)};
+
+  ScopedPK11SlotInfo slot(PK11_GetInternalSlot());
+  PK11SymKey* hmac_key =
+      PK11_ImportSymKey(slot.get(), CKM_SHA256_HMAC, PK11_OriginUnwrap,
+                        CKA_SIGN, &key_item, nullptr);
+  ASSERT_NE(nullptr, hmac_key);
+  SSLInt_SetSelfEncryptMacKey(hmac_key);
+  ConfigureSessionCache(RESUME_BOTH, RESUME_TICKET);
+  ConnectExpectAlert(server_, illegal_parameter);
+  server_->CheckErrorCode(SSL_ERROR_RX_MALFORMED_CLIENT_HELLO);
+}
+
 // This callback switches out the "server" cert used on the server with
 // the "client" certificate, which should be the same type.
 static int32_t SwitchCertificates(TlsAgent* agent, const SECItem* srvNameArr,
@@ -331,10 +355,7 @@ TEST_P(TlsConnectGenericPre13, ConnectEcdheTwiceReuseKey) {
 
 // This test parses the ServerKeyExchange, which isn't in 1.3
 TEST_P(TlsConnectGenericPre13, ConnectEcdheTwiceNewKey) {
-  server_->EnsureTlsSetup();
-  SECStatus rv =
-      SSL_OptionSet(server_->ssl_fd(), SSL_REUSE_SERVER_ECDHE_KEY, PR_FALSE);
-  EXPECT_EQ(SECSuccess, rv);
+  server_->SetOption(SSL_REUSE_SERVER_ECDHE_KEY, PR_FALSE);
   auto i1 = std::make_shared<TlsInspectorRecordHandshakeMessage>(
       kTlsHandshakeServerKeyExchange);
   server_->SetPacketFilter(i1);
@@ -345,9 +366,7 @@ TEST_P(TlsConnectGenericPre13, ConnectEcdheTwiceNewKey) {
 
   // Restart
   Reset();
-  server_->EnsureTlsSetup();
-  rv = SSL_OptionSet(server_->ssl_fd(), SSL_REUSE_SERVER_ECDHE_KEY, PR_FALSE);
-  EXPECT_EQ(SECSuccess, rv);
+  server_->SetOption(SSL_REUSE_SERVER_ECDHE_KEY, PR_FALSE);
   auto i2 = std::make_shared<TlsInspectorRecordHandshakeMessage>(
       kTlsHandshakeServerKeyExchange);
   server_->SetPacketFilter(i2);
@@ -627,7 +646,7 @@ TEST_F(TlsConnectTest, TestTls13ResumptionDuplicateNST) {
   Connect();
 
   // Clear the session ticket keys to invalidate the old ticket.
-  SSLInt_ClearSessionTicketKey();
+  SSLInt_ClearSelfEncryptKey();
   SSLInt_SendNewSessionTicket(server_->ssl_fd());
 
   SendReceive();  // Need to read so that we absorb the session tickets.

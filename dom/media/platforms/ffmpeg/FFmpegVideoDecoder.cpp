@@ -10,6 +10,7 @@
 #include "MediaInfo.h"
 #include "MP4Decoder.h"
 #include "VPXDecoder.h"
+#include "mozilla/layers/KnowsCompositor.h"
 
 #include "libavutil/pixfmt.h"
 #if LIBAVCODEC_VERSION_MAJOR < 54
@@ -22,6 +23,7 @@
 #include "mozilla/PodOperations.h"
 #include "mozilla/TaskQueue.h"
 #include "nsThreadUtils.h"
+#include "prsystem.h"
 
 
 typedef mozilla::layers::Image Image;
@@ -83,8 +85,8 @@ FFmpegVideoDecoder<LIBAV_VER>::PtsCorrectionContext::GuessCorrectPts(
     mNumFaultyPts += aPts <= mLastPts;
     mLastPts = aPts;
   }
-  if ((mNumFaultyPts <= mNumFaultyDts || aDts == int64_t(AV_NOPTS_VALUE))
-      && aPts != int64_t(AV_NOPTS_VALUE)) {
+  if ((mNumFaultyPts <= mNumFaultyDts || aDts == int64_t(AV_NOPTS_VALUE)) &&
+      aPts != int64_t(AV_NOPTS_VALUE)) {
     pts = aPts;
   } else {
     pts = aDts;
@@ -103,8 +105,10 @@ FFmpegVideoDecoder<LIBAV_VER>::PtsCorrectionContext::Reset()
 
 FFmpegVideoDecoder<LIBAV_VER>::FFmpegVideoDecoder(
   FFmpegLibWrapper* aLib, TaskQueue* aTaskQueue, const VideoInfo& aConfig,
-  ImageContainer* aImageContainer, bool aLowLatency)
+  KnowsCompositor* aAllocator, ImageContainer* aImageContainer,
+  bool aLowLatency)
   : FFmpegDataDecoder(aLib, aTaskQueue, GetCodecId(aConfig.mMimeType))
+  , mImageAllocator(aAllocator)
   , mImageContainer(aImageContainer)
   , mInfo(aConfig)
   , mCodecParser(nullptr)
@@ -121,8 +125,9 @@ FFmpegVideoDecoder<LIBAV_VER>::FFmpegVideoDecoder(
 RefPtr<MediaDataDecoder::InitPromise>
 FFmpegVideoDecoder<LIBAV_VER>::Init()
 {
-  if (NS_FAILED(InitDecoder())) {
-    return InitPromise::CreateAndReject(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
+  MediaResult rv = InitDecoder();
+  if (NS_FAILED(rv)) {
+    return InitPromise::CreateAndReject(rv, __func__);
   }
 
   return InitPromise::CreateAndResolve(TrackInfo::kVideoTrack, __func__);
@@ -349,7 +354,8 @@ FFmpegVideoDecoder<LIBAV_VER>::DoDecode(MediaRawData* aSample,
                                   !!mFrame->key_frame,
                                   TimeUnit::FromMicroseconds(-1),
                                   mInfo.ScaledImageRect(mFrame->width,
-                                                        mFrame->height));
+                                                        mFrame->height),
+                                  mImageAllocator);
 
   if (!v) {
     return MediaResult(NS_ERROR_OUT_OF_MEMORY,

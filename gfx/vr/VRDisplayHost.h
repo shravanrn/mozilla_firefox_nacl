@@ -17,7 +17,13 @@
 #include "mozilla/TimeStamp.h"
 #include "mozilla/TypedEnumBits.h"
 #include "mozilla/dom/GamepadPoseState.h"
+#if defined(XP_WIN)
+#include <d3d11_1.h>
+#endif
 
+#if defined(XP_MACOSX)
+class MacIOSurface;
+#endif
 namespace mozilla {
 namespace layers {
 class PTextureParent;
@@ -45,12 +51,26 @@ public:
   void StartFrame();
   void SubmitFrame(VRLayerParent* aLayer,
                    mozilla::layers::PTextureParent* aTexture,
+                   uint64_t aFrameId,
                    const gfx::Rect& aLeftEyeRect,
                    const gfx::Rect& aRightEyeRect);
 
   bool CheckClearDisplayInfoDirty();
   void SetGroupMask(uint32_t aGroupMask);
   bool GetIsConnected();
+
+  class AutoRestoreRenderState {
+  public:
+    explicit AutoRestoreRenderState(VRDisplayHost* aDisplay);
+    ~AutoRestoreRenderState();
+    bool IsSuccess();
+  private:
+    RefPtr<VRDisplayHost> mDisplay;
+#if defined(XP_WIN)
+    RefPtr<ID3DDeviceContextState> mPrevDeviceContextState;
+#endif
+    bool mSuccess;
+  };
 
 protected:
   explicit VRDisplayHost(VRDeviceType aType);
@@ -62,6 +82,11 @@ protected:
   // to control timing of the next frame and throttle the render loop
   // for the needed framerate.
   virtual bool SubmitFrame(mozilla::layers::TextureSourceD3D11* aSource,
+                           const IntSize& aSize,
+                           const gfx::Rect& aLeftEyeRect,
+                           const gfx::Rect& aRightEyeRect) = 0;
+#elif defined(XP_MACOSX)
+  virtual bool SubmitFrame(MacIOSurface* aMacIOSurface,
                            const IntSize& aSize,
                            const gfx::Rect& aLeftEyeRect,
                            const gfx::Rect& aRightEyeRect) = 0;
@@ -80,6 +105,19 @@ private:
   VRDisplayInfo mLastUpdateDisplayInfo;
   TimeStamp mLastFrameStart;
   bool mFrameStarted;
+
+#if defined(XP_WIN)
+protected:
+  bool CreateD3DObjects();
+  RefPtr<ID3D11Device1> mDevice;
+  RefPtr<ID3D11DeviceContext1> mContext;
+  ID3D11Device1* GetD3DDevice();
+  ID3D11DeviceContext1* GetD3DDeviceContext();
+  ID3DDeviceContextState* GetD3DDeviceContextState();
+
+private:
+  RefPtr<ID3DDeviceContextState> mDeviceContextState;
+#endif
 };
 
 class VRControllerHost {
@@ -98,7 +136,8 @@ public:
   uint64_t GetVibrateIndex();
 
 protected:
-  explicit VRControllerHost(VRDeviceType aType);
+  explicit VRControllerHost(VRDeviceType aType, dom::GamepadHand aHand,
+                            uint32_t aDisplayID);
   virtual ~VRControllerHost();
 
   VRControllerInfo mControllerInfo;

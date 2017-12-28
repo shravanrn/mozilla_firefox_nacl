@@ -23,7 +23,6 @@ module.exports = createClass({
     grids: PropTypes.arrayOf(PropTypes.shape(Types.grid)).isRequired,
     highlighterSettings: PropTypes.shape(Types.highlighterSettings).isRequired,
     setSelectedNode: PropTypes.func.isRequired,
-    showGridOutline: PropTypes.bool.isRequired,
     onHideBoxModelHighlighter: PropTypes.func.isRequired,
     onSetGridOverlayColor: PropTypes.func.isRequired,
     onShowBoxModelHighlighterForNode: PropTypes.func.isRequired,
@@ -44,7 +43,6 @@ module.exports = createClass({
       grids,
       highlighterSettings,
       setSelectedNode,
-      showGridOutline,
       onHideBoxModelHighlighter,
       onSetGridOverlayColor,
       onShowBoxModelHighlighterForNode,
@@ -81,19 +79,16 @@ module.exports = createClass({
             onToggleShowInfiniteLines,
           })
         ),
-        showGridOutline ?
-          GridOutline({
-            grids,
-            onShowGridAreaHighlight,
-            onShowGridCellHighlight,
-          })
-          :
-          null
+        GridOutline({
+          grids,
+          onShowGridAreaHighlight,
+          onShowGridCellHighlight,
+        })
       )
       :
       dom.div(
         {
-          className: "layout-no-grids",
+          className: "devtools-sidepanel-no-result",
         },
         getStr("layout.noGridsOnThisPage")
       );

@@ -25,15 +25,14 @@ function executeSoon(aFun)
 {
   let comp = SpecialPowers.wrap(Components);
 
-  let thread = comp.classes["@mozilla.org/thread-manager;1"]
-                   .getService(comp.interfaces.nsIThreadManager)
-                   .mainThread;
+  let tm = comp.classes["@mozilla.org/thread-manager;1"]
+               .getService(comp.interfaces.nsIThreadManager);
 
-  thread.dispatch({
+  tm.dispatchToMainThread({
     run() {
       aFun();
     }
-  }, Components.interfaces.nsIThread.DISPATCH_NORMAL);
+  });
 }
 
 function clearAllDatabases(callback) {
@@ -78,6 +77,7 @@ function* testHarnessSteps() {
       "set": [
         ["dom.indexedDB.testing", true],
         ["dom.indexedDB.experimental", true],
+        ["javascript.options.wasm_baselinejit", true]  // This can be removed when on by default
       ]
     },
     nextTestHarnessStep

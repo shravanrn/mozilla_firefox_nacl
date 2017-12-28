@@ -119,11 +119,12 @@ var gEMEHandler = {
       });
     }
 
-    let iconURL = "chrome://browser/skin/drm-icon.svg#chains-black";
+    let iconURL = "chrome://browser/skin/drm-icon.svg";
 
     // Do a little dance to get rich content into the notification:
     let fragment = document.createDocumentFragment();
     let descriptionContainer = document.createElement("description");
+    // eslint-disable-next-line no-unsanitized/property
     descriptionContainer.innerHTML = message;
     while (descriptionContainer.childNodes.length) {
       fragment.appendChild(descriptionContainer.childNodes[0]);
@@ -168,11 +169,7 @@ var gEMEHandler = {
       label: gNavigatorBundle.getString(btnLabelId),
       accessKey: gNavigatorBundle.getString(btnAccessKeyId),
       callback() {
-        if (Services.prefs.getBoolPref("browser.preferences.useOldOrganization")) {
-          openPreferences("paneContent", {origin: "browserMedia"});
-        } else {
-          openPreferences("panePrivacy", {origin: "browserMedia"});
-        }
+        openPreferences("general-drm", {origin: "browserMedia"});
       },
       dismiss: true
     };

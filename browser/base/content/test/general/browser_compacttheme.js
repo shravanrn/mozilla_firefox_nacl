@@ -17,7 +17,7 @@ registerCleanupFunction(() => {
   Services.prefs.clearUserPref(PREF_LWTHEME_USED_THEMES);
 });
 
-add_task(function* startTests() {
+add_task(async function startTests() {
   if (SKIP_TEST) {
     ok(true, "No need to run this test since themes aren't installed");
     return;
@@ -53,13 +53,13 @@ function dummyLightweightTheme(id) {
     id,
     name: id,
     headerURL: "resource:///chrome/browser/content/browser/defaultthemes/compact.header.png",
-    iconURL: "resource:///chrome/browser/content/browser/defaultthemes/compactlight.icon.svg",
+    iconURL: "resource:///chrome/browser/content/browser/defaultthemes/light.icon.svg",
     textcolor: "red",
     accentcolor: "blue"
   };
 }
 
-add_task(function* testLightweightThemePreview() {
+add_task(async function testLightweightThemePreview() {
   if (SKIP_TEST) {
     ok(true, "No need to run this test since themes aren't installed");
     return;

@@ -5,7 +5,6 @@
 
 #include "gtest/gtest.h"
 #include "MP4Demuxer.h"
-#include "MP4Stream.h"
 #include "mozilla/MozPromise.h"
 #include "MediaDataDemuxer.h"
 #include "mozilla/SharedThreadPool.h"
@@ -44,7 +43,7 @@ public:
     , mTaskQueue(new TaskQueue(GetMediaThreadPool(MediaThreadType::PLAYBACK)))
     , mIndex(0)
   {
-    EXPECT_EQ(NS_OK, resource->Open(nullptr));
+    EXPECT_EQ(NS_OK, resource->Open());
   }
 
   template<typename Function>
@@ -148,7 +147,8 @@ private:
   void
   DispatchTask(FunctionType aFun)
   {
-    RefPtr<Runnable> r = NS_NewRunnableFunction(aFun);
+    RefPtr<Runnable> r =
+      NS_NewRunnableFunction("MP4DemuxerBinding::DispatchTask", aFun);
     mTaskQueue->Dispatch(r.forget());
   }
 

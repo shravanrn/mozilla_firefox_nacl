@@ -3,28 +3,29 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use bluetooth_traits::BluetoothRequest;
+use canvas_traits::webgl::WebGLPipeline;
 use compositing::CompositionPipeline;
 use compositing::CompositorProxy;
 use compositing::compositor_thread::Msg as CompositorMsg;
 use devtools_traits::{DevtoolsControlMsg, ScriptToDevtoolsControlMsg};
-use euclid::scale_factor::ScaleFactor;
-use euclid::size::TypedSize2D;
+use euclid::{TypedSize2D, ScaleFactor};
 use event_loop::EventLoop;
 use gfx::font_cache_thread::FontCacheThread;
 use ipc_channel::Error;
 use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
 use ipc_channel::router::ROUTER;
 use layout_traits::LayoutThreadFactory;
+use metrics::PaintTimeMetrics;
 use msg::constellation_msg::{BrowsingContextId, TopLevelBrowsingContextId, FrameType, PipelineId, PipelineNamespaceId};
 use net::image_cache::ImageCacheImpl;
 use net_traits::{IpcSend, ResourceThreads};
 use net_traits::image_cache::ImageCache;
 use profile_traits::mem as profile_mem;
 use profile_traits::time;
-use script_traits::{ConstellationControlMsg, DevicePixel, DiscardBrowsingContext};
+use script_traits::{ConstellationControlMsg, DiscardBrowsingContext, ScriptToConstellationChan};
 use script_traits::{DocumentActivity, InitialScriptState};
 use script_traits::{LayoutControlMsg, LayoutMsg, LoadData, MozBrowserEvent};
-use script_traits::{NewLayoutInfo, SWManagerMsg, SWManagerSenders, ScriptMsg};
+use script_traits::{NewLayoutInfo, SWManagerMsg, SWManagerSenders};
 use script_traits::{ScriptThreadFactory, TimerSchedulerMsg, WindowSizeData};
 use servo_config::opts::{self, Opts};
 use servo_config::prefs::{PREFS, Pref};
@@ -38,7 +39,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::mpsc::Sender;
 use style_traits::CSSPixel;
-use webrender_traits;
+use style_traits::DevicePixel;
+use webrender_api;
 use webvr_traits::WebVRMsg;
 
 /// A `Pipeline` is the constellation's view of a `Document`. Each pipeline has an
@@ -76,9 +78,6 @@ pub struct Pipeline {
     /// to a hash URL.
     pub url: ServoUrl,
 
-    /// The title of the most recently-loaded page.
-    pub title: Option<String>,
-
     /// Whether this pipeline is currently running animations. Pipelines that are running
     /// animations cause composites to be continually scheduled.
     pub running_animations: bool,
@@ -114,7 +113,7 @@ pub struct InitialPipelineState {
     pub parent_info: Option<(PipelineId, FrameType)>,
 
     /// A channel to the associated constellation.
-    pub constellation_chan: IpcSender<ScriptMsg>,
+    pub script_to_constellation_chan: ScriptToConstellationChan,
 
     /// A channel for the layout thread to send messages to the constellation.
     pub layout_to_constellation_chan: IpcSender<LayoutMsg>,
@@ -158,6 +157,7 @@ pub struct InitialPipelineState {
     /// Information about the page to load.
     pub load_data: LoadData,
 
+
     /// The ID of the pipeline namespace for this script thread.
     pub pipeline_namespace_id: PipelineNamespaceId,
 
@@ -165,12 +165,19 @@ pub struct InitialPipelineState {
     pub prev_visibility: Option<bool>,
 
     /// Webrender api.
-    pub webrender_api_sender: webrender_traits::RenderApiSender,
+    pub webrender_api_sender: webrender_api::RenderApiSender,
+
+    /// The ID of the document processed by this script thread.
+    pub webrender_document: webrender_api::DocumentId,
 
     /// Whether this pipeline is considered private.
     pub is_private: bool,
+
+    /// A channel to the webgl thread.
+    pub webgl_chan: WebGLPipeline,
+
     /// A channel to the webvr thread.
-    pub webvr_thread: Option<IpcSender<WebVRMsg>>,
+    pub webvr_chan: Option<IpcSender<WebVRMsg>>,
 }
 
 impl Pipeline {
@@ -244,7 +251,7 @@ impl Pipeline {
                     browsing_context_id: state.browsing_context_id,
                     top_level_browsing_context_id: state.top_level_browsing_context_id,
                     parent_info: state.parent_info,
-                    constellation_chan: state.constellation_chan,
+                    script_to_constellation_chan: state.script_to_constellation_chan.clone(),
                     scheduler_chan: state.scheduler_chan,
                     devtools_chan: script_to_devtools_chan,
                     bluetooth_thread: state.bluetooth_thread,
@@ -267,14 +274,16 @@ impl Pipeline {
                     script_content_process_shutdown_chan: script_content_process_shutdown_chan,
                     script_content_process_shutdown_port: script_content_process_shutdown_port,
                     webrender_api_sender: state.webrender_api_sender,
-                    webvr_thread: state.webvr_thread,
+                    webrender_document: state.webrender_document,
+                    webgl_chan: state.webgl_chan,
+                    webvr_chan: state.webvr_chan,
                 };
 
                 // Spawn the child process.
                 //
                 // Yes, that's all there is to it!
                 if opts::multiprocess() {
-                    let _ = try!(unprivileged_pipeline_content.spawn_multiprocess());
+                    let _ = unprivileged_pipeline_content.spawn_multiprocess()?;
                 } else {
                     unprivileged_pipeline_content.start_all::<Message, LTF, STF>(false);
                 }
@@ -317,7 +326,6 @@ impl Pipeline {
             layout_chan: layout_chan,
             compositor_proxy: compositor_proxy,
             url: url,
-            title: None,
             children: vec!(),
             running_animations: false,
             visible: visible,
@@ -444,7 +452,7 @@ pub struct UnprivilegedPipelineContent {
     top_level_browsing_context_id: TopLevelBrowsingContextId,
     browsing_context_id: BrowsingContextId,
     parent_info: Option<(PipelineId, FrameType)>,
-    constellation_chan: IpcSender<ScriptMsg>,
+    script_to_constellation_chan: ScriptToConstellationChan,
     layout_to_constellation_chan: IpcSender<LayoutMsg>,
     scheduler_chan: IpcSender<TimerSchedulerMsg>,
     devtools_chan: Option<IpcSender<ScriptToDevtoolsControlMsg>>,
@@ -466,8 +474,10 @@ pub struct UnprivilegedPipelineContent {
     layout_content_process_shutdown_port: IpcReceiver<()>,
     script_content_process_shutdown_chan: IpcSender<()>,
     script_content_process_shutdown_port: IpcReceiver<()>,
-    webrender_api_sender: webrender_traits::RenderApiSender,
-    webvr_thread: Option<IpcSender<WebVRMsg>>,
+    webrender_api_sender: webrender_api::RenderApiSender,
+    webrender_document: webrender_api::DocumentId,
+    webgl_chan: WebGLPipeline,
+    webvr_chan: Option<IpcSender<WebVRMsg>>,
 }
 
 impl UnprivilegedPipelineContent {
@@ -476,6 +486,10 @@ impl UnprivilegedPipelineContent {
               STF: ScriptThreadFactory<Message=Message>
     {
         let image_cache = Arc::new(ImageCacheImpl::new(self.webrender_api_sender.create_api()));
+        let paint_time_metrics = PaintTimeMetrics::new(self.id,
+                                                       self.time_profiler_chan.clone(),
+                                                       self.layout_to_constellation_chan.clone(),
+                                                       self.script_chan.clone());
         let layout_pair = STF::create(InitialScriptState {
             id: self.id,
             browsing_context_id: self.browsing_context_id,
@@ -483,7 +497,7 @@ impl UnprivilegedPipelineContent {
             parent_info: self.parent_info,
             control_chan: self.script_chan.clone(),
             control_port: self.script_port,
-            constellation_chan: self.constellation_chan,
+            script_to_constellation_chan: self.script_to_constellation_chan.clone(),
             layout_to_constellation_chan: self.layout_to_constellation_chan.clone(),
             scheduler_chan: self.scheduler_chan,
             bluetooth_thread: self.bluetooth_thread,
@@ -495,7 +509,8 @@ impl UnprivilegedPipelineContent {
             window_size: self.window_size,
             pipeline_namespace_id: self.pipeline_namespace_id,
             content_process_shutdown_chan: self.script_content_process_shutdown_chan,
-            webvr_thread: self.webvr_thread
+            webgl_chan: self.webgl_chan,
+            webvr_chan: self.webvr_chan,
         }, self.load_data.clone());
 
         LTF::create(self.id,
@@ -512,8 +527,10 @@ impl UnprivilegedPipelineContent {
                     self.mem_profiler_chan,
                     Some(self.layout_content_process_shutdown_chan),
                     self.webrender_api_sender,
+                    self.webrender_document,
                     self.prefs.get("layout.threads").expect("exists").value()
-                        .as_u64().expect("count") as usize);
+                        .as_u64().expect("count") as usize,
+                    paint_time_metrics);
 
         if wait_for_completion {
             let _ = self.script_content_process_shutdown_port.recv();
@@ -521,7 +538,7 @@ impl UnprivilegedPipelineContent {
         }
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(all(not(target_os = "windows"), not(target_os = "ios")))]
     pub fn spawn_multiprocess(self) -> Result<(), Error> {
         use gaol::sandbox::{self, Sandbox, SandboxMethods};
         use ipc_channel::ipc::IpcOneShotServer;
@@ -564,14 +581,14 @@ impl UnprivilegedPipelineContent {
         }
 
         let (_receiver, sender) = server.accept().expect("Server failed to accept.");
-        try!(sender.send(self));
+        sender.send(self)?;
 
         Ok(())
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "ios"))]
     pub fn spawn_multiprocess(self) -> Result<(), Error> {
-        error!("Multiprocess is not supported on Windows.");
+        error!("Multiprocess is not supported on Windows or iOS.");
         process::exit(1);
     }
 
@@ -589,8 +606,8 @@ impl UnprivilegedPipelineContent {
         }
     }
 
-    pub fn constellation_chan(&self) -> IpcSender<ScriptMsg> {
-        self.constellation_chan.clone()
+    pub fn script_to_constellation_chan(&self) -> &ScriptToConstellationChan {
+        &self.script_to_constellation_chan
     }
 
     pub fn opts(&self) -> Opts {

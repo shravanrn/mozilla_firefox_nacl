@@ -29,6 +29,8 @@ class unknown(object):
 
     def __str__(self):
         return 'UNKNOWN'
+
+
 unknown = unknown()  # singleton
 
 
@@ -56,13 +58,15 @@ def get_windows_version():
 
     return os_version.dwMajorVersion, os_version.dwMinorVersion, os_version.dwBuildNumber
 
+
 # get system information
 info = {'os': unknown,
         'processor': unknown,
         'version': unknown,
         'os_version': unknown,
         'bits': unknown,
-        'has_sandbox': unknown}
+        'has_sandbox': unknown,
+        'webrender': bool(os.environ.get("MOZ_WEBRENDER", False))}
 (system, node, release, version, machine, processor) = platform.uname()
 (bits, linkage) = platform.architecture()
 
@@ -244,6 +248,7 @@ def output_to_file(path):
     with open(path, 'w') as f:
         f.write(json.dumps(info))
 
+
 update({})
 
 # exports
@@ -296,6 +301,7 @@ def main(args=None):
     # otherwise, print out all info
     for key, value in info.items():
         print '%s: %s' % (key, value)
+
 
 if __name__ == '__main__':
     main()

@@ -25,7 +25,6 @@
 #include "nsStyleConsts.h"
 #include "nsStyleContext.h"
 #include "nsHTMLParts.h"
-#include "nsRenderingContext.h"
 #include "nsIDOMMutationEvent.h"
 #include "nsNameSpaceManager.h"
 #include "nsCSSAnonBoxes.h"
@@ -100,7 +99,6 @@ public:
                              nsIFrame::Cursor& aCursor) override;
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 
   virtual void Reflow(nsPresContext*           aPresContext,
@@ -148,7 +146,6 @@ public:
 #endif
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 
   virtual void Reflow(nsPresContext*           aPresContext,
@@ -676,10 +673,9 @@ nsHTMLFramesetFrame::GetCursor(const nsPoint&    aPoint,
 
 void
 nsHTMLFramesetFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                      const nsRect&           aDirtyRect,
                                       const nsDisplayListSet& aLists)
 {
-  BuildDisplayListForInline(aBuilder, aDirtyRect, aLists);
+  BuildDisplayListForInline(aBuilder, aLists);
 
   if (mDragger && aBuilder->IsForEventDelivery()) {
     aLists.Content()->AppendNewToTop(
@@ -807,6 +803,8 @@ nsHTMLFramesetFrame::Reflow(nsPresContext*           aPresContext,
   MarkInReflow();
   DO_GLOBAL_REFLOW_COUNT("nsHTMLFramesetFrame");
   DISPLAY_REFLOW(aPresContext, this, aReflowInput, aDesiredSize, aStatus);
+  MOZ_ASSERT(aStatus.IsEmpty(), "Caller should pass a fresh reflow status!");
+
   nsIPresShell *shell = aPresContext->PresShell();
   StyleSetHandle styleSet = shell->StyleSet();
 
@@ -851,7 +849,6 @@ nsHTMLFramesetFrame::Reflow(nsPresContext*           aPresContext,
   // If the number of cols or rows has changed, the frame for the frameset
   // will be re-created.
   if (mNumRows != rows || mNumCols != cols) {
-    aStatus.Reset();
     mDrag.UnSet();
     NS_FRAME_SET_TRUNCATION(aStatus, aReflowInput, aDesiredSize);
     return;
@@ -1084,7 +1081,6 @@ nsHTMLFramesetFrame::Reflow(nsPresContext*           aPresContext,
     mChildBorderColors.reset();
   }
 
-  aStatus.Reset();
   mDrag.UnSet();
 
   aDesiredSize.SetOverflowAreasToDesiredBounds();
@@ -1378,13 +1374,13 @@ nsHTMLFramesetBorderFrame::Reflow(nsPresContext*           aPresContext,
 {
   DO_GLOBAL_REFLOW_COUNT("nsHTMLFramesetBorderFrame");
   DISPLAY_REFLOW(aPresContext, this, aReflowInput, aDesiredSize, aStatus);
+  MOZ_ASSERT(aStatus.IsEmpty(), "Caller should pass a fresh reflow status!");
 
   // Override Reflow(), since we don't want to deal with what our
   // computed values are.
   SizeToAvailSize(aReflowInput, aDesiredSize);
 
   aDesiredSize.SetOverflowAreasToDesiredBounds();
-  aStatus.Reset();
 }
 
 class nsDisplayFramesetBorder : public nsDisplayItem {
@@ -1408,12 +1404,12 @@ public:
     aOutFrames->AppendElement(mFrame);
   }
   virtual void Paint(nsDisplayListBuilder* aBuilder,
-                     nsRenderingContext* aCtx) override;
+                     gfxContext* aCtx) override;
   NS_DISPLAY_DECL_NAME("FramesetBorder", TYPE_FRAMESET_BORDER)
 };
 
 void nsDisplayFramesetBorder::Paint(nsDisplayListBuilder* aBuilder,
-                                    nsRenderingContext* aCtx)
+                                    gfxContext* aCtx)
 {
   static_cast<nsHTMLFramesetBorderFrame*>(mFrame)->
     PaintBorder(aCtx->GetDrawTarget(), ToReferenceFrame());
@@ -1421,7 +1417,6 @@ void nsDisplayFramesetBorder::Paint(nsDisplayListBuilder* aBuilder,
 
 void
 nsHTMLFramesetBorderFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                            const nsRect&           aDirtyRect,
                                             const nsDisplayListSet& aLists)
 {
   aLists.Content()->AppendNewToTop(
@@ -1593,13 +1588,13 @@ nsHTMLFramesetBlankFrame::Reflow(nsPresContext*           aPresContext,
                                  nsReflowStatus&          aStatus)
 {
   DO_GLOBAL_REFLOW_COUNT("nsHTMLFramesetBlankFrame");
+  MOZ_ASSERT(aStatus.IsEmpty(), "Caller should pass a fresh reflow status!");
 
   // Override Reflow(), since we don't want to deal with what our
   // computed values are.
   SizeToAvailSize(aReflowInput, aDesiredSize);
 
   aDesiredSize.SetOverflowAreasToDesiredBounds();
-  aStatus.Reset();
 }
 
 class nsDisplayFramesetBlank : public nsDisplayItem {
@@ -1616,12 +1611,12 @@ public:
 #endif
 
   virtual void Paint(nsDisplayListBuilder* aBuilder,
-                     nsRenderingContext* aCtx) override;
+                     gfxContext* aCtx) override;
   NS_DISPLAY_DECL_NAME("FramesetBlank", TYPE_FRAMESET_BLANK)
 };
 
 void nsDisplayFramesetBlank::Paint(nsDisplayListBuilder* aBuilder,
-                                   nsRenderingContext* aCtx)
+                                   gfxContext* aCtx)
 {
   DrawTarget* drawTarget = aCtx->GetDrawTarget();
   int32_t appUnitsPerDevPixel = mFrame->PresContext()->AppUnitsPerDevPixel();
@@ -1633,7 +1628,6 @@ void nsDisplayFramesetBlank::Paint(nsDisplayListBuilder* aBuilder,
 
 void
 nsHTMLFramesetBlankFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                           const nsRect&           aDirtyRect,
                                            const nsDisplayListSet& aLists)
 {
   aLists.Content()->AppendNewToTop(

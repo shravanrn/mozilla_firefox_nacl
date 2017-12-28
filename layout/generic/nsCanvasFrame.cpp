@@ -8,12 +8,12 @@
 #include "nsCanvasFrame.h"
 
 #include "AccessibleCaretEventHub.h"
+#include "gfxContext.h"
 #include "gfxUtils.h"
 #include "nsContainerFrame.h"
 #include "nsCSSRendering.h"
 #include "nsPresContext.h"
 #include "nsStyleContext.h"
-#include "nsRenderingContext.h"
 #include "nsGkAtoms.h"
 #include "nsIFrameInlines.h"
 #include "nsIPresShell.h"
@@ -124,7 +124,9 @@ nsCanvasFrame::CreateAnonymousContent(nsTArray<ContentInfo>& aElements)
 void
 nsCanvasFrame::AppendAnonymousContentTo(nsTArray<nsIContent*>& aElements, uint32_t aFilter)
 {
-  aElements.AppendElement(mCustomContentContainer);
+  if (mCustomContentContainer) {
+    aElements.AppendElement(mCustomContentContainer);
+  }
 }
 
 void
@@ -151,7 +153,7 @@ nsCanvasFrame::DestroyFrom(nsIFrame* aDestructRoot)
       content->SetContentNode(clonedElement->AsElement());
     }
   }
-  nsContentUtils::DestroyAnonymousContent(&mCustomContentContainer);
+  DestroyAnonymousContent(mCustomContentContainer.forget());
 
   nsContainerFrame::DestroyFrom(aDestructRoot);
 }
@@ -253,7 +255,7 @@ nsRect nsCanvasFrame::CanvasArea() const
 
 void
 nsDisplayCanvasBackgroundColor::Paint(nsDisplayListBuilder* aBuilder,
-                                      nsRenderingContext* aCtx)
+                                      gfxContext* aCtx)
 {
   nsCanvasFrame* frame = static_cast<nsCanvasFrame*>(mFrame);
   nsPoint offset = ToReferenceFrame();
@@ -303,13 +305,21 @@ nsDisplayCanvasBackgroundColor::BuildLayer(nsDisplayListBuilder* aBuilder,
   return layer.forget();
 }
 
-void
+bool
 nsDisplayCanvasBackgroundColor::CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
+                                                        mozilla::wr::IpcResourceUpdateQueue& aResources,
                                                         const StackingContextHelper& aSc,
-                                                        nsTArray<WebRenderParentCommand>& aParentCommands,
-                                                        WebRenderDisplayItemLayer* aLayer)
+                                                        WebRenderLayerManager* aManager,
+                                                        nsDisplayListBuilder* aDisplayListBuilder)
 {
-  nsCanvasFrame* frame = static_cast<nsCanvasFrame*>(mFrame);
+  if (aManager->IsLayersFreeTransaction()) {
+    ContainerLayerParameters parameter;
+    if (GetLayerState(aDisplayListBuilder, aManager, parameter) != LAYER_ACTIVE) {
+      return false;
+    }
+  }
+
+  nsCanvasFrame *frame = static_cast<nsCanvasFrame *>(mFrame);
   nsPoint offset = ToReferenceFrame();
   nsRect bgClipRect = frame->CanvasArea() + offset;
   int32_t appUnitsPerDevPixel = mFrame->PresContext()->AppUnitsPerDevPixel();
@@ -317,10 +327,12 @@ nsDisplayCanvasBackgroundColor::CreateWebRenderCommands(mozilla::wr::DisplayList
   LayoutDeviceRect rect = LayoutDeviceRect::FromAppUnits(
           bgClipRect, appUnitsPerDevPixel);
 
-  WrRect transformedRect = aSc.ToRelativeWrRect(rect);
+  wr::LayoutRect transformedRect = aSc.ToRelativeLayoutRect(rect);
   aBuilder.PushRect(transformedRect,
-                    aBuilder.PushClipRegion(transformedRect),
-                    wr::ToWrColor(ToDeviceColor(mColor)));
+                    transformedRect,
+                    !BackfaceIsHidden(),
+                    wr::ToColorF(ToDeviceColor(mColor)));
+  return true;
 }
 
 #ifdef MOZ_DUMP_PAINTING
@@ -347,14 +359,14 @@ static void BlitSurface(DrawTarget* aDest, const gfxRect& aRect, DrawTarget* aSo
 
 void
 nsDisplayCanvasBackgroundImage::Paint(nsDisplayListBuilder* aBuilder,
-                                      nsRenderingContext* aCtx)
+                                      gfxContext* aCtx)
 {
   nsCanvasFrame* frame = static_cast<nsCanvasFrame*>(mFrame);
   nsPoint offset = ToReferenceFrame();
   nsRect bgClipRect = frame->CanvasArea() + offset;
 
 #ifndef MOZ_GFX_OPTIMIZE_MOBILE
-  RefPtr<gfxContext> dest = aCtx->ThebesContext();
+  RefPtr<gfxContext> dest = aCtx;
   gfxRect destRect;
   if (IsSingleFixedPositionImage(aBuilder, bgClipRect, &destRect) &&
       aBuilder->IsPaintingToWindow() && !aBuilder->IsCompositingCheap() &&
@@ -363,7 +375,7 @@ nsDisplayCanvasBackgroundImage::Paint(nsDisplayListBuilder* aBuilder,
     // to snap for this context, because we checked HasNonIntegerTranslation
     // above.
     destRect.Round();
-    RefPtr<DrawTarget> dt = 
+    RefPtr<DrawTarget> dt =
       Frame()->GetProperty(nsIFrame::CachedBackgroundImageDT());
     DrawTarget* destDT = dest->GetDrawTarget();
     if (dt) {
@@ -377,9 +389,8 @@ nsDisplayCanvasBackgroundImage::Paint(nsDisplayListBuilder* aBuilder,
     if (dt && dt->IsValid()) {
       RefPtr<gfxContext> ctx = gfxContext::CreateOrNull(dt);
       MOZ_ASSERT(ctx); // already checked draw target above
-      ctx->SetMatrix(ctx->CurrentMatrix().Translate(-destRect.x, -destRect.y));
-      nsRenderingContext context(ctx);
-      PaintInternal(aBuilder, &context, bgClipRect, &bgClipRect);
+      ctx->SetMatrix(ctx->CurrentMatrix().PreTranslate(-destRect.x, -destRect.y));
+      PaintInternal(aBuilder, ctx, bgClipRect, &bgClipRect);
       BlitSurface(dest->GetDrawTarget(), destRect, dt);
       frame->SetProperty(nsIFrame::CachedBackgroundImageDT(),
                               dt.forget().take());
@@ -428,7 +439,7 @@ nsDisplayCanvasBackgroundImage::IsSingleFixedPositionImage(nsDisplayListBuilder*
 
 void
 nsDisplayCanvasThemedBackground::Paint(nsDisplayListBuilder* aBuilder,
-                                       nsRenderingContext* aCtx)
+                                       gfxContext* aCtx)
 {
   nsCanvasFrame* frame = static_cast<nsCanvasFrame*>(mFrame);
   nsPoint offset = ToReferenceFrame();
@@ -454,7 +465,7 @@ public:
   }
 
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder,
-                           bool* aSnap) override
+                           bool* aSnap) const override
   {
     *aSnap = false;
     // This is an overestimate, but that's not a problem.
@@ -463,7 +474,7 @@ public:
   }
 
   virtual void Paint(nsDisplayListBuilder* aBuilder,
-                     nsRenderingContext* aCtx) override
+                     gfxContext* aCtx) override
   {
     nsCanvasFrame* frame = static_cast<nsCanvasFrame*>(mFrame);
     frame->PaintFocus(aCtx->GetDrawTarget(), ToReferenceFrame());
@@ -474,11 +485,10 @@ public:
 
 void
 nsCanvasFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
-                                const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists)
 {
   if (GetPrevInFlow()) {
-    DisplayOverflowContainers(aBuilder, aDirtyRect, aLists);
+    DisplayOverflowContainers(aBuilder, aLists);
   }
 
   // Force a background to be shown. We may have a background propagated to us,
@@ -497,7 +507,7 @@ nsCanvasFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     }
     aLists.BorderBackground()->AppendNewToTop(
         new (aBuilder) nsDisplayCanvasBackgroundColor(aBuilder, this));
-  
+
     if (isThemed) {
       aLists.BorderBackground()->AppendNewToTop(
         new (aBuilder) nsDisplayCanvasThemedBackground(aBuilder, this));
@@ -541,8 +551,9 @@ nsCanvasFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
         DisplayListClipState::AutoSaveRestore clipState(aBuilder);
         nsDisplayListBuilder::AutoCurrentActiveScrolledRootSetter asrSetter(aBuilder);
         if (displayData) {
-          nsRect dirtyRect = displayData->mDirtyRect + GetOffsetTo(PresContext()->GetPresShell()->GetRootFrame());
-          buildingDisplayList.SetDirtyRect(dirtyRect);
+          nsPoint offset = GetOffsetTo(PresContext()->GetPresShell()->GetRootFrame());
+          aBuilder->SetDirtyRect(displayData->mDirtyRect + offset);
+
           clipState.SetClipChainForContainingBlockDescendants(
             displayData->mContainingBlockClipChain);
           asrSetter.SetCurrentActiveScrolledRoot(
@@ -586,7 +597,7 @@ nsCanvasFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
 
   for (nsIFrame* kid : PrincipalChildList()) {
     // Put our child into its own pseudo-stack.
-    BuildDisplayListForChild(aBuilder, kid, aDirtyRect, aLists);
+    BuildDisplayListForChild(aBuilder, kid, aLists);
   }
 
 #ifdef DEBUG_CANVAS_FOCUS
@@ -600,11 +611,12 @@ nsCanvasFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   nsCOMPtr<nsIDocShell> docShell(do_QueryInterface(container));
   if (docShell) {
     docShell->GetHasFocus(&hasFocus);
-    printf("%p - nsCanvasFrame::Paint R:%d,%d,%d,%d  DR: %d,%d,%d,%d\n", this, 
+    nsRect dirty = aBuilder->GetDirtyRect();
+    printf("%p - nsCanvasFrame::Paint R:%d,%d,%d,%d  DR: %d,%d,%d,%d\n", this,
             mRect.x, mRect.y, mRect.width, mRect.height,
-            aDirtyRect.x, aDirtyRect.y, aDirtyRect.width, aDirtyRect.height);
+            dirty.x, dirty.y, dirty.width, dirty.height);
   }
-  printf("%p - Focus: %s   c: %p  DoPaint:%s\n", docShell.get(), hasFocus?"Y":"N", 
+  printf("%p - Focus: %s   c: %p  DoPaint:%s\n", docShell.get(), hasFocus?"Y":"N",
          focusContent.get(), mDoPaintFocus?"Y":"N");
 #endif
 
@@ -613,7 +625,7 @@ nsCanvasFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   // Only paint the focus if we're visible
   if (!StyleVisibility()->IsVisible())
     return;
-  
+
   aLists.Outlines()->AppendNewToTop(new (aBuilder)
     nsDisplayCanvasFocus(aBuilder, this));
 }
@@ -645,7 +657,7 @@ nsCanvasFrame::PaintFocus(DrawTarget* aDrawTarget, nsPoint aPt)
 }
 
 /* virtual */ nscoord
-nsCanvasFrame::GetMinISize(nsRenderingContext *aRenderingContext)
+nsCanvasFrame::GetMinISize(gfxContext *aRenderingContext)
 {
   nscoord result;
   DISPLAY_MIN_WIDTH(this, result);
@@ -657,7 +669,7 @@ nsCanvasFrame::GetMinISize(nsRenderingContext *aRenderingContext)
 }
 
 /* virtual */ nscoord
-nsCanvasFrame::GetPrefISize(nsRenderingContext *aRenderingContext)
+nsCanvasFrame::GetPrefISize(gfxContext *aRenderingContext)
 {
   nscoord result;
   DISPLAY_PREF_WIDTH(this, result);
@@ -677,10 +689,8 @@ nsCanvasFrame::Reflow(nsPresContext*           aPresContext,
   MarkInReflow();
   DO_GLOBAL_REFLOW_COUNT("nsCanvasFrame");
   DISPLAY_REFLOW(aPresContext, this, aReflowInput, aDesiredSize, aStatus);
+  MOZ_ASSERT(aStatus.IsEmpty(), "Caller should pass a fresh reflow status!");
   NS_FRAME_TRACE_REFLOW_IN("nsCanvasFrame::Reflow");
-
-  // Initialize OUT parameter
-  aStatus.Reset();
 
   nsCanvasFrame* prevCanvasFrame = static_cast<nsCanvasFrame*>
                                                (GetPrevInFlow());
@@ -701,7 +711,7 @@ nsCanvasFrame::Reflow(nsPresContext*           aPresContext,
   // Set our size up front, since some parts of reflow depend on it
   // being already set.  Note that the computed height may be
   // unconstrained; that's ok.  Consumers should watch out for that.
-  SetSize(nsSize(aReflowInput.ComputedWidth(), aReflowInput.ComputedHeight())); 
+  SetSize(nsSize(aReflowInput.ComputedWidth(), aReflowInput.ComputedHeight()));
 
   // Reflow our one and only normal child frame. It's either the root
   // element's frame or a placeholder for that frame, if the root element
@@ -778,7 +788,7 @@ nsCanvasFrame::Reflow(nsPresContext*           aPresContext,
       nsIFrame* viewport = PresContext()->GetPresShell()->GetRootFrame();
       viewport->InvalidateFrame();
     }
-    
+
     // Return our desired size. Normally it's what we're told, but
     // sometimes we can be given an unconstrained height (when a window
     // is sizing-to-content), and we should compute our desired height.

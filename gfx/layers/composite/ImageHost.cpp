@@ -195,23 +195,12 @@ ImageHost::Composite(Compositor* aCompositor,
                      const nsIntRegion* aVisibleRegion,
                      const Maybe<gfx::Polygon>& aGeometry)
 {
-  HostLayerManager* lm = GetLayerManager();
-  if (!lm) {
+  RenderInfo info;
+  if (!PrepareToRender(aCompositor, &info)) {
     return;
   }
 
-  int imageIndex = ChooseImageIndex();
-  if (imageIndex < 0) {
-    return;
-  }
-
-  if (uint32_t(imageIndex) + 1 < mImages.Length()) {
-    lm->CompositeUntil(mImages[imageIndex + 1].mTimeStamp + TimeDuration::FromMilliseconds(BIAS_TIME_MS));
-  }
-
-  TimedImage* img = &mImages[imageIndex];
-  img->mTextureHost->SetTextureSourceProvider(aCompositor);
-  SetCurrentTextureHost(img->mTextureHost);
+  TimedImage* img = info.img;
 
   {
     AutoLockCompositableHost autoLock(this);
@@ -250,22 +239,8 @@ ImageHost::Composite(Compositor* aCompositor,
       diagnosticFlags |= DiagnosticFlags::YCBCR;
     }
 
-    if (mLastFrameID != img->mFrameID || mLastProducerID != img->mProducerID) {
-      if (mAsyncRef) {
-        ImageCompositeNotificationInfo info;
-        info.mImageBridgeProcessId = mAsyncRef.mProcessId;
-        info.mNotification = ImageCompositeNotification(
-          mAsyncRef.mHandle,
-          img->mTimeStamp, lm->GetCompositionTime(),
-          img->mFrameID, img->mProducerID);
-        static_cast<LayerManagerComposite*>(aLayer->GetLayerManager())->
-            AppendImageCompositeNotification(info);
-      }
-      mLastFrameID = img->mFrameID;
-      mLastProducerID = img->mProducerID;
-    }
     aEffectChain.mPrimaryEffect = effect;
-    gfx::Rect pictureRect(0, 0, img->mPictureRect.width, img->mPictureRect.height);
+    gfx::Rect pictureRect(0, 0, img->mPictureRect.Width(), img->mPictureRect.Height());
     BigImageIterator* it = mCurrentTextureSource->AsBigImageIterator();
     if (it) {
 
@@ -288,15 +263,15 @@ ImageHost::Composite(Compositor* aCompositor,
       it->BeginBigImageIteration();
       do {
         IntRect tileRect = it->GetTileRect();
-        gfx::Rect rect(tileRect.x, tileRect.y, tileRect.width, tileRect.height);
+        gfx::Rect rect(tileRect.x, tileRect.y, tileRect.Width(), tileRect.Height());
         rect = rect.Intersect(pictureRect);
-        effect->mTextureCoords = Rect(Float(rect.x - tileRect.x) / tileRect.width,
-                                      Float(rect.y - tileRect.y) / tileRect.height,
-                                      Float(rect.width) / tileRect.width,
-                                      Float(rect.height) / tileRect.height);
+        effect->mTextureCoords = Rect(Float(rect.x - tileRect.x) / tileRect.Width(),
+                                      Float(rect.y - tileRect.y) / tileRect.Height(),
+                                      Float(rect.Width()) / tileRect.Width(),
+                                      Float(rect.Height()) / tileRect.Height());
         if (img->mTextureHost->GetFlags() & TextureFlags::ORIGIN_BOTTOM_LEFT) {
           effect->mTextureCoords.y = effect->mTextureCoords.YMost();
-          effect->mTextureCoords.height = -effect->mTextureCoords.height;
+          effect->mTextureCoords.SetHeight(-effect->mTextureCoords.Height());
         }
         aCompositor->DrawGeometry(rect, aClipRect, aEffectChain,
                                   aOpacity, aTransform, aGeometry);
@@ -311,12 +286,12 @@ ImageHost::Composite(Compositor* aCompositor,
       IntSize textureSize = mCurrentTextureSource->GetSize();
       effect->mTextureCoords = Rect(Float(img->mPictureRect.x) / textureSize.width,
                                     Float(img->mPictureRect.y) / textureSize.height,
-                                    Float(img->mPictureRect.width) / textureSize.width,
-                                    Float(img->mPictureRect.height) / textureSize.height);
+                                    Float(img->mPictureRect.Width()) / textureSize.width,
+                                    Float(img->mPictureRect.Height()) / textureSize.height);
 
       if (img->mTextureHost->GetFlags() & TextureFlags::ORIGIN_BOTTOM_LEFT) {
         effect->mTextureCoords.y = effect->mTextureCoords.YMost();
-        effect->mTextureCoords.height = -effect->mTextureCoords.height;
+        effect->mTextureCoords.SetHeight(-effect->mTextureCoords.Height());
       }
 
       aCompositor->DrawGeometry(pictureRect, aClipRect, aEffectChain,
@@ -325,6 +300,67 @@ ImageHost::Composite(Compositor* aCompositor,
                                    pictureRect, aClipRect,
                                    aTransform, mFlashCounter);
     }
+  }
+
+  FinishRendering(info);
+}
+
+bool
+ImageHost::PrepareToRender(TextureSourceProvider* aProvider, RenderInfo* aOutInfo)
+{
+  HostLayerManager* lm = GetLayerManager();
+  if (!lm) {
+    return false;
+  }
+
+  int imageIndex = ChooseImageIndex();
+  if (imageIndex < 0) {
+    return false;
+  }
+
+  if (uint32_t(imageIndex) + 1 < mImages.Length()) {
+    lm->CompositeUntil(mImages[imageIndex + 1].mTimeStamp + TimeDuration::FromMilliseconds(BIAS_TIME_MS));
+  }
+
+  TimedImage* img = &mImages[imageIndex];
+  img->mTextureHost->SetTextureSourceProvider(aProvider);
+  SetCurrentTextureHost(img->mTextureHost);
+
+  aOutInfo->imageIndex = imageIndex;
+  aOutInfo->img = img;
+  aOutInfo->host = mCurrentTextureHost;
+  return true;
+}
+
+RefPtr<TextureSource>
+ImageHost::AcquireTextureSource(const RenderInfo& aInfo)
+{
+  MOZ_ASSERT(aInfo.host == mCurrentTextureHost);
+  if (!aInfo.host->AcquireTextureSource(mCurrentTextureSource)) {
+    return nullptr;
+  }
+  return mCurrentTextureSource.get();
+}
+
+void
+ImageHost::FinishRendering(const RenderInfo& aInfo)
+{
+  HostLayerManager* lm = GetLayerManager();
+  TimedImage* img = aInfo.img;
+  int imageIndex = aInfo.imageIndex;
+
+  if (mLastFrameID != img->mFrameID || mLastProducerID != img->mProducerID) {
+    if (mAsyncRef) {
+      ImageCompositeNotificationInfo info;
+      info.mImageBridgeProcessId = mAsyncRef.mProcessId;
+      info.mNotification = ImageCompositeNotification(
+        mAsyncRef.mHandle,
+        img->mTimeStamp, lm->GetCompositionTime(),
+        img->mFrameID, img->mProducerID);
+      lm->AppendImageCompositeNotification(info);
+    }
+    mLastFrameID = img->mFrameID;
+    mLastProducerID = img->mProducerID;
   }
 
   // Update mBias last. This can change which frame ChooseImage(Index) would
@@ -423,7 +459,7 @@ ImageHost::GetImageSize() const
 {
   const TimedImage* img = ChooseImage();
   if (img) {
-    return IntSize(img->mPictureRect.width, img->mPictureRect.height);
+    return IntSize(img->mPictureRect.Width(), img->mPictureRect.Height());
   }
   return IntSize();
 }
@@ -436,8 +472,8 @@ ImageHost::IsOpaque()
     return false;
   }
 
-  if (img->mPictureRect.width == 0 ||
-      img->mPictureRect.height == 0 ||
+  if (img->mPictureRect.Width() == 0 ||
+      img->mPictureRect.Height() == 0 ||
       !img->mTextureHost) {
     return false;
   }
