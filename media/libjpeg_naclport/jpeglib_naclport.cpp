@@ -17,7 +17,7 @@
   #error "USE_SANDBOXING value not provided"
 #endif
 
-#if(USE_SANDBOXING != 0 && USE_SANDBOXING != 1 && USE_SANDBOXING != 2)
+#if(USE_SANDBOXING != 0 && USE_SANDBOXING != 1 && USE_SANDBOXING != 2 && USE_SANDBOXING != 3)
   #error "Bad USE_SANDBOXING value provided"
 #endif
 
@@ -32,6 +32,11 @@
   #define TERM_SOURCE_SLOT 5
 
   NaClSandbox* jpegSandbox;
+
+#elif(USE_SANDBOXING == 3)
+  #include "ProcessSandbox.h"
+
+  Sandbox* sandbox;
 
 #endif
 
@@ -169,16 +174,21 @@ int initializeLibJpegSandbox()
     return 1;
   }
   
+  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_DL_PATH, JPEG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
+
   startedInit = 1;
+
   #if(USE_SANDBOXING == 0)
     printf("Using static libjpeg\n");
     finishedInit = 1;
     return 1;
-  #endif
 
-  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_DL_PATH, JPEG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
+  #elif(USE_SANDBOXING == 1)
 
-  #if(USE_SANDBOXING == 2)
+    printf("Loading dynamic library %s\n", JPEG_NON_NACL_DL_PATH);
+    dlPtr = dlopen(JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
+
+  #elif(USE_SANDBOXING == 2)
 
     printf("Creating NaCl Sandbox\n");
 
@@ -197,13 +207,12 @@ int initializeLibJpegSandbox()
     }
 
     printf("Loading dynamic library %s\n", JPEG_DL_PATH);
-
     dlPtr = dlopenInSandbox(jpegSandbox, JPEG_DL_PATH, RTLD_LAZY);
 
-  #elif(USE_SANDBOXING == 1)
+  #elif(USE_SANDBOXING == 3)
 
-    printf("Loading dynamic library %s\n", JPEG_NON_NACL_DL_PATH);
-    dlPtr = dlopen(JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
+    printf("Creating process sandbox\n");
+    sandbox = new ProcessSandbox();
 
   #endif
 
@@ -216,7 +225,14 @@ int initializeLibJpegSandbox()
   printf("Loading symbols.\n");
   int failed = 0;
 
-  #if(USE_SANDBOXING == 2)
+  #if(USE_SANDBOXING == 3)
+    #define loadSymbol(symbol) do { \
+      void* dlSymRes = sandbox->dlsymInSandbox(dlPtr, #symbol); \
+      if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
+      *((void **) &ptr_##symbol) = dlSymRes; \
+    } while(0)
+
+  #elif(USE_SANDBOXING == 2)
     #define loadSymbol(symbol) do { \
       void* dlSymRes = dlsymInSandbox(jpegSandbox, dlPtr, #symbol); \
       if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
@@ -301,8 +317,10 @@ int isAddressInNonJpegSandboxMemoryOrNull(uintptr_t uaddr)
 }
 void* mallocInJpegSandbox(size_t size)
 {
- #if(USE_SANDBOXING == 2)
+  #if(USE_SANDBOXING == 2)
     return mallocInSandbox(jpegSandbox, size);
+  #elif(USE_SANDBOXING == 3)
+    return sandbox->mallocInSandbox(size);
   #else
     return malloc(size);
   #endif 
@@ -311,6 +329,8 @@ void freeInJpegSandbox(void* ptr)
 {
   #if(USE_SANDBOXING == 2)
     freeInSandbox(jpegSandbox, ptr);
+  #elif(USE_SANDBOXING == 3)
+    sandbox->freeInSandbox(ptr);
   #else
     free(ptr);
   #endif 
