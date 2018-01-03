@@ -4,26 +4,19 @@ Version of firefox modified to use a sandboxed version of libjpeg.
 
 To Build
 =========
-First time setup
-	Update the paths in media/libjpeg_naclport/moz.build 
-	Run ./mach bootstrap
-
-Build with ./mach build.
+Build with cd builds && make build64 
+For the 32 bit version cd builds && make build32
 
 To Run
 ======
-# for the purposes of testing we are turning of seccomp. Eventually, we should perform all initialization prior to seccomp init
-export MOZ_DISABLE_CONTENT_SANDBOX=1
-./mach run
+cd builds && make run64
+For the 32 bit version cd builds && make run32
 
-The sandboxed version of libjpeg is compiled with NaCl's gcc compiler. 
-This binary is then loaded with the help of the library from https://github.com/shravanrn/Sandboxing_NaCl.git
-
-Note if you are building the Sandoxing_NaCl library from scratch, make sure to use settings compatible with firefox compile settings.
-To do this, replace the SConstruct file with SConstruct_Firefox and the built it
-
-For perf testing use the script
+For perf testing the 64 bit version
 ./runPerfTest outputfile.txt
+
+For perf testing the 32 bit version
+./runPerfTest32 outputfile.txt
 
 /////////////////////////////////////////////////////////////////////////////////////
 

@@ -1,0 +1,17 @@
+# Flags set for targeting x86.
+export CROSS_COMPILE=1
+export PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib/i386-linux-gnu/pkgconfig/
+export PKG_CONFIG_LIBDIR=/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib/i386-linux-gnu/pkgconfig/
+
+CC="gcc -m32"
+CXX="g++ -m32"
+AR=ar
+ac_add_options --target=i686-pc-linux
+
+# Normal build flags.  These make a debug browser build.
+ac_add_options --enable-application=browser
+mk_add_options MOZ_MAKE_FLAGS="-j8"
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/firefox_32bit_optdebug
+
+# ac_add_options --enable-debug
+ac_add_options --enable-optimize
