@@ -34,17 +34,17 @@ DEFINES['PRINT_FUNCTION_TIMES'] = 42
 
 ############ Update these paths as required
 
-DEFINES['JPEG_NON_NACL_DL_PATH'] = '"../libjpeg-turbo/non_nacl_build_simd_clang/.libs/libjpeg.so"'
-DEFINES['STARTUP_LIBRARY_PATH'] = '"../nacl2/native_client/scons-out/nacl_irt-x86-32/staging/irt_core.nexe"'
-DEFINES['SANDBOX_INIT_APP'] = '"../libjpeg-turbo/nacl_build_simd_clang/mainCombine/libjpeg.nexe"'
+DEFINES['JPEG_NON_NACL_DL_PATH'] = '"../libjpeg-turbo/builds/x32/non_nacl_build/.libs/libjpeg.so"'
+DEFINES['STARTUP_LIBRARY_PATH'] = '"../Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-32/staging/irt_core.nexe"'
+DEFINES['SANDBOX_INIT_APP'] = '"../libjpeg-turbo/builds/x32/nacl_build/mainCombine/libjpeg.nexe"'
 
 LOCAL_INCLUDES += [
     ############ Update this path as required
-    '/../nacl2/native_client/src/trusted/dyn_ldr',
+    '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
     '/media/libjpeg'
 ]
 
 ############ Update this path as required
-OS_LIBS += ['-L../nacl2/native_client/scons-out-firefox/opt-linux-x86-32/lib', '-ldyn_ldr', '-lsel', '-lnacl_error_code', '-lenv_cleanser', '-lnrd_xfer', '-lnacl_perf_counter', '-lnacl_base', '-limc', '-lnacl_fault_inject', '-lnacl_interval', '-lplatform_qual_lib', '-lvalidators', '-ldfa_validate_caller_x86_32', '-lcpu_features', '-lvalidation_cache', '-lplatform', '-lgio', '-lnccopy_x86_32', '-lrt', '-lpthread']
+OS_LIBS += ['-L../../../../Sandboxing_NaCl/native_client/scons-out-firefox/opt-linux-x86-32/lib', '-ldyn_ldr', '-lsel', '-lnacl_error_code', '-lenv_cleanser', '-lnrd_xfer', '-lnacl_perf_counter', '-lnacl_base', '-limc', '-lnacl_fault_inject', '-lnacl_interval', '-lplatform_qual_lib', '-lvalidators', '-ldfa_validate_caller_x86_32', '-lcpu_features', '-lvalidation_cache', '-lplatform', '-lgio', '-lnccopy_x86_32', '-lrt', '-lpthread']
 
 FINAL_LIBRARY = 'gkmedias'
