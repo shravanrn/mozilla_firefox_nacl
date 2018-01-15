@@ -27,10 +27,10 @@ sudo echo "Starting. Make sure to disable scaling first with. sudo cpufreq-set -
 function writeTimingLinesToOutput() {
 	# Logs are in the format as given below
 	#
-	# stuff | 1,JPEG_Time,0xf7150598,10,0,0
-	# stuff | 2,JPEG_Time,0xf7150598,33,1,10
-	# stuff | 1,JPEG_Time,0xaaa,31,0,0
-	# stuff | 2,JPEG_Time,0xaaa,40,1,11
+	# stuff | 1,JPEG_Time,0xf7150598,10,0,0,30
+	# stuff | 2,JPEG_Time,0xf7150598,33,1,10,35
+	# stuff | 1,JPEG_Time,0xaaa,31,0,0,40
+	# stuff | 2,JPEG_Time,0xaaa,40,1,11,50
 	#
 	# where the 5 comma separated columns are 
 	# - invocation count for this thread
@@ -39,11 +39,12 @@ function writeTimingLinesToOutput() {
 	# - cumulative time spent in "timed" code
 	# - invocation count for scanlines in this thread
 	# - cumulative time spent in "timed" scanlines code
+	# - cumulative time spent in rendering thread until jpeg destroy
 	#
 	# We want the latest time for each thread i.e.
 	#
-	# stuff | 2,JPEG_Time,0xf7150598,33,1,10
-	# stuff | 2,JPEG_Time,0xaaa,40,1,11
+	# stuff | 2,JPEG_Time,0xf7150598,33,1,10,35
+	# stuff | 2,JPEG_Time,0xaaa,40,1,11,50
 
 
 	ORIGINALDATA=$(cat "$2")
@@ -55,6 +56,7 @@ function writeTimingLinesToOutput() {
 	FNTIMESPENT=0
 	FNCOREINVOCATIONS=0
 	FNCORETIMESPENT=0
+	DESTROYTIMESPENT=0
 	while [ -n "$DATATOFILTER" ]
 	do
 
@@ -65,12 +67,14 @@ function writeTimingLinesToOutput() {
 		FNTIMESPENT=$((FNTIMESPENT + PIECES[3]))
 		FNCOREINVOCATIONS=$((FNCOREINVOCATIONS + PIECES[4]))
 		FNCORETIMESPENT=$((FNCORETIMESPENT + PIECES[5]))
+		DESTROYTIMESPENT=$((FNCORETIMESPENT + PIECES[6]))
 		DATATOFILTER=$(echo "$DATATOFILTER" | grep -v -E "${PIECES[2]}")
 	done
 
 	COMMASEPTIME=$(printf "%'.f\n" $((FNTIMESPENT / 25)))
 	COMMASEPCORETIME=$(printf "%'.f\n" $((FNCORETIMESPENT / 25)))
-	echo "Final JPEG_Time (for 1 run): inv=$((FNINVOCATIONS / 25)) time=$COMMASEPTIME core_inv=$((FNCOREINVOCATIONS / 25)) time=$COMMASEPCORETIME" >> "$1"
+	COMMASEPDESTROYTIME=$(printf "%'.f\n" $((DESTROYTIMESPENT / 25)))
+	echo "Final JPEG_Time (for 1 run): inv=$((FNINVOCATIONS / 25)) time=$COMMASEPTIME core_inv=$((FNCOREINVOCATIONS / 25)) time=$COMMASEPCORETIME destroy=$COMMASEPDESTROYTIME" >> "$1"
 	echo -e "\n" >> "$1"
 
 	IFS=$OIFS

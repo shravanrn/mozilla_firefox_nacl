@@ -30,6 +30,19 @@ extern "C" {
 #include "iccjpeg.h"
 }
 
+#include <sys/types.h>
+#include <unistd.h>
+#include <chrono>
+#include <atomic>
+using namespace std::chrono;
+
+extern "C" {
+  unsigned long long getTimeSpentInJpeg();
+  unsigned long long getTimeSpentInJpegCore();
+  unsigned long long getInvocationsInJpeg();
+  unsigned long long getInvocationsInJpegCore();
+}
+
 #if MOZ_BIG_ENDIAN
 #define MOZ_JCS_EXT_NATIVE_ENDIAN_XRGB JCS_EXT_XRGB
 #else
@@ -123,6 +136,10 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
          ("nsJPEGDecoder::nsJPEGDecoder: Creating JPEG decoder %p",
           this));
 }
+
+high_resolution_clock::time_point JpegCreateTime;
+unsigned long long inv = 0;
+unsigned long long timeInJpeg = 0;
 
 nsJPEGDecoder::~nsJPEGDecoder()
 {
@@ -478,6 +495,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
     mInfo.do_block_smoothing = TRUE;
 
     // Step 5: Start decompressor
+    JpegCreateTime = high_resolution_clock::now();
     if (d_jpeg_start_decompress(&mInfo) == FALSE) {
       MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
              ("} (I/O suspension after jpeg_start_decompress())"));
@@ -590,6 +608,9 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
                             " JPEG_DONE case");
 
     // Step 7: Finish decompression
+    timeInJpeg += duration_cast<nanoseconds>(high_resolution_clock::now() - JpegCreateTime).count();
+    printf("%10llu,JPEG_Time,%d,%10llu,%10llu,%10llu,%10llu\n", inv, getppid(), getTimeSpentInJpeg(), getInvocationsInJpegCore(), getTimeSpentInJpegCore(), timeInJpeg);
+    inv++;
 
     if (d_jpeg_finish_decompress(&mInfo) == FALSE) {
       MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
