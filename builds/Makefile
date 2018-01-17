@@ -4,6 +4,7 @@
 
 inithasrun:
 	cd .. && ./mach bootstrap
+	cd .. && ./mach configure
 	echo hi > "inithasrun"
 
 .NOTPARALLEL: build32 build64
