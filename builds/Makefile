@@ -6,6 +6,8 @@ inithasrun:
 	cd .. && ./mach bootstrap
 	echo hi > "inithasrun"
 
+.NOTPARALLEL: build32 build64
+
 build32: inithasrun
 	mkdir -p ../firefox_32bit_optdebug_static
 	mkdir -p ../firefox_32bit_optdebug_nonnacl
