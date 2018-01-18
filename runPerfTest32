@@ -10,7 +10,7 @@ if [[ -f "$1" ]]; then
 	exit 1; 
 fi
 
-FFVersions=("firefox_32bit_optdebug_nacl" "firefox_32bit_optdebug_nonnacl" "firefox_32bit_optdebug_static") 
+FFVersions=("firefox_32bit_optdebug_nacl" "firefox_32bit_optdebug_nonnacl" "firefox_32bit_optdebug_static" "firefox_32bit_optdebug_ps")
 
 for i in ${FFVersions[@]}; do
 	if [[ ! -d "${i}" ]]; then
@@ -112,6 +112,11 @@ function loadStaticFirefox(){
 	cp ./mozconfig32_static ./mozconfig
 	sleep 2	
 }
+function loadPsFirefox(){
+    sleep 2
+    cp ./mozconfig32_ps ./mozconfig
+    sleep 2
+}
 
 for i in 1 2
 do
@@ -119,6 +124,14 @@ do
 	loadSandboxedFirefox
 
 	echo -e "FFBuild-NACL-SIMD\n" >> "$1"
+	runTest "$1" "jpeg_page_render"
+	# runTest "$1" "jpeg_page_render_25"
+	# runTest "$1" "jpeg_page_render_50"
+	echo -e "\n---------------------\n" >> "$1"
+
+    loadPsFirefox
+
+	echo -e "FFBuild-PS-SIMD\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
 	# runTest "$1" "jpeg_page_render_25"
 	# runTest "$1" "jpeg_page_render_50"

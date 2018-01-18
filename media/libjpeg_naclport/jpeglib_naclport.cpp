@@ -17,7 +17,7 @@
   #error "USE_SANDBOXING value not provided"
 #endif
 
-#if(USE_SANDBOXING != 0 && USE_SANDBOXING != 1 && USE_SANDBOXING != 2)
+#if(USE_SANDBOXING != 0 && USE_SANDBOXING != 1 && USE_SANDBOXING != 2 && USE_SANDBOXING != 3)
   #error "Bad USE_SANDBOXING value provided"
 #endif
 
@@ -32,6 +32,11 @@
   #define TERM_SOURCE_SLOT 5
 
   NaClSandbox* jpegSandbox;
+
+#elif(USE_SANDBOXING == 3)
+  #include "ProcessSandbox.h"
+
+  ProcessSandbox* sandbox;
 
 #endif
 
@@ -98,6 +103,7 @@ typedef boolean (*t_jpeg_finish_output) (j_decompress_ptr cinfo);
 typedef boolean (*t_jpeg_input_complete) (j_decompress_ptr cinfo);
 typedef int (*t_jpeg_consume_input) (j_decompress_ptr cinfo);
 
+#if(USE_SANDBOXING != 3)
 t_jpeg_std_error              ptr_jpeg_std_error;
 t_jpeg_CreateCompress         ptr_jpeg_CreateCompress;
 t_jpeg_stdio_dest             ptr_jpeg_stdio_dest;
@@ -121,6 +127,7 @@ t_jpeg_start_output           ptr_jpeg_start_output;
 t_jpeg_finish_output          ptr_jpeg_finish_output;
 t_jpeg_input_complete         ptr_jpeg_input_complete;
 t_jpeg_consume_input          ptr_jpeg_consume_input;
+#endif
 
 //Callback stubs
 t_my_error_exit          cb_my_error_exit;
@@ -170,17 +177,27 @@ int initializeLibJpegSandbox()
     while(!jpegFinishedInit){}
     return 1;
   }
-  
+
+  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_NON_NACL_DL_PATH, PS_OTHERSIDE_PATH are defined as macros in the moz.build of this folder
+
   jpegStartedInit = 1;
+
   #if(USE_SANDBOXING == 0)
     printf("Using static libjpeg\n");
     jpegFinishedInit = 1;
     return 1;
-  #endif
 
-  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
+  #elif(USE_SANDBOXING == 1)
 
-  #if(USE_SANDBOXING == 2)
+    printf("Loading dynamic library %s\n", JPEG_NON_NACL_DL_PATH);
+    jpegDlPtr = dlopen(JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
+    if(!jpegDlPtr)
+    {
+      printf("Loading of dynamic library %s has failed\n", JPEG_NON_NACL_DL_PATH);
+      return 0;
+    }
+
+  #elif(USE_SANDBOXING == 2)
 
     printf("Creating NaCl Sandbox %s, %s\n", STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
 
@@ -198,21 +215,17 @@ int initializeLibJpegSandbox()
       return 0;
     }
 
-  #elif(USE_SANDBOXING == 1)
+  #elif(USE_SANDBOXING == 3)
 
-    printf("Loading dynamic library %s\n", JPEG_NON_NACL_DL_PATH);
-    jpegDlPtr = dlopen(JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
-
-    if(!jpegDlPtr)
-    {
-      printf("Loading of dynamic library %s has failed\n", JPEG_NON_NACL_DL_PATH);
-      return 0;
-    }
+    printf("Creating process sandbox\n");
+    sandbox = new ProcessSandbox(PS_OTHERSIDE_PATH, 0, 2);
 
   #endif
 
   printf("Loading symbols.\n");
   int failed = 0;
+
+#if(USE_SANDBOXING != 3)
 
   #if(USE_SANDBOXING == 2)
     #define loadSymbol(symbol) do { \
@@ -229,7 +242,7 @@ int initializeLibJpegSandbox()
     } while(0)
 
   #else
-    #define loadSymbol(symbol) do {} while(0)  
+    #define loadSymbol(symbol) do {} while(0)
   #endif
 
   loadSymbol(jpeg_std_error);
@@ -258,6 +271,34 @@ int initializeLibJpegSandbox()
 
   #undef loadSymbol
 
+#else  // USE_SANDBOXING == 3
+
+  #define ptr_jpeg_std_error              (sandbox->inv_jpeg_std_error)
+  #define ptr_jpeg_CreateCompress         (sandbox->inv_jpeg_CreateCompress)
+  #define ptr_jpeg_stdio_dest             (sandbox->inv_jpeg_stdio_dest)
+  #define ptr_jpeg_set_defaults           (sandbox->inv_jpeg_set_defaults)
+  #define ptr_jpeg_set_quality            (sandbox->inv_jpeg_set_quality)
+  #define ptr_jpeg_start_compress         (sandbox->inv_jpeg_start_compress)
+  #define ptr_jpeg_write_scanlines        (sandbox->inv_jpeg_write_scanlines)
+  #define ptr_jpeg_finish_compress        (sandbox->inv_jpeg_finish_compress)
+  #define ptr_jpeg_destroy_compress       (sandbox->inv_jpeg_destroy_compress)
+  #define ptr_jpeg_CreateDecompress       (sandbox->inv_jpeg_CreateDecompress)
+  #define ptr_jpeg_stdio_src              (sandbox->inv_jpeg_stdio_src)
+  #define ptr_jpeg_read_header            (sandbox->inv_jpeg_read_header)
+  #define ptr_jpeg_start_decompress       (sandbox->inv_jpeg_start_decompress)
+  #define ptr_jpeg_read_scanlines         (sandbox->inv_jpeg_read_scanlines)
+  #define ptr_jpeg_finish_decompress      (sandbox->inv_jpeg_finish_decompress)
+  #define ptr_jpeg_destroy_decompress     (sandbox->inv_jpeg_destroy_decompress)
+  #define ptr_jpeg_save_markers           (sandbox->inv_jpeg_save_markers)
+  #define ptr_jpeg_has_multiple_scans     (sandbox->inv_jpeg_has_multiple_scans)
+  #define ptr_jpeg_calc_output_dimensions (sandbox->inv_jpeg_calc_output_dimensions)
+  #define ptr_jpeg_start_output           (sandbox->inv_jpeg_start_output)
+  #define ptr_jpeg_finish_output          (sandbox->inv_jpeg_finish_output)
+  #define ptr_jpeg_input_complete         (sandbox->inv_jpeg_input_complete)
+  #define ptr_jpeg_consume_input          (sandbox->inv_jpeg_consume_input)
+
+#endif
+
   if(failed) { return 0; }
 
   printf("Loaded symbols\n");
@@ -276,7 +317,7 @@ uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr)
 uintptr_t getSandboxedJpegPtr(uintptr_t uaddr)
 {
   #if(USE_SANDBOXING == 2)
-    return getSandboxedAddress(jpegSandbox, uaddr);    
+    return getSandboxedAddress(jpegSandbox, uaddr);
   #else
     return uaddr;
   #endif
@@ -299,19 +340,23 @@ int isAddressInNonJpegSandboxMemoryOrNull(uintptr_t uaddr)
 }
 void* mallocInJpegSandbox(size_t size)
 {
- #if(USE_SANDBOXING == 2)
+  #if(USE_SANDBOXING == 2)
     return mallocInSandbox(jpegSandbox, size);
+  #elif(USE_SANDBOXING == 3)
+    return sandbox->mallocInSandbox(size);
   #else
     return malloc(size);
-  #endif 
+  #endif
 }
 void freeInJpegSandbox(void* ptr)
 {
   #if(USE_SANDBOXING == 2)
     freeInSandbox(jpegSandbox, ptr);
+  #elif(USE_SANDBOXING == 3)
+    sandbox->freeInSandbox(ptr);
   #else
     free(ptr);
-  #endif 
+  #endif
 }
 
 
@@ -330,7 +375,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_PTR_TO_STACK(threadData, struct jpeg_error_mgr *, err);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_std_error);
     struct jpeg_error_mgr * ret = (struct jpeg_error_mgr *)functionCallReturnPtr(threadData);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     struct jpeg_error_mgr * ret = ptr_jpeg_std_error(err);
 #elif(USE_SANDBOXING == 0)
     struct jpeg_error_mgr * ret = jpeg_std_error(err);
@@ -356,7 +401,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_VAL_TO_STACK(threadData, int, version);
     PUSH_VAL_TO_STACK(threadData, size_t, structsize);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_CreateCompress);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     ptr_jpeg_CreateCompress(cinfo, version, structsize);
 #elif(USE_SANDBOXING == 0)
     jpeg_CreateCompress(cinfo, version, structsize);
@@ -380,7 +425,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
     PUSH_PTR_TO_STACK(threadData, FILE *, outfile);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_stdio_dest);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     ptr_jpeg_stdio_dest(cinfo, outfile);
 #elif(USE_SANDBOXING == 0)
     jpeg_stdio_dest(cinfo, outfile);
@@ -403,7 +448,7 @@ void freeInJpegSandbox(void* ptr)
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
     PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_set_defaults);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     ptr_jpeg_set_defaults(cinfo);
 #elif(USE_SANDBOXING == 0)
     jpeg_set_defaults(cinfo);
@@ -428,7 +473,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_VAL_TO_STACK(threadData, int, quality);
     PUSH_VAL_TO_STACK(threadData, boolean, force_baseline);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_set_quality);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     ptr_jpeg_set_quality(cinfo, quality, force_baseline);
 #elif(USE_SANDBOXING == 0)
     jpeg_set_quality(cinfo, quality, force_baseline);
@@ -452,7 +497,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
     PUSH_VAL_TO_STACK(threadData, boolean, write_all_tables);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_start_compress);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     ptr_jpeg_start_compress(cinfo, write_all_tables);
 #elif(USE_SANDBOXING == 0)
     jpeg_start_compress(cinfo, write_all_tables);
@@ -478,7 +523,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_VAL_TO_STACK(threadData, JDIMENSION, num_lines);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_write_scanlines);
     JDIMENSION ret = (JDIMENSION) functionCallReturnRawPrimitiveInt(threadData);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     JDIMENSION ret = ptr_jpeg_write_scanlines(cinfo, scanlines, num_lines);
 #elif(USE_SANDBOXING == 0)
     JDIMENSION ret = jpeg_write_scanlines(cinfo, scanlines, num_lines);
@@ -501,7 +546,7 @@ void freeInJpegSandbox(void* ptr)
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
     PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_finish_compress);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     ptr_jpeg_finish_compress(cinfo);
 #elif(USE_SANDBOXING == 0)
     jpeg_finish_compress(cinfo);
@@ -523,7 +568,7 @@ void freeInJpegSandbox(void* ptr)
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
     PUSH_PTR_TO_STACK(threadData, j_compress_ptr, cinfo);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_destroy_compress);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     ptr_jpeg_destroy_compress(cinfo);
 #elif(USE_SANDBOXING == 0)
     jpeg_destroy_compress(cinfo);
@@ -547,7 +592,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_VAL_TO_STACK(threadData, int, version);
     PUSH_VAL_TO_STACK(threadData, size_t, structsize);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_CreateDecompress);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     ptr_jpeg_CreateDecompress(cinfo, version, structsize);
 #elif(USE_SANDBOXING == 0)
     jpeg_CreateDecompress(cinfo, version, structsize);
@@ -570,7 +615,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
     PUSH_PTR_TO_STACK(threadData, FILE *, infile);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_stdio_src);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     ptr_jpeg_stdio_src(cinfo, infile);
 #elif(USE_SANDBOXING == 0)
     jpeg_stdio_src(cinfo, infile);
@@ -594,7 +639,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_VAL_TO_STACK(threadData, boolean, require_image);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_read_header);
     int ret = (int) functionCallReturnRawPrimitiveInt(threadData);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     int ret = ptr_jpeg_read_header(cinfo, require_image);
 #elif(USE_SANDBOXING == 0)
     int ret = jpeg_read_header(cinfo, require_image);
@@ -618,7 +663,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_start_decompress);
     boolean ret = (boolean) functionCallReturnRawPrimitiveInt(threadData);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     boolean ret = ptr_jpeg_start_decompress(cinfo);
 #elif(USE_SANDBOXING == 0)
     boolean ret = jpeg_start_decompress(cinfo);
@@ -644,7 +689,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_VAL_TO_STACK(threadData, JDIMENSION, max_lines);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_read_scanlines);
     JDIMENSION ret = (JDIMENSION) functionCallReturnRawPrimitiveInt(threadData);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     JDIMENSION ret = ptr_jpeg_read_scanlines(cinfo, scanlines, max_lines);
 #elif(USE_SANDBOXING == 0)
     JDIMENSION ret = jpeg_read_scanlines(cinfo, scanlines, max_lines);
@@ -668,7 +713,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_finish_decompress);
     boolean ret = (boolean) functionCallReturnRawPrimitiveInt(threadData);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     boolean ret = ptr_jpeg_finish_decompress(cinfo);
 #elif(USE_SANDBOXING == 0)
     boolean ret = jpeg_finish_decompress(cinfo);
@@ -691,7 +736,7 @@ void freeInJpegSandbox(void* ptr)
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
     PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_destroy_decompress);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     ptr_jpeg_destroy_decompress(cinfo);
 #elif(USE_SANDBOXING == 0)
     jpeg_destroy_decompress(cinfo);
@@ -715,7 +760,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_VAL_TO_STACK(threadData, int, marker_code);
     PUSH_VAL_TO_STACK(threadData, unsigned int, length_limit);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_save_markers);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     ptr_jpeg_save_markers(cinfo, marker_code, length_limit);
 #elif(USE_SANDBOXING == 0)
     jpeg_save_markers(cinfo, marker_code, length_limit);
@@ -738,7 +783,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_has_multiple_scans);
     boolean ret = (boolean) functionCallReturnRawPrimitiveInt(threadData);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     boolean ret = ptr_jpeg_has_multiple_scans(cinfo);
 #elif(USE_SANDBOXING == 0)
     boolean ret = jpeg_has_multiple_scans(cinfo);
@@ -761,7 +806,7 @@ void freeInJpegSandbox(void* ptr)
     NaClSandbox_Thread* threadData = preFunctionCall(jpegSandbox, sizeof(cinfo), 0 /* size of any arrays being pushed on the stack */);
     PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_calc_output_dimensions);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     ptr_jpeg_calc_output_dimensions(cinfo);
 #elif(USE_SANDBOXING == 0)
     jpeg_calc_output_dimensions(cinfo);
@@ -785,7 +830,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_VAL_TO_STACK(threadData, int, scan_number);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_start_output);
     boolean ret = (boolean) functionCallReturnRawPrimitiveInt(threadData);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     boolean ret = ptr_jpeg_start_output(cinfo, scan_number);
 #elif(USE_SANDBOXING == 0)
     boolean ret = jpeg_start_output(cinfo, scan_number);
@@ -809,7 +854,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_finish_output);
     boolean ret = (boolean) functionCallReturnRawPrimitiveInt(threadData);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     boolean ret = ptr_jpeg_finish_output(cinfo);
 #elif(USE_SANDBOXING == 0)
     boolean ret = jpeg_finish_output(cinfo);
@@ -833,7 +878,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_input_complete);
     boolean ret = (boolean) functionCallReturnRawPrimitiveInt(threadData);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     boolean ret = ptr_jpeg_input_complete(cinfo);
 #elif(USE_SANDBOXING == 0)
     boolean ret = jpeg_input_complete(cinfo);
@@ -857,7 +902,7 @@ void freeInJpegSandbox(void* ptr)
     PUSH_PTR_TO_STACK(threadData, j_decompress_ptr, cinfo);
     invokeFunctionCall(threadData, (void *)ptr_jpeg_consume_input);
     int ret = (int) functionCallReturnRawPrimitiveInt(threadData);
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     int ret = ptr_jpeg_consume_input(cinfo);
 #elif(USE_SANDBOXING == 0)
     int ret = jpeg_consume_input(cinfo);
@@ -886,13 +931,11 @@ void freeInJpegSandbox(void* ptr)
     PUSH_VAL_TO_STACK(threadData, JDIMENSION, numrows);
     invokeFunctionCall(threadData, alloc_sarray);
     JSAMPARRAY ret = (JSAMPARRAY)functionCallReturnPtr(threadData);
-#elif(USE_SANDBOXING == 1)
-    // Craig: Unsure why the first two lines here?
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     typedef JSAMPARRAY (*t_alloc_sarray)(j_common_ptr, int, JDIMENSION, JDIMENSION);
     t_alloc_sarray ptr_alloc_sarray = (t_alloc_sarray) alloc_sarray;
     JSAMPARRAY ret = ptr_alloc_sarray(cinfo, pool_id, samplesperrow, numrows);
 #elif(USE_SANDBOXING == 0)
-    // Craig: Unsure why the first two lines here?
     typedef JSAMPARRAY (*t_alloc_sarray)(j_common_ptr, int, JDIMENSION, JDIMENSION);
     t_alloc_sarray ptr_alloc_sarray = (t_alloc_sarray) alloc_sarray;
     JSAMPARRAY ret = ptr_alloc_sarray(cinfo, pool_id, samplesperrow, numrows);
@@ -917,13 +960,11 @@ void freeInJpegSandbox(void* ptr)
     PUSH_PTR_TO_STACK(threadData, j_common_ptr, cinfo);
     PUSH_PTR_TO_STACK(threadData, char *, buffer);
     invokeFunctionCall(threadData, format_message);
-#elif(USE_SANDBOXING == 1)
-    // Craig: Unsure why the first two lines here?
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     typedef void (*t_format_message)(j_common_ptr, char *);
     t_format_message ptr_format_message = (t_format_message) format_message;
     ptr_format_message(cinfo, buffer);
 #elif(USE_SANDBOXING == 0)
-    // Craig: Unsure why the first two lines here?
     typedef void (*t_format_message)(j_common_ptr, char *);
     t_format_message ptr_format_message = (t_format_message) format_message;
     ptr_format_message(cinfo, buffer);
@@ -952,7 +993,7 @@ void freeInJpegSandbox(void* ptr)
     j_common_ptr cinfo = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, j_common_ptr);
 
     //We should not assume anything about - need to have some sort of validation here
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
 #elif(USE_SANDBOXING == 0)
 #else
 #error Missed case of USE_SANDBOXING
@@ -980,7 +1021,7 @@ void freeInJpegSandbox(void* ptr)
     j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, j_decompress_ptr);
 
     //We should not assume anything about - need to have some sort of validation here
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
 #elif(USE_SANDBOXING == 0)
 #else
 #error Missed case of USE_SANDBOXING
@@ -1009,7 +1050,7 @@ void freeInJpegSandbox(void* ptr)
     long num_bytes = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(threadData, long);
 
     //We should not assume anything about - need to have some sort of validation here
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
 #elif(USE_SANDBOXING == 0)
 #else
 #error Missed case of USE_SANDBOXING
@@ -1037,7 +1078,7 @@ void freeInJpegSandbox(void* ptr)
     j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, j_decompress_ptr);
 
     //We should not assume anything about - need to have some sort of validation here
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
 #elif(USE_SANDBOXING == 0)
 #else
 #error Missed case of USE_SANDBOXING
@@ -1066,7 +1107,7 @@ void freeInJpegSandbox(void* ptr)
     j_decompress_ptr jd = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, j_decompress_ptr);
 
     //We should not assume anything about - need to have some sort of validation here
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
 #elif(USE_SANDBOXING == 0)
 #else
 #error Missed case of USE_SANDBOXING
@@ -1095,7 +1136,7 @@ void freeInJpegSandbox(void* ptr)
     int desired = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(threadData, int);
 
     //We should not assume anything about - need to have some sort of validation here
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
 #elif(USE_SANDBOXING == 0)
 #else
 #error Missed case of USE_SANDBOXING
@@ -1120,7 +1161,7 @@ void freeInJpegSandbox(void* ptr)
         //printf("Failed in registering the error handler my_error_exit");
     }
     return (t_my_error_exit) registeredCallback;
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     return my_error_exit_stub;
 #elif(USE_SANDBOXING == 0)
     return my_error_exit_stub;
@@ -1143,7 +1184,7 @@ void freeInJpegSandbox(void* ptr)
         //printf("Failed in registering the error handler init_source");
     }
     return (t_init_source) registeredCallback;
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     return init_source_stub;
 #elif(USE_SANDBOXING == 0)
     return init_source_stub;
@@ -1166,7 +1207,7 @@ void freeInJpegSandbox(void* ptr)
         //printf("Failed in registering the error handler skip_input_data");
     }
     return (t_skip_input_data) registeredCallback;
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     return skip_input_data_stub;
 #elif(USE_SANDBOXING == 0)
     return skip_input_data_stub;
@@ -1189,7 +1230,7 @@ void freeInJpegSandbox(void* ptr)
         //printf("Failed in registering the error handler fill_input_buffer");
     }
     return (t_fill_input_buffer) registeredCallback;
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     return fill_input_buffer_stub;
 #elif(USE_SANDBOXING == 0)
     return fill_input_buffer_stub;
@@ -1212,7 +1253,7 @@ void freeInJpegSandbox(void* ptr)
         //printf("Failed in registering the error handler term_source");
     }
     return (t_term_source) registeredCallback;
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     return term_source_stub;
 #elif(USE_SANDBOXING == 0)
     return term_source_stub;
@@ -1235,7 +1276,7 @@ void freeInJpegSandbox(void* ptr)
         //printf("Failed in registering the error handler jpeg_resync_to_restart");
     }
     return (t_jpeg_resync_to_restart) registeredCallback;
-#elif(USE_SANDBOXING == 1)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     return jpeg_resync_to_restart_stub;
 #elif(USE_SANDBOXING == 0)
     return jpeg_resync_to_restart_stub;

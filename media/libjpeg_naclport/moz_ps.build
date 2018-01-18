@@ -1,0 +1,55 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+with Files("**"):
+    BUG_COMPONENT = ("Core", "ImageLib")
+
+EXPORTS += [
+    'jpeglib_naclport.h',
+]
+
+SOURCES += [
+    'jpeglib_naclport.cpp',
+]
+
+# Pick from one of the values below
+#
+# Static func calls to libjpeg
+# DEFINES['USE_SANDBOXING'] = 0
+#
+# Dynamic func calls to libjpeg
+# DEFINES['USE_SANDBOXING'] = 1
+#
+# Sandboxed dynamic func calls to libjpeg, using NaCl sandbox
+# DEFINES['USE_SANDBOXING'] = 2
+#
+# Sandboxed dynamic func calls to libjpeg, using process sandbox
+DEFINES['USE_SANDBOXING'] = 3
+
+# Comment out the following if you don't want to print the time spent in jpeg rendering. The value '42' below is disregarded
+DEFINES['PRINT_FUNCTION_TIMES'] = 42
+
+# Comment out if you don't want logging. The value '42' below is disregarded
+# DEFINES['PRINT_FUNCTION_LOGS'] = 42
+
+############ Update these paths as required
+
+DEFINES['JPEG_NON_NACL_DL_PATH'] = '"../libjpeg-turbo/builds/x64/non_nacl_build_simd/.libs/libjpeg.so"'
+DEFINES['STARTUP_LIBRARY_PATH'] = '"../Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe"'
+DEFINES['SANDBOX_INIT_APP'] = '"../libjpeg-turbo/builds/x64/nacl_build_simd/mainCombine/libjpeg.nexe"'
+DEFINES['USE_LIBJPEG'] = 42  # Again, the '42' is disregarded
+DEFINES['PS_OTHERSIDE_PATH'] = '"../ProcessSandbox/ProcessSandbox_otherside_jpeg64_simd"'  # path to the ProcessSandbox_otherside executable
+
+LOCAL_INCLUDES += [
+    ############ Update this path as required
+    '/../ProcessSandbox',
+    '/media/libjpeg'
+]
+
+############ Update this path as required
+OS_LIBS += ['../../../../ProcessSandbox/ProcessSandbox_jpeg64.a']
+
+FINAL_LIBRARY = 'gkmedias'
