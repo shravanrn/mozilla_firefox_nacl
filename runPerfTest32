@@ -99,34 +99,17 @@ function runTest(){
 
 function loadSandboxedFirefox(){
 	sleep 2
-	mv firefox_32bit_optdebug_nacl firefox_32bit_optdebug
+	cp ./mozconfig32_nacl ./mozconfig
 	sleep 2
 }
-function unloadSandboxedFirefox(){
-	sleep 2
-	mv firefox_32bit_optdebug firefox_32bit_optdebug_nacl
-	sleep 2
-}
-
 function loadUnsandboxedFirefox(){
 	sleep 2
-	mv firefox_32bit_optdebug_nonnacl firefox_32bit_optdebug
+	cp ./mozconfig32_nonnacl ./mozconfig
 	sleep 2	
 }
-function unloadUnsandboxedFirefox(){
-	sleep 2
-	mv firefox_32bit_optdebug firefox_32bit_optdebug_nonnacl
-	sleep 2	
-}
-
 function loadStaticFirefox(){
 	sleep 2
-	mv firefox_32bit_optdebug_static firefox_32bit_optdebug
-	sleep 2	
-}
-function unloadStaticFirefox(){
-	sleep 2
-	mv firefox_32bit_optdebug firefox_32bit_optdebug_static
+	cp ./mozconfig32_static ./mozconfig
 	sleep 2	
 }
 
@@ -141,8 +124,6 @@ do
 	# runTest "$1" "jpeg_page_render_50"
 	echo -e "\n---------------------\n" >> "$1"
 
-	unloadSandboxedFirefox
-
 	loadUnsandboxedFirefox
 
 	echo -e "FFBuild-Non-NACL\n" >> "$1"
@@ -151,8 +132,6 @@ do
 	# runTest "$1" "jpeg_page_render_50"
 	echo -e "\n---------------------\n" >> "$1"
 
-	unloadUnsandboxedFirefox
-
 	loadStaticFirefox
 
 	echo -e "FFBuild-Static\n" >> "$1"
@@ -160,8 +139,6 @@ do
 	# runTest "$1" "jpeg_page_render_25"
 	# runTest "$1" "jpeg_page_render_50"
 	echo -e "\n---------------------\n" >> "$1"
-
-	unloadStaticFirefox
 
 done
 
