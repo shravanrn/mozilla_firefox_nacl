@@ -43,25 +43,25 @@
 
   std::atomic_ullong timeSpentInJpeg{0};
   std::atomic_ullong timeSpentInJpegCore{0};
-  std::atomic_ullong sandboxFuncOrCallbackInvocations{0};
-  std::atomic_ullong sandboxFuncOrCallbackInvocationsCore{0};
+  std::atomic_ullong jpegSandboxFuncOrCallbackInvocations{0};
+  std::atomic_ullong jpegSandboxFuncOrCallbackInvocationsCore{0};
 
-  __thread high_resolution_clock::time_point SandboxEnterTime;
-  __thread high_resolution_clock::time_point SandboxExitTime;
+  __thread high_resolution_clock::time_point JpegSandboxEnterTime;
+  __thread high_resolution_clock::time_point JpegSandboxExitTime;
 
-  #define START_TIMER(NAME) SandboxEnterTime = high_resolution_clock::now(); \
-    sandboxFuncOrCallbackInvocations++
+  #define START_TIMER(NAME) JpegSandboxEnterTime = high_resolution_clock::now(); \
+    jpegSandboxFuncOrCallbackInvocations++
 
-  #define START_TIMER_CORE(NAME) SandboxEnterTime = high_resolution_clock::now(); \
-    sandboxFuncOrCallbackInvocations++; \
-    sandboxFuncOrCallbackInvocationsCore++
+  #define START_TIMER_CORE(NAME) JpegSandboxEnterTime = high_resolution_clock::now(); \
+    jpegSandboxFuncOrCallbackInvocations++; \
+    jpegSandboxFuncOrCallbackInvocationsCore++
 
-  #define END_TIMER(NAME)   SandboxExitTime = high_resolution_clock::now(); \
-    timeSpentInJpeg+= duration_cast<nanoseconds>(SandboxExitTime - SandboxEnterTime).count()
+  #define END_TIMER(NAME)   JpegSandboxExitTime = high_resolution_clock::now(); \
+    timeSpentInJpeg+= duration_cast<nanoseconds>(JpegSandboxExitTime - JpegSandboxEnterTime).count()
 
-  #define END_TIMER_CORE(NAME)   SandboxExitTime = high_resolution_clock::now(); \
-    timeSpentInJpeg+= duration_cast<nanoseconds>(SandboxExitTime - SandboxEnterTime).count(); \
-    timeSpentInJpegCore+= duration_cast<nanoseconds>(SandboxExitTime - SandboxEnterTime).count()
+  #define END_TIMER_CORE(NAME)   JpegSandboxExitTime = high_resolution_clock::now(); \
+    timeSpentInJpeg+= duration_cast<nanoseconds>(JpegSandboxExitTime - JpegSandboxEnterTime).count(); \
+    timeSpentInJpegCore+= duration_cast<nanoseconds>(JpegSandboxExitTime - JpegSandboxEnterTime).count()
 
 #else
   #define START_TIMER(NAME) do {} while(0)
@@ -70,9 +70,9 @@
   #define END_TIMER_CORE(NAME) do {} while(0)
 #endif
 
-void* dlPtr;
-int startedInit = 0;
-int finishedInit = 0;
+void* jpegDlPtr;
+int jpegStartedInit = 0;
+int jpegFinishedInit = 0;
 
 typedef struct jpeg_error_mgr * (*t_jpeg_std_error) (struct jpeg_error_mgr * err);
 typedef void (*t_jpeg_CreateCompress) (j_compress_ptr cinfo, int version, size_t structsize);
@@ -149,7 +149,7 @@ unsigned long long getTimeSpentInJpegCore()
 unsigned long long getInvocationsInJpeg()
 {
   #ifdef PRINT_FUNCTION_TIMES
-    return sandboxFuncOrCallbackInvocations;
+    return jpegSandboxFuncOrCallbackInvocations;
   #else
     return 0;
   #endif
@@ -157,7 +157,7 @@ unsigned long long getInvocationsInJpeg()
 unsigned long long getInvocationsInJpegCore()
 {
   #ifdef PRINT_FUNCTION_TIMES
-    return sandboxFuncOrCallbackInvocationsCore;
+    return jpegSandboxFuncOrCallbackInvocationsCore;
   #else
     return 0;
   #endif
@@ -165,16 +165,16 @@ unsigned long long getInvocationsInJpegCore()
 
 int initializeLibJpegSandbox()
 {
-  if(startedInit)
+  if(jpegStartedInit)
   {
-    while(!finishedInit){}
+    while(!jpegFinishedInit){}
     return 1;
   }
   
-  startedInit = 1;
+  jpegStartedInit = 1;
   #if(USE_SANDBOXING == 0)
     printf("Using static libjpeg\n");
-    finishedInit = 1;
+    jpegFinishedInit = 1;
     return 1;
   #endif
 
@@ -201,9 +201,9 @@ int initializeLibJpegSandbox()
   #elif(USE_SANDBOXING == 1)
 
     printf("Loading dynamic library %s\n", JPEG_NON_NACL_DL_PATH);
-    dlPtr = dlopen(JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
+    jpegDlPtr = dlopen(JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
 
-    if(!dlPtr)
+    if(!jpegDlPtr)
     {
       printf("Loading of dynamic library %s has failed\n", JPEG_NON_NACL_DL_PATH);
       return 0;
@@ -223,7 +223,7 @@ int initializeLibJpegSandbox()
 
   #elif(USE_SANDBOXING == 1)
     #define loadSymbol(symbol) do { \
-      void* dlSymRes = dlsym(dlPtr, #symbol); \
+      void* dlSymRes = dlsym(jpegDlPtr, #symbol); \
       if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
       *((void **) &ptr_##symbol) = dlSymRes; \
     } while(0)
@@ -261,7 +261,7 @@ int initializeLibJpegSandbox()
   if(failed) { return 0; }
 
   printf("Loaded symbols\n");
-  finishedInit = 1;
+  jpegFinishedInit = 1;
 
   return 1;
 }

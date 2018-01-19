@@ -41,6 +41,7 @@ if CONFIG['MOZ_AV1']:
 
 if not CONFIG['MOZ_SYSTEM_PNG']:
     external_dirs += ['media/libpng']
+    external_dirs += ['media/libpng_naclport']
 
 if CONFIG['CPU_ARCH'] == 'arm':
     external_dirs += ['media/openmax_dl']
