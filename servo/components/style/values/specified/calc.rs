@@ -8,7 +8,7 @@
 
 use cssparser::{Parser, Token, BasicParseError};
 use parser::ParserContext;
-use std::ascii::AsciiExt;
+#[allow(unused_imports)] use std::ascii::AsciiExt;
 use std::fmt;
 use style_traits::{ToCss, ParseError, StyleParseError};
 use style_traits::values::specified::AllowedNumericType;
