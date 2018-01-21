@@ -122,12 +122,21 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
  , mFrameIsHidden(false)
  , mDisablePremultipliedAlpha(false)
  , mNumFrames(0)
-{ }
+{ 
+  initializeLibPngSandbox();
+}
 
 nsPNGDecoder::~nsPNGDecoder()
 {
   if (mPNG) {
-    d_png_destroy_read_struct(&mPNG, mInfo ? &mInfo : nullptr, nullptr);
+
+    png_structp* new_mPNG_Loc = (png_structp*) mallocInPngSandbox(sizeof(png_structp));
+    *new_mPNG_Loc = (png_structp)getSandboxedPngPtr((uintptr_t)mPNG);
+
+    png_infop* new_mInfo_Loc = (png_infop*) mallocInPngSandbox(sizeof(png_infop));
+    *new_mInfo_Loc = (png_infop)getSandboxedPngPtr((uintptr_t)mInfo);
+
+    d_png_destroy_read_struct(new_mPNG_Loc, mInfo ? new_mInfo_Loc : nullptr, nullptr);
   }
   if (mCMSLine) {
     free(mCMSLine);
@@ -330,10 +339,9 @@ nsPNGDecoder::InitInternal()
 
   mInfo = d_png_create_info_struct(mPNG);
   if (!mInfo) {
-    png_structpp* tmp_mPNG_pLoc = (png_structpp*) mallocInPngSandbox(sizeof(png_structpp));
-    png_structpp& tmp_mPNG_p = *tmp_mPNG_pLoc;
-    tmp_mPNG_p = (png_structpp) getSandboxedPngPtr((uintptr_t)&mPNG);
-    d_png_destroy_read_struct(tmp_mPNG_p, nullptr, nullptr);
+    png_structp* new_mPNG_Loc = (png_structp*) mallocInPngSandbox(sizeof(png_structp));
+    *new_mPNG_Loc = (png_structp)getSandboxedPngPtr((uintptr_t)mPNG);
+    d_png_destroy_read_struct(new_mPNG_Loc, nullptr, nullptr);
     return NS_ERROR_OUT_OF_MEMORY;
   }
 

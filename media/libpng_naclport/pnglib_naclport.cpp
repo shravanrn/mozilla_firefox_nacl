@@ -253,14 +253,12 @@ int initializeLibPngSandbox()
   #if(USE_SANDBOXING == 2)
     #define loadSymbol(symbol) do { \
       void* dlSymRes = symbolTableLookupInSandbox(pngSandbox, #symbol); \
-      if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
       *((void **) &ptr_##symbol) = dlSymRes; \
     } while(0)
 
   #elif(USE_SANDBOXING == 1)
     #define loadSymbol(symbol) do { \
       void* dlSymRes = dlsym(pngDlPtr, #symbol); \
-      if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
       *((void **) &ptr_##symbol) = dlSymRes; \
     } while(0)
 
@@ -552,8 +550,8 @@ PNG_ALLOCATED png_structp d_png_create_read_struct(png_const_charp user_png_ver,
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(user_png_ver) + sizeof(error_ptr) + sizeof(error_fn) + sizeof(warn_fn), STRING_SIZE(user_png_ver));
         PUSH_STRING_TO_STACK(threadData, user_png_ver);
         PUSH_PTR_TO_STACK(threadData, png_voidp, error_ptr);
-        PUSH_PTR_TO_STACK(threadData, png_error_ptr, errRegisteredCallback);
-        PUSH_PTR_TO_STACK(threadData, png_error_ptr, warnRegisteredCallback);
+        PUSH_VAL_TO_STACK(threadData, png_error_ptr, errRegisteredCallback);
+        PUSH_VAL_TO_STACK(threadData, png_error_ptr, warnRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_create_read_struct);
         png_structp ret = (png_structp)functionCallReturnPtr(threadData);
     #elif(USE_SANDBOXING == 1)
@@ -852,10 +850,11 @@ void d_png_set_progressive_read_fn(png_structrp png_ptr, png_voidp progressive_p
 
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(progressive_ptr) + sizeof(info_fn) + sizeof(row_fn) + sizeof(end_fn), 0 /* size of any arrays being pushed on the stack */);
         PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
-        PUSH_PTR_TO_STACK(threadData, png_voidp, progressive_ptr);
-        PUSH_PTR_TO_STACK(threadData, png_progressive_info_ptr, infoRegisteredCallback);
-        PUSH_PTR_TO_STACK(threadData, png_progressive_row_ptr, rowRegisteredCallback);
-        PUSH_PTR_TO_STACK(threadData, png_progressive_end_ptr, endRegisteredCallback);
+        //this is a pointer supplied by the outside world - but is basically an opaque piece of data, so just treat it as a value
+        PUSH_VAL_TO_STACK(threadData, png_voidp, progressive_ptr);
+        PUSH_VAL_TO_STACK(threadData, png_progressive_info_ptr, infoRegisteredCallback);
+        PUSH_VAL_TO_STACK(threadData, png_progressive_row_ptr, rowRegisteredCallback);
+        PUSH_VAL_TO_STACK(threadData, png_progressive_end_ptr, endRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_set_progressive_read_fn);
     #elif(USE_SANDBOXING == 1)
         ptr_png_set_progressive_read_fn(png_ptr, progressive_ptr, info_fn, row_fn, end_fn);
@@ -1287,8 +1286,8 @@ void d_png_set_progressive_frame_fn(png_structp png_ptr, png_progressive_frame_p
 
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(frame_info_fn) + sizeof(frame_end_fn), 0 /* size of any arrays being pushed on the stack */);
         PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
-        PUSH_PTR_TO_STACK(threadData, png_progressive_info_ptr, frameInfoRegisteredCallback);
-        PUSH_PTR_TO_STACK(threadData, png_progressive_end_ptr, frameEndRegisteredCallback);
+        PUSH_VAL_TO_STACK(threadData, png_progressive_info_ptr, frameInfoRegisteredCallback);
+        PUSH_VAL_TO_STACK(threadData, png_progressive_end_ptr, frameEndRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_set_progressive_frame_fn);
     #elif(USE_SANDBOXING == 1)
         ptr_png_set_progressive_frame_fn(png_ptr, frame_info_fn_stub, frame_end_fn_stub);
@@ -1597,7 +1596,8 @@ png_voidp d_png_get_progressive_ptr(png_const_structrp png_ptr)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr), 0 /* size of any arrays being pushed on the stack */);
         PUSH_PTR_TO_STACK(threadData, png_const_structrp, png_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_get_progressive_ptr);
-        png_voidp ret = (png_voidp)functionCallReturnPtr(threadData);
+        //this returns a pointer supplied by the user - an opaque address which is not converted. So return it as a value
+        png_voidp ret = (png_voidp)functionCallReturnRawPrimitiveInt(threadData);
     #elif(USE_SANDBOXING == 1)
         png_voidp ret = ptr_png_get_progressive_ptr(png_ptr);
     #elif(USE_SANDBOXING == 0)
