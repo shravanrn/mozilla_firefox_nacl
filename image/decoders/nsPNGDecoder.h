@@ -8,7 +8,8 @@
 #define mozilla_image_decoders_nsPNGDecoder_h
 
 #include "Decoder.h"
-#include "png.h"
+#include "pnglib_naclport.h"
+//#include "png.h"
 #include "qcms.h"
 #include "StreamingLexer.h"
 #include "SurfacePipe.h"
