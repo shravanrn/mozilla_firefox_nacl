@@ -111,6 +111,7 @@ typedef png_voidp (*t_png_get_progressive_ptr)(png_const_structrp png_ptr);
 typedef void (*t_png_longjmp)(png_const_structrp png_ptr, int val);
 typedef jmp_buf* (*t_png_set_longjmp_fn)(png_structrp png_ptr, png_longjmp_ptr longjmp_fn, size_t jmp_buf_size);
 typedef png_uint_32 (*t_png_get_IHDR)(png_const_structrp png_ptr, png_const_inforp info_ptr, png_uint_32 *width, png_uint_32 *height, int *bit_depth, int *color_type, int *interlace_type, int *compression_type, int *filter_type);
+typedef void (*t_png_set_scale_16)(png_structrp png_ptr);
 
 t_png_get_next_frame_delay_num    ptr_png_get_next_frame_delay_num;
 t_png_get_next_frame_delay_den    ptr_png_get_next_frame_delay_den;
@@ -154,6 +155,7 @@ t_png_get_progressive_ptr         ptr_png_get_progressive_ptr;
 t_png_longjmp                     ptr_png_longjmp;
 t_png_set_longjmp_fn              ptr_png_set_longjmp_fn;
 t_png_get_IHDR                    ptr_png_get_IHDR;
+t_png_set_scale_16                ptr_png_set_scale_16;
 
 //Callback stubs
 png_error_ptr             cb_my_err_fn;
@@ -308,6 +310,7 @@ int initializeLibPngSandbox()
   loadSymbol(png_longjmp);
   loadSymbol(png_set_longjmp_fn);
   loadSymbol(png_get_IHDR);
+  loadSymbol(png_set_scale_16);
 
   #undef loadSymbol
 
@@ -546,8 +549,8 @@ PNG_ALLOCATED png_structp d_png_create_read_struct(png_const_charp user_png_ver,
         uintptr_t errRegisteredCallback = registerSandboxCallback(pngSandbox, ERROR_FN_SLOT, (uintptr_t) my_err_fn_stub);
         uintptr_t warnRegisteredCallback = registerSandboxCallback(pngSandbox, WARN_FN_SLOT, (uintptr_t) my_warn_fn_stub);
 
-        NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(user_png_ver) + sizeof(error_ptr) + sizeof(error_fn) + sizeof(warn_fn), 0 /* size of any arrays being pushed on the stack */);
-        PUSH_PTR_TO_STACK(threadData, png_const_charp, user_png_ver);
+        NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(user_png_ver) + sizeof(error_ptr) + sizeof(error_fn) + sizeof(warn_fn), STRING_SIZE(user_png_ver));
+        PUSH_STRING_TO_STACK(threadData, user_png_ver);
         PUSH_PTR_TO_STACK(threadData, png_voidp, error_ptr);
         PUSH_PTR_TO_STACK(threadData, png_error_ptr, errRegisteredCallback);
         PUSH_PTR_TO_STACK(threadData, png_error_ptr, warnRegisteredCallback);
@@ -1053,7 +1056,7 @@ void d_png_set_expand(png_structrp png_ptr)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_destroy_read_struct);
+    END_TIMER(d_png_set_expand);
 }
 
 png_uint_32 d_png_get_tRNS(png_const_structrp png_ptr, png_inforp info_ptr, png_bytep *trans_alpha, int *num_trans, png_color_16p *trans_color)
@@ -1567,9 +1570,9 @@ void d_png_error(png_const_structrp png_ptr, png_const_charp error_message)
     START_TIMER(d_png_error);
 
     #if(USE_SANDBOXING == 2)
-        NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(error_message), 0 /* size of any arrays being pushed on the stack */);
+        NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(error_message), STRING_SIZE(error_message));
         PUSH_PTR_TO_STACK(threadData, png_structp, png_ptr);
-        PUSH_PTR_TO_STACK(threadData, png_const_charp, error_message);
+        PUSH_STRING_TO_STACK(threadData, error_message);
         invokeFunctionCall(threadData, (void *)ptr_png_error);
     #elif(USE_SANDBOXING == 1)
         ptr_png_error(png_ptr, error_message);
@@ -1631,8 +1634,6 @@ void d_png_longjmp(png_const_structrp png_ptr, int val)
     END_TIMER(d_png_longjmp);
 }
 
-#define d_png_jmpbuf(png_ptr) (*d_png_set_longjmp_fn((png_ptr), longjmp, (sizeof (jmp_buf))))
-
 jmp_buf* d_png_set_longjmp_fn(png_structrp png_ptr, png_longjmp_ptr longjmp_fn, size_t jmp_buf_size)
 {
     #ifdef PRINT_FUNCTION_LOGS
@@ -1691,4 +1692,27 @@ png_uint_32 d_png_get_IHDR(png_const_structrp png_ptr, png_const_inforp info_ptr
 
     END_TIMER(png_get_IHDR);
     return ret;
+}
+
+void d_png_set_scale_16(png_structrp png_ptr)
+{
+    #ifdef PRINT_FUNCTION_LOGS
+      MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_scale_16"));
+    #endif
+    //printf("Calling func d_png_set_scale_16\n");
+    START_TIMER(d_png_set_scale_16);
+
+    #if(USE_SANDBOXING == 2)
+        NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr), 0 /* size of any arrays being pushed on the stack */);
+        PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
+        invokeFunctionCall(threadData, (void *)ptr_png_set_scale_16);
+    #elif(USE_SANDBOXING == 1)
+        ptr_png_set_scale_16(png_ptr);
+    #elif(USE_SANDBOXING == 0)
+        png_set_scale_16(png_ptr);
+    #else
+        #error Missed case of USE_SANDBOXING
+    #endif
+
+    END_TIMER(d_png_set_scale_16);
 }
