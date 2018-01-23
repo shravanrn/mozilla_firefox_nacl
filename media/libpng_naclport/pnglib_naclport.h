@@ -21,10 +21,14 @@ png_byte d_png_get_next_frame_blend_op(png_structp png_ptr, png_infop info_ptr);
 png_structp d_png_create_read_struct(png_const_charp user_png_ver, png_voidp error_ptr, png_error_ptr error_fn, png_error_ptr warn_fn);
 png_infop d_png_create_info_struct(png_const_structrp png_ptr);
 void d_png_destroy_read_struct(png_structpp png_ptr_ptr, png_infopp info_ptr_ptr, png_infopp end_info_ptr_ptr);
+#ifdef PNG_HANDLE_AS_UNKNOWN_SUPPORTED
 void d_png_set_keep_unknown_chunks(png_structrp png_ptr, int keep, png_const_bytep chunk_list, int num_chunks_in);
+#endif
 void d_png_set_user_limits (png_structrp png_ptr, png_uint_32 user_width_max, png_uint_32 user_height_max);
 void d_png_set_chunk_malloc_max (png_structrp png_ptr, png_alloc_size_t user_chunk_malloc_max);
+#ifdef PNG_READ_CHECK_FOR_INVALID_INDEX_SUPPORTED
 void d_png_set_check_for_invalid_index(png_structrp png_ptr, int allowed);
+#endif
 int d_png_set_option(png_structrp png_ptr, int option, int onoff);
 void d_png_set_progressive_read_fn(png_structrp png_ptr, png_voidp progressive_ptr, png_progressive_info_ptr info_fn, png_progressive_row_ptr row_fn, png_progressive_end_ptr end_fn);
 png_uint_32 d_png_get_gAMA(png_const_structrp png_ptr, png_const_inforp info_ptr, double *file_gamma);

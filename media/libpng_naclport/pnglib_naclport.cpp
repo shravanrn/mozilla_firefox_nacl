@@ -1,4 +1,5 @@
 #include "pnglib_naclport.h"
+#include <dlfcn.h>
 
 #ifdef PRINT_FUNCTION_LOGS
   using mozilla::LogLevel;
@@ -253,12 +254,14 @@ int initializeLibPngSandbox()
   #if(USE_SANDBOXING == 2)
     #define loadSymbol(symbol) do { \
       void* dlSymRes = symbolTableLookupInSandbox(pngSandbox, #symbol); \
+      if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
       *((void **) &ptr_##symbol) = dlSymRes; \
     } while(0)
 
   #elif(USE_SANDBOXING == 1)
     #define loadSymbol(symbol) do { \
       void* dlSymRes = dlsym(pngDlPtr, #symbol); \
+      if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
       *((void **) &ptr_##symbol) = dlSymRes; \
     } while(0)
 
@@ -616,6 +619,7 @@ void d_png_destroy_read_struct(png_structpp png_ptr_ptr, png_infopp info_ptr_ptr
     END_TIMER(d_png_destroy_read_struct);
 }
 
+#ifdef PNG_HANDLE_AS_UNKNOWN_SUPPORTED
 void d_png_set_keep_unknown_chunks(png_structrp png_ptr, int keep, png_const_bytep chunk_list, int num_chunks_in)
 {
     #ifdef PRINT_FUNCTION_LOGS
@@ -641,6 +645,7 @@ void d_png_set_keep_unknown_chunks(png_structrp png_ptr, int keep, png_const_byt
 
     END_TIMER(d_png_set_keep_unknown_chunks);
 }
+#endif
 
 void d_png_set_user_limits (png_structrp png_ptr, png_uint_32 user_width_max, png_uint_32 user_height_max)
 {
@@ -691,6 +696,7 @@ void d_png_set_chunk_malloc_max (png_structrp png_ptr, png_alloc_size_t user_chu
     END_TIMER(d_png_set_chunk_malloc_max);
 }
 
+#ifdef PNG_READ_CHECK_FOR_INVALID_INDEX_SUPPORTED
 void d_png_set_check_for_invalid_index(png_structrp png_ptr, int allowed)
 {
     #ifdef PRINT_FUNCTION_LOGS
@@ -714,6 +720,7 @@ void d_png_set_check_for_invalid_index(png_structrp png_ptr, int allowed)
 
     END_TIMER(d_png_set_check_for_invalid_index);
 }
+#endif
 
 int d_png_set_option(png_structrp png_ptr, int option, int onoff)
 {
@@ -1126,9 +1133,9 @@ void d_png_set_gray_to_rgb(png_structrp png_ptr)
         PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_set_gray_to_rgb);
     #elif(USE_SANDBOXING == 1)
-        ptr_png_set_gray_to_rgb(png_ptr, info_ptr);
+        ptr_png_set_gray_to_rgb(png_ptr);
     #elif(USE_SANDBOXING == 0)
-        png_set_gray_to_rgb(png_ptr, info_ptr);
+        png_set_gray_to_rgb(png_ptr);
     #else
         #error Missed case of USE_SANDBOXING
     #endif
@@ -1290,9 +1297,9 @@ void d_png_set_progressive_frame_fn(png_structp png_ptr, png_progressive_frame_p
         PUSH_VAL_TO_STACK(threadData, png_progressive_end_ptr, frameEndRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_set_progressive_frame_fn);
     #elif(USE_SANDBOXING == 1)
-        ptr_png_set_progressive_frame_fn(png_ptr, frame_info_fn_stub, frame_end_fn_stub);
+        ptr_png_set_progressive_frame_fn(png_ptr, my_frame_info_fn_stub, my_frame_end_fn_stub);
     #elif(USE_SANDBOXING == 0)
-        png_set_progressive_frame_fn(png_ptr, frame_info_fn_stub, frame_end_fn_stub);
+        png_set_progressive_frame_fn(png_ptr, my_frame_info_fn_stub, my_frame_end_fn_stub);
     #else
         #error Missed case of USE_SANDBOXING
     #endif
