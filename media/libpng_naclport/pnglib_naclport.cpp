@@ -26,6 +26,7 @@
   #define END_FN_SLOT 4
   #define FRAME_INFO_FN_SLOT 5
   #define FRAME_END_FN_SLOT 6
+  #define LONGJMP_FN_SLOT 7
 
   NaClSandbox* pngSandbox;
 
@@ -166,6 +167,7 @@ png_progressive_row_ptr   cb_my_row_fn;
 png_progressive_end_ptr   cb_my_end_fn;
 png_progressive_frame_ptr cb_my_frame_info_fn;
 png_progressive_frame_ptr cb_my_frame_end_fn;
+png_longjmp_ptr           cb_my_longjmp_fn;
 
 unsigned long long getTimeSpentInPng()
 {
@@ -1641,6 +1643,35 @@ void d_png_longjmp(png_const_structrp png_ptr, int val)
     END_TIMER(d_png_longjmp);
 }
 
+#if(USE_SANDBOXING == 2)
+    SANDBOX_CALLBACK void my_longjmp_fn_stub(uintptr_t sandboxPtr)
+#else
+    void my_longjmp_fn_stub(jmp_buf env, int val)
+#endif
+{
+    #ifdef PRINT_FUNCTION_LOGS
+        MOZ_LOG(sPNGLog, LogLevel::Debug, ("my_longjmp_fn_stub"));
+    #endif
+    END_TIMER(my_longjmp_fn_stub);
+    //printf("Callback my_longjmp_fn_stub\n");
+
+    #if(USE_SANDBOXING == 2)
+        NaClSandbox* sandboxC = (NaClSandbox*) sandboxPtr;
+        NaClSandbox_Thread* threadData = callbackParamsBegin(sandboxC);
+        jmp_buf& env = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(threadData, jmp_buf);
+        int val = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(threadData, int);
+
+        //We should not assume anything about - need to have some sort of validation here
+    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 0)
+    #else
+        #error Missed case of USE_SANDBOXING
+    #endif
+
+    cb_my_longjmp_fn(env, val);
+    START_TIMER(my_longjmp_fn_stub);
+}
+
 jmp_buf* d_png_set_longjmp_fn(png_structrp png_ptr, png_longjmp_ptr longjmp_fn, size_t jmp_buf_size)
 {
     #ifdef PRINT_FUNCTION_LOGS
@@ -1649,10 +1680,14 @@ jmp_buf* d_png_set_longjmp_fn(png_structrp png_ptr, png_longjmp_ptr longjmp_fn, 
     //printf("Calling func d_png_set_longjmp_fn\n");
     START_TIMER(png_set_longjmp_fn);
 
+    cb_my_longjmp_fn = longjmp_fn;
+
     #if(USE_SANDBOXING == 2)
+        uintptr_t longJmpRegisteredCallback = registerSandboxCallback(pngSandbox, LONGJMP_FN_SLOT, (uintptr_t) my_longjmp_fn_stub);
+
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(longjmp_fn) + sizeof(jmp_buf_size), 0 /* size of any arrays being pushed on the stack */);
         PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
-        PUSH_PTR_TO_STACK(threadData, png_longjmp_ptr, longjmp_fn);
+        PUSH_VAL_TO_STACK(threadData, png_longjmp_ptr, longJmpRegisteredCallback);
         PUSH_VAL_TO_STACK(threadData, size_t, jmp_buf_size);
         invokeFunctionCall(threadData, (void *)ptr_png_set_longjmp_fn);
         jmp_buf* ret = (jmp_buf*)functionCallReturnPtr(threadData);
