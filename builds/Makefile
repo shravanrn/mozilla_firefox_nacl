@@ -76,10 +76,6 @@ run32_perf: build32
 	cd .. && ./runPerfTest32 $OUTPUTFILE
 
 clean:
-	cp ../mozconfig64 ../mozconfig	
-	cd .. && ./mach clobber
-	cp ../mozconfig32 ../mozconfig
-	cd .. && ./mach clobber
 	-rm -rf ../firefox_32bit_optdebug
 	-rm -rf ../firefox_32bit_optdebug_static
 	-rm -rf ../firefox_32bit_optdebug_nonnacl
