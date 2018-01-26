@@ -18,13 +18,13 @@ SOURCES += [
 # Pick from one of the values below
 #
 # Static func calls to libpng
-# DEFINES['USE_SANDBOXING'] = 0
+DEFINES['USE_SANDBOXING'] = 0
 #
 # Dynamic func calls to libpng
 # DEFINES['USE_SANDBOXING'] = 1
 #
 # Sandboxed dynamic func calls to libpng
-DEFINES['USE_SANDBOXING'] = 2
+# DEFINES['USE_SANDBOXING'] = 2
 
 # Comment out the following if you don't want to print the time spent in png rendering. The value '42' below is disregarded
 DEFINES['PRINT_FUNCTION_TIMES'] = 42

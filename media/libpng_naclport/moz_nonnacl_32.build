@@ -21,10 +21,10 @@ SOURCES += [
 # DEFINES['USE_SANDBOXING'] = 0
 #
 # Dynamic func calls to libpng
-# DEFINES['USE_SANDBOXING'] = 1
+DEFINES['USE_SANDBOXING'] = 1
 #
 # Sandboxed dynamic func calls to libpng
-DEFINES['USE_SANDBOXING'] = 2
+# DEFINES['USE_SANDBOXING'] = 2
 
 # Comment out the following if you don't want to print the time spent in png rendering. The value '42' below is disregarded
 DEFINES['PRINT_FUNCTION_TIMES'] = 42
@@ -34,9 +34,9 @@ DEFINES['PRINT_FUNCTION_TIMES'] = 42
 
 ############ Update these paths as required
 
-DEFINES['PNG_NON_NACL_DL_PATH'] = '"../libpng_nacl/builds/x64/non_nacl_build/libpng.so"'
-DEFINES['STARTUP_LIBRARY_PATH'] = '"../Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe"'
-DEFINES['SANDBOX_INIT_APP'] = '"../libpng_nacl/builds/x64/nacl_build/mainCombine/libpng.nexe"'
+DEFINES['PNG_NON_NACL_DL_PATH'] = '"../libpng_nacl/builds/x32/non_nacl_build/libpng.so"'
+DEFINES['STARTUP_LIBRARY_PATH'] = '"../Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-32/staging/irt_core.nexe"'
+DEFINES['SANDBOX_INIT_APP'] = '"../libpng_nacl/builds/x32/nacl_build/mainCombine/libpng.nexe"'
 
 LOCAL_INCLUDES += [
     ############ Update this path as required
@@ -45,6 +45,6 @@ LOCAL_INCLUDES += [
 ]
 
 ############ Update this path as required
-OS_LIBS += ['-L../../../../Sandboxing_NaCl/native_client/scons-out-firefox/opt-linux-x86-64/lib', '-ldyn_ldr', '-lsel', '-lnacl_error_code', '-lenv_cleanser', '-lnrd_xfer', '-lnacl_perf_counter', '-lnacl_base', '-limc', '-lnacl_fault_inject', '-lnacl_interval', '-lplatform_qual_lib', '-lvalidators', '-ldfa_validate_caller_x86_64', '-lcpu_features', '-lvalidation_cache', '-lplatform', '-lgio', '-lnccopy_x86_64', '-lrt', '-lpthread']
+OS_LIBS += ['-L../../../../Sandboxing_NaCl/native_client/scons-out-firefox/opt-linux-x86-32/lib', '-ldyn_ldr', '-lsel', '-lnacl_error_code', '-lenv_cleanser', '-lnrd_xfer', '-lnacl_perf_counter', '-lnacl_base', '-limc', '-lnacl_fault_inject', '-lnacl_interval', '-lplatform_qual_lib', '-lvalidators', '-ldfa_validate_caller_x86_32', '-lcpu_features', '-lvalidation_cache', '-lplatform', '-lgio', '-lnccopy_x86_32', '-lrt', '-lpthread']
 
 FINAL_LIBRARY = 'gkmedias'
