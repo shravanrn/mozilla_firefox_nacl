@@ -202,6 +202,12 @@ unsigned long long getInvocationsInPngCore()
   #endif
 }
 
+#if(USE_SANDBOXING == 2)
+
+  extern void ensureNaClSandboxInit();
+
+#endif
+
 int initializeLibPngSandbox()
 {
   if(pngStartedInit)
@@ -223,12 +229,7 @@ int initializeLibPngSandbox()
 
     printf("Creating NaCl Sandbox %s, %s\n", STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
 
-    if(!initializeDlSandboxCreator(0 /* Should enable detailed logging */))
-    {
-      printf("Error creating png Sandbox");
-      return 0;
-    }
-
+    ensureNaClSandboxInit();
     pngSandbox = createDlSandbox(STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
 
     if(!pngSandbox)

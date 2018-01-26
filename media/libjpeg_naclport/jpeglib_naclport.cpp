@@ -170,6 +170,31 @@ unsigned long long getInvocationsInJpegCore()
   #endif
 }
 
+#if(USE_SANDBOXING == 2)
+
+  int naclStartedInit = 0;
+  int naclFinishedInit = 0;
+  void ensureNaClSandboxInit()
+  {
+      if(naclStartedInit)
+      {
+          while(!naclFinishedInit){}
+          return;
+      }
+
+      naclStartedInit = 1;
+
+      printf("Initializing NaCl Sandbox\n");
+      if(!initializeDlSandboxCreator(0 /* Should enable detailed logging */))
+      {
+        printf("Error initializing NaCl Sandbox\n");
+      }
+
+      naclFinishedInit = 1;
+  }
+
+#endif
+
 int initializeLibJpegSandbox()
 {
   if(jpegStartedInit)
@@ -201,12 +226,7 @@ int initializeLibJpegSandbox()
 
     printf("Creating NaCl Sandbox %s, %s\n", STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
 
-    if(!initializeDlSandboxCreator(0 /* Should enable detailed logging */))
-    {
-      printf("Error creating jpeg Sandbox");
-      return 0;
-    }
-
+    ensureNaClSandboxInit();
     jpegSandbox = createDlSandbox(STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
 
     if(!jpegSandbox)
