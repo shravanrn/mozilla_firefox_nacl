@@ -34,9 +34,9 @@ DEFINES['PRINT_FUNCTION_TIMES'] = 42
 
 ############ Update these paths as required
 
-DEFINES['PNG_NON_NACL_DL_PATH'] = '"../libpng_nacl/builds/x64/non_nacl_build/libpng.so"'
-DEFINES['STARTUP_LIBRARY_PATH'] = '"../Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe"'
-DEFINES['SANDBOX_INIT_APP'] = '"../libpng_nacl/builds/x64/nacl_build/mainCombine/libpng.nexe"'
+DEFINES['PNG_NON_NACL_DL_PATH'] = '"libpng_nacl/builds/x64/non_nacl_build/libpng.so"'
+DEFINES['STARTUP_LIBRARY_PATH'] = '"Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe"'
+DEFINES['SANDBOX_INIT_APP'] = '"libpng_nacl/builds/x64/nacl_build/mainCombine/libpng.nexe"'
 
 LOCAL_INCLUDES += [
     ############ Update this path as required

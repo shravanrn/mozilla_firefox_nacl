@@ -8,25 +8,25 @@ with Files("**"):
     BUG_COMPONENT = ("Core", "ImageLib")
 
 EXPORTS += [
-    'pnglib_naclport.h',
+    'jpeglib_naclport.h',
 ]
 
 SOURCES += [
-    'pnglib_naclport.cpp',
+    'jpeglib_naclport.cpp',
 ]
 
 # Pick from one of the values below
 #
-# Static func calls to libpng
+# Static func calls to libjpeg
 # DEFINES['USE_SANDBOXING'] = 0
 #
-# Dynamic func calls to libpng
+# Dynamic func calls to libjpeg
 DEFINES['USE_SANDBOXING'] = 1
 #
-# Sandboxed dynamic func calls to libpng
+# Sandboxed dynamic func calls to libjpeg
 # DEFINES['USE_SANDBOXING'] = 2
 
-# Comment out the following if you don't want to print the time spent in png rendering. The value '42' below is disregarded
+# Comment out the following if you don't want to print the time spent in jpeg rendering. The value '42' below is disregarded
 DEFINES['PRINT_FUNCTION_TIMES'] = 42
 
 # Comment out if you don't want logging. The value '42' below is disregarded
@@ -34,17 +34,17 @@ DEFINES['PRINT_FUNCTION_TIMES'] = 42
 
 ############ Update these paths as required
 
-DEFINES['PNG_NON_NACL_DL_PATH'] = '"libpng_nacl/builds/x32/non_nacl_build/libpng.so"'
+DEFINES['JPEG_NON_NACL_DL_PATH'] = '"libjpeg-turbo/builds/x32/non_nacl_build_simd/.libs/libjpeg.so"'
 DEFINES['STARTUP_LIBRARY_PATH'] = '"Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-32/staging/irt_core.nexe"'
-DEFINES['SANDBOX_INIT_APP'] = '"libpng_nacl/builds/x32/nacl_build/mainCombine/libpng.nexe"'
+DEFINES['SANDBOX_INIT_APP'] = '"libjpeg-turbo/builds/x32/nacl_build_simd/mainCombine/libjpeg.nexe"'
 
 LOCAL_INCLUDES += [
     ############ Update this path as required
     '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
-    '/media/libpng'
+    '/media/libjpeg'
 ]
 
 ############ Update this path as required
-OS_LIBS += ['-L../../../../Sandboxing_NaCl/native_client/scons-out-firefox/opt-linux-x86-32/lib', '-ldyn_ldr', '-lsel', '-lnacl_error_code', '-lenv_cleanser', '-lnrd_xfer', '-lnacl_perf_counter', '-lnacl_base', '-limc', '-lnacl_fault_inject', '-lnacl_interval', '-lplatform_qual_lib', '-lvalidators', '-ldfa_validate_caller_x86_32', '-lcpu_features', '-lvalidation_cache', '-lplatform', '-lgio', '-lnccopy_x86_32', '-lrt', '-lpthread']
+OS_LIBS += ['-L../../../../Sandboxing_NaCl/native_client/scons-out-firefox/dbg-linux-x86-32/lib', '-ldyn_ldr', '-lsel', '-lnacl_error_code', '-lenv_cleanser', '-lnrd_xfer', '-lnacl_perf_counter', '-lnacl_base', '-limc', '-lnacl_fault_inject', '-lnacl_interval', '-lplatform_qual_lib', '-lvalidators', '-ldfa_validate_caller_x86_32', '-lcpu_features', '-lvalidation_cache', '-lplatform', '-lgio', '-lnccopy_x86_32', '-lrt', '-lpthread']
 
 FINAL_LIBRARY = 'gkmedias'

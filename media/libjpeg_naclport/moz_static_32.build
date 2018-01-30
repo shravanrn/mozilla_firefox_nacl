@@ -34,9 +34,9 @@ DEFINES['PRINT_FUNCTION_TIMES'] = 42
 
 ############ Update these paths as required
 
-DEFINES['JPEG_NON_NACL_DL_PATH'] = '"../libjpeg-turbo/builds/x32/non_nacl_build_simd/.libs/libjpeg.so"'
-DEFINES['STARTUP_LIBRARY_PATH'] = '"../Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-32/staging/irt_core.nexe"'
-DEFINES['SANDBOX_INIT_APP'] = '"../libjpeg-turbo/builds/x32/nacl_build_simd/mainCombine/libjpeg.nexe"'
+DEFINES['JPEG_NON_NACL_DL_PATH'] = '"libjpeg-turbo/builds/x32/non_nacl_build_simd/.libs/libjpeg.so"'
+DEFINES['STARTUP_LIBRARY_PATH'] = '"Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-32/staging/irt_core.nexe"'
+DEFINES['SANDBOX_INIT_APP'] = '"libjpeg-turbo/builds/x32/nacl_build_simd/mainCombine/libjpeg.nexe"'
 
 LOCAL_INCLUDES += [
     ############ Update this path as required

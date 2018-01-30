@@ -126,6 +126,10 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
   initializeLibPngSandbox();
 }
 
+high_resolution_clock::time_point PngCreateTime;
+unsigned long long invPng = 0;
+unsigned long long timeInPng = 0;
+
 nsPNGDecoder::~nsPNGDecoder()
 {
   if (mPNG) {
@@ -398,6 +402,8 @@ LexerResult
 nsPNGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
+
+  PngCreateTime = high_resolution_clock::now();
 
   return mLexer.Lex(aIterator, aOnResume,
                     [=](State aState, const char* aData, size_t aLength) {
@@ -1135,6 +1141,11 @@ nsPNGDecoder::end_callback(png_structp png_ptr, png_infop info_ptr)
 
   // We shouldn't get here if we've hit an error
   MOZ_ASSERT(!decoder->HasError(), "Finishing up PNG but hit error!");
+
+
+  timeInPng += duration_cast<nanoseconds>(high_resolution_clock::now() - PngCreateTime).count();
+  printf("%10llu,PNG_Time,%d,%10llu,%10llu,%10llu,%10llu\n", invPng, getppid(), getTimeSpentInPng(), getInvocationsInPngCore(), getTimeSpentInPngCore(), timeInPng);
+  invPng++;
 
   return decoder->DoTerminate(png_ptr, TerminalState::SUCCESS);
 }

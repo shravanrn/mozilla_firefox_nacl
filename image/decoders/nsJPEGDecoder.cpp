@@ -138,7 +138,7 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
 }
 
 high_resolution_clock::time_point JpegCreateTime;
-unsigned long long inv = 0;
+unsigned long long invJpeg = 0;
 unsigned long long timeInJpeg = 0;
 
 nsJPEGDecoder::~nsJPEGDecoder()
@@ -609,8 +609,8 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 
     // Step 7: Finish decompression
     timeInJpeg += duration_cast<nanoseconds>(high_resolution_clock::now() - JpegCreateTime).count();
-    printf("%10llu,JPEG_Time,%d,%10llu,%10llu,%10llu,%10llu\n", inv, getppid(), getTimeSpentInJpeg(), getInvocationsInJpegCore(), getTimeSpentInJpegCore(), timeInJpeg);
-    inv++;
+    printf("%10llu,JPEG_Time,%d,%10llu,%10llu,%10llu,%10llu\n", invJpeg, getppid(), getTimeSpentInJpeg(), getInvocationsInJpegCore(), getTimeSpentInJpegCore(), timeInJpeg);
+    invJpeg++;
 
     if (d_jpeg_finish_decompress(&mInfo) == FALSE) {
       MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,

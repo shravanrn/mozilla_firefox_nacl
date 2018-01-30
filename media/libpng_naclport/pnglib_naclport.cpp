@@ -1,5 +1,6 @@
 #include "pnglib_naclport.h"
 #include <dlfcn.h>
+#include <unistd.h>
 
 #ifdef PRINT_FUNCTION_LOGS
   using mozilla::LogLevel;
@@ -216,39 +217,69 @@ int initializeLibPngSandbox()
     return 1;
   }
   
+  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, PNG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
+
   pngStartedInit = 1;
+
+  char SandboxingCodeRootFolder[1024];
+  int index;
+
+  getcwd(SandboxingCodeRootFolder, 256);
+
+  char * found = strstr(SandboxingCodeRootFolder, "/mozilla-release");
+  if (found == NULL)
+  {
+    printf("Error initializing start directory for NaCl\n");   
+    exit(1);
+  }
+  
+  index = found - SandboxingCodeRootFolder + 1;
+  SandboxingCodeRootFolder[index] = '\0';
+
   #if(USE_SANDBOXING == 0)
+  {
     printf("Using static libpng\n");
     pngfinishedInit = 1;
     return 1;
-  #endif
+  }
+  #elif(USE_SANDBOXING == 1)
+  {
+    char full_PNG_NON_NACL_DL_PATH[1024];
 
-  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, PNG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
+    strcpy(full_PNG_NON_NACL_DL_PATH, SandboxingCodeRootFolder);
+    strcat(full_PNG_NON_NACL_DL_PATH, PNG_NON_NACL_DL_PATH);
 
-  #if(USE_SANDBOXING == 2)
+    printf("Loading dynamic library %s\n", full_PNG_NON_NACL_DL_PATH);
+    pngDlPtr = dlopen(full_PNG_NON_NACL_DL_PATH, RTLD_LAZY);
 
-    printf("Creating NaCl Sandbox %s, %s\n", STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
+    if(!pngDlPtr)
+    {
+      printf("Loading of dynamic library %s has failed\n", full_PNG_NON_NACL_DL_PATH);
+      return 0;
+    }
+  }  
+  #elif(USE_SANDBOXING == 2)
+  {
+    char full_STARTUP_LIBRARY_PATH[1024];
+    char full_SANDBOX_INIT_APP[1024];
+
+    strcpy(full_STARTUP_LIBRARY_PATH, SandboxingCodeRootFolder);
+    strcat(full_STARTUP_LIBRARY_PATH, STARTUP_LIBRARY_PATH);
+
+    strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
+    strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
+
+    printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
 
     ensureNaClSandboxInit();
-    pngSandbox = createDlSandbox(STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
+    pngSandbox = createDlSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
 
     if(!pngSandbox)
     {
       printf("Error creating png Sandbox");
       return 0;
     }
-
-  #elif(USE_SANDBOXING == 1)
-
-    printf("Loading dynamic library %s\n", PNG_NON_NACL_DL_PATH);
-    pngDlPtr = dlopen(PNG_NON_NACL_DL_PATH, RTLD_LAZY);
-
-    if(!pngDlPtr)
-    {
-      printf("Loading of dynamic library %s has failed\n", PNG_NON_NACL_DL_PATH);
-      return 0;
-    }
-
+  }
   #endif
 
   printf("Loading symbols.\n");

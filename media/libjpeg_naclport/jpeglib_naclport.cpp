@@ -3,6 +3,7 @@
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <unistd.h>
 
 #include "jpeglib_naclport.h"
 
@@ -174,6 +175,7 @@ unsigned long long getInvocationsInJpegCore()
 
   int naclStartedInit = 0;
   int naclFinishedInit = 0;
+
   void ensureNaClSandboxInit()
   {
       if(naclStartedInit)
@@ -185,6 +187,7 @@ unsigned long long getInvocationsInJpegCore()
       naclStartedInit = 1;
 
       printf("Initializing NaCl Sandbox\n");
+
       if(!initializeDlSandboxCreator(0 /* Should enable detailed logging */))
       {
         printf("Error initializing NaCl Sandbox\n");
@@ -207,39 +210,74 @@ int initializeLibJpegSandbox()
 
   jpegStartedInit = 1;
 
+  char SandboxingCodeRootFolder[1024];
+  int index;
+
+  getcwd(SandboxingCodeRootFolder, 256);
+
+  char * found = strstr(SandboxingCodeRootFolder, "/mozilla-release");
+  if (found == NULL)
+  {
+    printf("Error initializing start directory for NaCl\n");   
+    exit(1);
+  }
+  
+  index = found - SandboxingCodeRootFolder + 1;
+  SandboxingCodeRootFolder[index] = '\0';
+
   #if(USE_SANDBOXING == 0)
+  {
     printf("Using static libjpeg\n");
     jpegFinishedInit = 1;
     return 1;
-
+  }
   #elif(USE_SANDBOXING == 1)
+  {
+    char full_JPEG_NON_NACL_DL_PATH[1024];
 
-    printf("Loading dynamic library %s\n", JPEG_NON_NACL_DL_PATH);
-    jpegDlPtr = dlopen(JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
+    strcpy(full_JPEG_NON_NACL_DL_PATH, SandboxingCodeRootFolder);
+    strcat(full_JPEG_NON_NACL_DL_PATH, JPEG_NON_NACL_DL_PATH);
+
+    printf("Loading dynamic library %s\n", full_JPEG_NON_NACL_DL_PATH);
+    jpegDlPtr = dlopen(full_JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
     if(!jpegDlPtr)
     {
-      printf("Loading of dynamic library %s has failed\n", JPEG_NON_NACL_DL_PATH);
+      printf("Loading of dynamic library %s has failed\n", full_JPEG_NON_NACL_DL_PATH);
       return 0;
     }
-
+  }
   #elif(USE_SANDBOXING == 2)
+  {
+    char full_STARTUP_LIBRARY_PATH[1024];
+    char full_SANDBOX_INIT_APP[1024];
 
-    printf("Creating NaCl Sandbox %s, %s\n", STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
+    strcpy(full_STARTUP_LIBRARY_PATH, SandboxingCodeRootFolder);
+    strcat(full_STARTUP_LIBRARY_PATH, STARTUP_LIBRARY_PATH);
+
+    strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
+    strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
+
+    printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
 
     ensureNaClSandboxInit();
-    jpegSandbox = createDlSandbox(STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP);
+    jpegSandbox = createDlSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
 
     if(!jpegSandbox)
     {
       printf("Error creating jpeg Sandbox");
       return 0;
     }
-
+  }
   #elif(USE_SANDBOXING == 3)
+  {
+    char full_PS_OTHERSIDE_PATH[1024];
+
+    strcpy(full_PS_OTHERSIDE_PATH, SandboxingCodeRootFolder);
+    strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
 
     printf("Creating process sandbox\n");
-    sandbox = new ProcessSandbox(PS_OTHERSIDE_PATH, 0, 2);
-
+    sandbox = new ProcessSandbox(full_PS_OTHERSIDE_PATH, 0, 2);
+  }
   #endif
 
   printf("Loading symbols.\n");

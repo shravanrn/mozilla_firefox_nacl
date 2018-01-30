@@ -28,6 +28,17 @@ build32: inithasrun
 	cp ../media/libpng_naclport/moz_nacl_32.build ../media/libpng_naclport/moz.build
 	cd .. && ./mach build
 
+build64_nonnacldebug: inithasrun
+	#build nacl debug
+	cp ../mozconfig64_nonnacl_debug ../mozconfig
+	cp ../media/libjpeg_naclport/moz_nonnacl_debug.build ../media/libjpeg_naclport/moz.build
+	cp ../media/libpng_naclport/moz_nonnacl_debug.build ../media/libpng_naclport/moz.build
+	cd .. && ./mach build
+
+run64_nonnacldebug:
+	cp ../mozconfig64_nonnacl_debug ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
+
 build64_nacldebug: inithasrun
 	#build nacl debug
 	cp ../mozconfig64_nacl_debug ../mozconfig

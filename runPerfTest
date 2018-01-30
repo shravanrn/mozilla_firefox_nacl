@@ -5,6 +5,8 @@ if [ -z "$1" ]; then
 	exit 1; 
 fi
 
+cd "$(dirname "$0")"
+
 if [[ -f "$1" ]]; then
 	echo "$1 already exists"; 
 	exit 1; 
@@ -46,49 +48,51 @@ function writeTimingLinesToOutput() {
 	# stuff | 2,JPEG_Time,0xf7150598,33,1,10,35
 	# stuff | 2,JPEG_Time,0xaaa,40,1,11,50
 
-
-	ORIGINALDATA=$(cat "$2")
-	DATATOFILTER=$(echo "$ORIGINALDATA" | grep -E "JPEG_Time" | grep -v "'TOPLINE'" | grep -o '|.*' | sed 's/| //')
-	OIFS=$IFS
-	IFS=,
-
-	FNINVOCATIONS=0
-	FNTIMESPENT=0
-	FNCOREINVOCATIONS=0
-	FNCORETIMESPENT=0
-	DESTROYTIMESPENT=0
-	while [ -n "$DATATOFILTER" ]
+	for testToRun in "JPEG_Time" "PNG_Time"
 	do
+		ORIGINALDATA=$(cat "$2")
+		DATATOFILTER=$(echo "$ORIGINALDATA" | grep -E "$testToRun" | grep -v "'TOPLINE'" | grep -o '|.*' | sed 's/| //')
+		OIFS=$IFS
+		IFS=,
 
-		TOPLINE=$(echo "$DATATOFILTER" | sort -r -n | head -1)
-		echo "JPEG_Time TOPLINE: $TOPLINE" >> "$1"
-		read -ra PIECES <<<"$TOPLINE"
-		FNINVOCATIONS=$((FNINVOCATIONS + PIECES[0]))
-		FNTIMESPENT=$((FNTIMESPENT + PIECES[3]))
-		FNCOREINVOCATIONS=$((FNCOREINVOCATIONS + PIECES[4]))
-		FNCORETIMESPENT=$((FNCORETIMESPENT + PIECES[5]))
-		DESTROYTIMESPENT=$((FNCORETIMESPENT + PIECES[6]))
-		DATATOFILTER=$(echo "$DATATOFILTER" | grep -v -E "${PIECES[2]}")
+		FNINVOCATIONS=0
+		FNTIMESPENT=0
+		FNCOREINVOCATIONS=0
+		FNCORETIMESPENT=0
+		DESTROYTIMESPENT=0
+		while [ -n "$DATATOFILTER" ]
+		do
+
+			TOPLINE=$(echo "$DATATOFILTER" | sort -r -n | head -1)
+			echo "$testToRun TOPLINE: $TOPLINE" >> "$1"
+			read -ra PIECES <<<"$TOPLINE"
+			FNINVOCATIONS=$((FNINVOCATIONS + PIECES[0]))
+			FNTIMESPENT=$((FNTIMESPENT + PIECES[3]))
+			FNCOREINVOCATIONS=$((FNCOREINVOCATIONS + PIECES[4]))
+			FNCORETIMESPENT=$((FNCORETIMESPENT + PIECES[5]))
+			DESTROYTIMESPENT=$((DESTROYTIMESPENT + PIECES[6]))
+			DATATOFILTER=$(echo "$DATATOFILTER" | grep -v -E "${PIECES[2]}")
+		done
+
+		COMMASEPTIME=$(printf "%'.f\n" $((FNTIMESPENT / 25)))
+		COMMASEPCORETIME=$(printf "%'.f\n" $((FNCORETIMESPENT / 25)))
+		COMMASEPDESTROYTIME=$(printf "%'.f\n" $((DESTROYTIMESPENT / 25)))
+		echo "Final $testToRun (for 1 run): inv=$((FNINVOCATIONS / 25)) time=$COMMASEPTIME core_inv=$((FNCOREINVOCATIONS / 25)) time=$COMMASEPCORETIME destroy=$COMMASEPDESTROYTIME" >> "$1"
+		echo -e "\n" >> "$1"
+
+		IFS=$OIFS
 	done
-
-	COMMASEPTIME=$(printf "%'.f\n" $((FNTIMESPENT / 25)))
-	COMMASEPCORETIME=$(printf "%'.f\n" $((FNCORETIMESPENT / 25)))
-	COMMASEPDESTROYTIME=$(printf "%'.f\n" $((DESTROYTIMESPENT / 25)))
-	echo "Final JPEG_Time (for 1 run): inv=$((FNINVOCATIONS / 25)) time=$COMMASEPTIME core_inv=$((FNCOREINVOCATIONS / 25)) time=$COMMASEPCORETIME destroy=$COMMASEPDESTROYTIME" >> "$1"
-	echo -e "\n" >> "$1"
-
-	IFS=$OIFS
 }
 
 # param: outputFile
 # param: testName
 function runTest(){
-	rm -f /home/shr/Code/mozilla-release/testing/mozharness/build/local.json
+	rm -f ./testing/mozharness/build/local.json
 	rm -f ./talos_output.txt
 	sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 	sleep 5
 	taskset -c 3 ./mach talos-test --activeTests $2 2>&1 | tee ./talos_output.txt
-	cat /home/shr/Code/mozilla-release/testing/mozharness/build/local.json >> "$1"
+	cat ./testing/mozharness/build/local.json >> "$1"
 	echo -e "\n" >> "$1"
 	writeTimingLinesToOutput "$1" "./talos_output.txt"
 	echo -e "\nTerminal Output\n" >> "$1"
@@ -156,4 +160,4 @@ do
 done
 
 echo "Output results to $1"
-cat "$1" | grep -E '(^FFBuild)|("name")|("value")|(Final JPEG_Time)' | grep --invert-match "INFO -"
+cat "$1" | grep -E '(^FFBuild)|("name")|("value")|(Final JPEG_Time)|(Final PNG_Time)' | grep --invert-match "INFO -"
