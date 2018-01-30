@@ -250,7 +250,7 @@ int initializeLibPngSandbox()
     strcat(full_PNG_NON_NACL_DL_PATH, PNG_NON_NACL_DL_PATH);
 
     printf("Loading dynamic library %s\n", full_PNG_NON_NACL_DL_PATH);
-    pngDlPtr = dlopen(full_PNG_NON_NACL_DL_PATH, RTLD_LAZY);
+    pngDlPtr = dlopen(full_PNG_NON_NACL_DL_PATH, RTLD_LAZY | RTLD_DEEPBIND);
 
     if(!pngDlPtr)
     {
@@ -411,7 +411,7 @@ png_uint_16 d_png_get_next_frame_delay_num(png_structp png_ptr, png_infop info_p
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_next_frame_delay_num"));
     #endif
     //printf("Calling func d_png_get_next_frame_delay_num\n");
-    START_TIMER(d_png_get_next_frame_delay_num);
+    START_TIMER_CORE(d_png_get_next_frame_delay_num);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -427,7 +427,7 @@ png_uint_16 d_png_get_next_frame_delay_num(png_structp png_ptr, png_infop info_p
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_get_next_frame_delay_num);
+    END_TIMER_CORE(d_png_get_next_frame_delay_num);
     return ret;
 }
 
@@ -437,7 +437,7 @@ png_uint_16 d_png_get_next_frame_delay_den(png_structp png_ptr, png_infop info_p
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_next_frame_delay_den"));
     #endif
     //printf("Calling func d_png_get_next_frame_delay_den\n");
-    START_TIMER(d_png_get_next_frame_delay_den);
+    START_TIMER_CORE(d_png_get_next_frame_delay_den);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -453,7 +453,7 @@ png_uint_16 d_png_get_next_frame_delay_den(png_structp png_ptr, png_infop info_p
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_get_next_frame_delay_den);
+    END_TIMER_CORE(d_png_get_next_frame_delay_den);
     return ret;
 }
 
@@ -463,7 +463,7 @@ png_byte d_png_get_next_frame_dispose_op(png_structp png_ptr, png_infop info_ptr
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_next_frame_dispose_op"));
     #endif
     //printf("Calling func d_png_get_next_frame_dispose_op\n");
-    START_TIMER(d_png_get_next_frame_dispose_op);
+    START_TIMER_CORE(d_png_get_next_frame_dispose_op);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -479,7 +479,7 @@ png_byte d_png_get_next_frame_dispose_op(png_structp png_ptr, png_infop info_ptr
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_get_next_frame_dispose_op);
+    END_TIMER_CORE(d_png_get_next_frame_dispose_op);
     return ret;
 }
 
@@ -489,7 +489,7 @@ png_byte d_png_get_next_frame_blend_op(png_structp png_ptr, png_infop info_ptr)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_next_frame_blend_op"));
     #endif
     //printf("Calling func d_png_get_next_frame_blend_op\n");
-    START_TIMER(d_png_get_next_frame_blend_op);
+    START_TIMER_CORE(d_png_get_next_frame_blend_op);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -505,7 +505,7 @@ png_byte d_png_get_next_frame_blend_op(png_structp png_ptr, png_infop info_ptr)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_get_next_frame_blend_op);
+    END_TIMER_CORE(d_png_get_next_frame_blend_op);
     return ret;
 }
 
@@ -519,7 +519,7 @@ png_byte d_png_get_next_frame_blend_op(png_structp png_ptr, png_infop info_ptr)
     #ifdef PRINT_FUNCTION_LOGS
         MOZ_LOG(sPNGLog, LogLevel::Debug, ("my_err_fn_stub"));
     #endif
-    END_TIMER(my_err_fn_stub);
+    END_TIMER_CORE(my_err_fn_stub);
     //printf("Callback my_err_fn_stub\n");
 
     #if(USE_SANDBOXING == 2)
@@ -536,7 +536,7 @@ png_byte d_png_get_next_frame_blend_op(png_structp png_ptr, png_infop info_ptr)
     #endif
 
     cb_my_err_fn(png_ptr, error_msg);
-    START_TIMER(my_err_fn_stub);
+    START_TIMER_CORE(my_err_fn_stub);
 }
 
 #if(USE_SANDBOXING == 2)
@@ -548,7 +548,7 @@ png_byte d_png_get_next_frame_blend_op(png_structp png_ptr, png_infop info_ptr)
     #ifdef PRINT_FUNCTION_LOGS
         MOZ_LOG(sPNGLog, LogLevel::Debug, ("my_warn_fn_stub"));
     #endif
-    END_TIMER(my_warn_fn_stub);
+    END_TIMER_CORE(my_warn_fn_stub);
     //printf("Callback my_warn_fn_stub\n");
 
     #if(USE_SANDBOXING == 2)
@@ -565,7 +565,7 @@ png_byte d_png_get_next_frame_blend_op(png_structp png_ptr, png_infop info_ptr)
     #endif
 
     cb_my_warn_fn(png_ptr, warning_msg);
-    START_TIMER(my_warn_fn_stub);
+    START_TIMER_CORE(my_warn_fn_stub);
 }
 
 
@@ -575,7 +575,7 @@ PNG_ALLOCATED png_structp d_png_create_read_struct(png_const_charp user_png_ver,
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_create_read_struct"));
     #endif
     //printf("Calling func d_png_create_read_struct\n");
-    START_TIMER(d_png_create_read_struct);
+    START_TIMER_CORE(d_png_create_read_struct);
 
     cb_my_err_fn = error_fn;
     cb_my_warn_fn = warn_fn;
@@ -599,7 +599,7 @@ PNG_ALLOCATED png_structp d_png_create_read_struct(png_const_charp user_png_ver,
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_create_read_struct);
+    END_TIMER_CORE(d_png_create_read_struct);
     return ret;
 }
 
@@ -609,7 +609,7 @@ PNG_ALLOCATED png_infop d_png_create_info_struct(png_const_structrp png_ptr)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_create_info_struct"));
     #endif
     //printf("Calling func d_png_create_info_struct\n");
-    START_TIMER(d_png_create_info_struct);
+    START_TIMER_CORE(d_png_create_info_struct);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -624,7 +624,7 @@ PNG_ALLOCATED png_infop d_png_create_info_struct(png_const_structrp png_ptr)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_create_info_struct);
+    END_TIMER_CORE(d_png_create_info_struct);
     return ret;
 }
 
@@ -634,7 +634,7 @@ void d_png_destroy_read_struct(png_structpp png_ptr_ptr, png_infopp info_ptr_ptr
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_destroy_read_struct"));
     #endif
     //printf("Calling func d_png_destroy_read_struct\n");
-    START_TIMER(d_png_destroy_read_struct);
+    START_TIMER_CORE(d_png_destroy_read_struct);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr_ptr) + sizeof(info_ptr_ptr) + sizeof(end_info_ptr_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -650,7 +650,7 @@ void d_png_destroy_read_struct(png_structpp png_ptr_ptr, png_infopp info_ptr_ptr
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_destroy_read_struct);
+    END_TIMER_CORE(d_png_destroy_read_struct);
 }
 
 #ifdef PNG_HANDLE_AS_UNKNOWN_SUPPORTED
@@ -660,7 +660,7 @@ void d_png_set_keep_unknown_chunks(png_structrp png_ptr, int keep, png_const_byt
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_keep_unknown_chunks"));
     #endif
     //printf("Calling func d_png_set_keep_unknown_chunks\n");
-    START_TIMER(d_png_set_keep_unknown_chunks);
+    START_TIMER_CORE(d_png_set_keep_unknown_chunks);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(keep) + sizeof(chunk_list) + sizeof(num_chunks_in), 0 /* size of any arrays being pushed on the stack */);
@@ -677,7 +677,7 @@ void d_png_set_keep_unknown_chunks(png_structrp png_ptr, int keep, png_const_byt
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_set_keep_unknown_chunks);
+    END_TIMER_CORE(d_png_set_keep_unknown_chunks);
 }
 #endif
 
@@ -687,7 +687,7 @@ void d_png_set_user_limits (png_structrp png_ptr, png_uint_32 user_width_max, pn
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_user_limits"));
     #endif
     //printf("Calling func d_png_set_user_limits\n");
-    START_TIMER(d_png_set_user_limits);
+    START_TIMER_CORE(d_png_set_user_limits);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(user_width_max) + sizeof(user_height_max), 0 /* size of any arrays being pushed on the stack */);
@@ -703,7 +703,7 @@ void d_png_set_user_limits (png_structrp png_ptr, png_uint_32 user_width_max, pn
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_set_user_limits);
+    END_TIMER_CORE(d_png_set_user_limits);
 }
 
 void d_png_set_chunk_malloc_max (png_structrp png_ptr, png_alloc_size_t user_chunk_malloc_max)
@@ -712,7 +712,7 @@ void d_png_set_chunk_malloc_max (png_structrp png_ptr, png_alloc_size_t user_chu
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_chunk_malloc_max"));
     #endif
     //printf("Calling func d_png_set_chunk_malloc_max\n");
-    START_TIMER(d_png_set_chunk_malloc_max);
+    START_TIMER_CORE(d_png_set_chunk_malloc_max);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(user_chunk_malloc_max), 0 /* size of any arrays being pushed on the stack */);
@@ -727,7 +727,7 @@ void d_png_set_chunk_malloc_max (png_structrp png_ptr, png_alloc_size_t user_chu
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_set_chunk_malloc_max);
+    END_TIMER_CORE(d_png_set_chunk_malloc_max);
 }
 
 #ifdef PNG_READ_CHECK_FOR_INVALID_INDEX_SUPPORTED
@@ -737,7 +737,7 @@ void d_png_set_check_for_invalid_index(png_structrp png_ptr, int allowed)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_check_for_invalid_index"));
     #endif
     //printf("Calling func d_png_set_check_for_invalid_index\n");
-    START_TIMER(d_png_set_check_for_invalid_index);
+    START_TIMER_CORE(d_png_set_check_for_invalid_index);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(allowed), 0 /* size of any arrays being pushed on the stack */);
@@ -752,7 +752,7 @@ void d_png_set_check_for_invalid_index(png_structrp png_ptr, int allowed)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_set_check_for_invalid_index);
+    END_TIMER_CORE(d_png_set_check_for_invalid_index);
 }
 #endif
 
@@ -762,7 +762,7 @@ int d_png_set_option(png_structrp png_ptr, int option, int onoff)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_option"));
     #endif
     //printf("Calling func d_png_set_option\n");
-    START_TIMER(d_png_set_option);
+    START_TIMER_CORE(d_png_set_option);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(option) + sizeof(onoff), 0 /* size of any arrays being pushed on the stack */);
@@ -779,7 +779,7 @@ int d_png_set_option(png_structrp png_ptr, int option, int onoff)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_set_option);
+    END_TIMER_CORE(d_png_set_option);
     return ret;
 }
 
@@ -792,7 +792,7 @@ int d_png_set_option(png_structrp png_ptr, int option, int onoff)
     #ifdef PRINT_FUNCTION_LOGS
         MOZ_LOG(sPNGLog, LogLevel::Debug, ("my_info_fn_stub"));
     #endif
-    END_TIMER(my_info_fn_stub);
+    END_TIMER_CORE(my_info_fn_stub);
     //printf("Callback my_info_fn_stub\n");
 
     #if(USE_SANDBOXING == 2)
@@ -809,7 +809,7 @@ int d_png_set_option(png_structrp png_ptr, int option, int onoff)
     #endif
 
     cb_my_info_fn(png_ptr, info_ptr);
-    START_TIMER(my_info_fn_stub);
+    START_TIMER_CORE(my_info_fn_stub);
 }
 
 #if(USE_SANDBOXING == 2)
@@ -821,7 +821,7 @@ int d_png_set_option(png_structrp png_ptr, int option, int onoff)
     #ifdef PRINT_FUNCTION_LOGS
         MOZ_LOG(sPNGLog, LogLevel::Debug, ("my_row_fn_stub"));
     #endif
-    END_TIMER(my_row_fn_stub);
+    END_TIMER_CORE(my_row_fn_stub);
     //printf("Callback my_row_fn_stub\n");
 
     #if(USE_SANDBOXING == 2)
@@ -840,7 +840,7 @@ int d_png_set_option(png_structrp png_ptr, int option, int onoff)
     #endif
 
     cb_my_row_fn(png_ptr, new_row, row_num, pass);
-    START_TIMER(my_row_fn_stub);
+    START_TIMER_CORE(my_row_fn_stub);
 }
 
 #if(USE_SANDBOXING == 2)
@@ -852,7 +852,7 @@ int d_png_set_option(png_structrp png_ptr, int option, int onoff)
     #ifdef PRINT_FUNCTION_LOGS
         MOZ_LOG(sPNGLog, LogLevel::Debug, ("my_end_fn_stub"));
     #endif
-    END_TIMER(my_end_fn_stub);
+    END_TIMER_CORE(my_end_fn_stub);
     //printf("Callback my_end_fn_stub\n");
 
     #if(USE_SANDBOXING == 2)
@@ -869,7 +869,7 @@ int d_png_set_option(png_structrp png_ptr, int option, int onoff)
     #endif
 
     cb_my_end_fn(png_ptr, info_ptr);
-    START_TIMER(my_end_fn_stub);
+    START_TIMER_CORE(my_end_fn_stub);
 }
 
 void d_png_set_progressive_read_fn(png_structrp png_ptr, png_voidp progressive_ptr, png_progressive_info_ptr info_fn, png_progressive_row_ptr row_fn, png_progressive_end_ptr end_fn)
@@ -878,7 +878,7 @@ void d_png_set_progressive_read_fn(png_structrp png_ptr, png_voidp progressive_p
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_progressive_read_fn"));
     #endif
     //printf("Calling func d_png_set_progressive_read_fn\n");
-    START_TIMER(d_png_set_progressive_read_fn);
+    START_TIMER_CORE(d_png_set_progressive_read_fn);
 
     cb_my_info_fn = info_fn;
     cb_my_row_fn = row_fn;
@@ -905,7 +905,7 @@ void d_png_set_progressive_read_fn(png_structrp png_ptr, png_voidp progressive_p
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_set_progressive_read_fn);
+    END_TIMER_CORE(d_png_set_progressive_read_fn);
 }
 
 png_uint_32 d_png_get_gAMA(png_const_structrp png_ptr, png_const_inforp info_ptr, double *file_gamma)
@@ -914,7 +914,7 @@ png_uint_32 d_png_get_gAMA(png_const_structrp png_ptr, png_const_inforp info_ptr
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_gAMA"));
     #endif
     //printf("Calling func d_png_get_gAMA\n");
-    START_TIMER(png_get_gAMA);
+    START_TIMER_CORE(png_get_gAMA);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr) + sizeof(file_gamma), 0 /* size of any arrays being pushed on the stack */);
@@ -931,7 +931,7 @@ png_uint_32 d_png_get_gAMA(png_const_structrp png_ptr, png_const_inforp info_ptr
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_get_gAMA);
+    END_TIMER_CORE(png_get_gAMA);
     return ret;
 }
 
@@ -941,7 +941,7 @@ void d_png_set_gAMA(png_const_structrp png_ptr, png_inforp info_ptr, double file
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_gAMA"));
     #endif
     //printf("Calling func d_png_set_gAMA\n");
-    START_TIMER(png_set_gAMA);
+    START_TIMER_CORE(png_set_gAMA);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr) + sizeof(file_gamma), 0 /* size of any arrays being pushed on the stack */);
@@ -957,7 +957,7 @@ void d_png_set_gAMA(png_const_structrp png_ptr, png_inforp info_ptr, double file
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_set_gAMA);
+    END_TIMER_CORE(png_set_gAMA);
 }
 
 void d_png_set_gamma(png_structrp png_ptr, double scrn_gamma, double file_gamma)
@@ -966,7 +966,7 @@ void d_png_set_gamma(png_structrp png_ptr, double scrn_gamma, double file_gamma)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_gamma"));
     #endif
     //printf("Calling func d_png_set_gamma\n");
-    START_TIMER(png_set_gamma);
+    START_TIMER_CORE(png_set_gamma);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(scrn_gamma) + sizeof(file_gamma), 0 /* size of any arrays being pushed on the stack */);
@@ -982,7 +982,7 @@ void d_png_set_gamma(png_structrp png_ptr, double scrn_gamma, double file_gamma)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_set_gamma);
+    END_TIMER_CORE(png_set_gamma);
 }
 
 png_uint_32 d_png_get_iCCP(png_const_structrp png_ptr, png_inforp info_ptr, png_charpp name, int *compression_type, png_bytepp profile, png_uint_32 *proflen)
@@ -991,7 +991,7 @@ png_uint_32 d_png_get_iCCP(png_const_structrp png_ptr, png_inforp info_ptr, png_
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_iCCP"));
     #endif
     //printf("Calling func d_png_get_iCCP\n");
-    START_TIMER(png_get_iCCP);
+    START_TIMER_CORE(png_get_iCCP);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr) + sizeof(name) + sizeof(compression_type) + sizeof(profile) + sizeof(proflen), 0 /* size of any arrays being pushed on the stack */);
@@ -1011,7 +1011,7 @@ png_uint_32 d_png_get_iCCP(png_const_structrp png_ptr, png_inforp info_ptr, png_
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_get_iCCP);
+    END_TIMER_CORE(png_get_iCCP);
     return ret;
 }
 
@@ -1021,7 +1021,7 @@ png_uint_32 d_png_get_sRGB(png_const_structrp png_ptr, png_const_inforp info_ptr
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_sRGB"));
     #endif
     //printf("Calling func d_png_get_sRGB\n");
-    START_TIMER(png_get_sRGB);
+    START_TIMER_CORE(png_get_sRGB);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr) + sizeof(file_srgb_intent), 0 /* size of any arrays being pushed on the stack */);
@@ -1038,7 +1038,7 @@ png_uint_32 d_png_get_sRGB(png_const_structrp png_ptr, png_const_inforp info_ptr
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_get_sRGB);
+    END_TIMER_CORE(png_get_sRGB);
     return ret;
 }
 
@@ -1048,7 +1048,7 @@ png_uint_32 d_png_get_cHRM(png_const_structrp png_ptr, png_const_inforp info_ptr
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_cHRM"));
     #endif
     //printf("Calling func d_png_get_cHRM\n");
-    START_TIMER(png_get_cHRM);
+    START_TIMER_CORE(png_get_cHRM);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr) + 8 * sizeof(double *), 0 /* size of any arrays being pushed on the stack */);
@@ -1072,7 +1072,7 @@ png_uint_32 d_png_get_cHRM(png_const_structrp png_ptr, png_const_inforp info_ptr
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_get_cHRM);
+    END_TIMER_CORE(png_get_cHRM);
     return ret;
 }
 
@@ -1082,7 +1082,7 @@ void d_png_set_expand(png_structrp png_ptr)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_expand"));
     #endif
     //printf("Calling func d_png_set_expand\n");
-    START_TIMER(d_png_set_expand);
+    START_TIMER_CORE(d_png_set_expand);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1096,7 +1096,7 @@ void d_png_set_expand(png_structrp png_ptr)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_set_expand);
+    END_TIMER_CORE(d_png_set_expand);
 }
 
 png_uint_32 d_png_get_tRNS(png_const_structrp png_ptr, png_inforp info_ptr, png_bytep *trans_alpha, int *num_trans, png_color_16p *trans_color)
@@ -1105,7 +1105,7 @@ png_uint_32 d_png_get_tRNS(png_const_structrp png_ptr, png_inforp info_ptr, png_
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_tRNS"));
     #endif
     //printf("Calling func d_png_get_tRNS\n");
-    START_TIMER(png_get_tRNS);
+    START_TIMER_CORE(png_get_tRNS);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr) + sizeof(trans_alpha) + sizeof(num_trans) + sizeof(trans_color), 0 /* size of any arrays being pushed on the stack */);
@@ -1124,7 +1124,7 @@ png_uint_32 d_png_get_tRNS(png_const_structrp png_ptr, png_inforp info_ptr, png_
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_get_tRNS);
+    END_TIMER_CORE(png_get_tRNS);
     return ret;
 }
 
@@ -1134,7 +1134,7 @@ void d_png_free_data(png_const_structrp png_ptr, png_inforp info_ptr, png_uint_3
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_free_data"));
     #endif
     //printf("Calling func d_png_free_data\n");
-    START_TIMER(png_free_data);
+    START_TIMER_CORE(png_free_data);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr) + sizeof(mask) + sizeof(num), 0 /* size of any arrays being pushed on the stack */);
@@ -1151,7 +1151,7 @@ void d_png_free_data(png_const_structrp png_ptr, png_inforp info_ptr, png_uint_3
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_free_data);
+    END_TIMER_CORE(png_free_data);
 }
 
 void d_png_set_gray_to_rgb(png_structrp png_ptr)
@@ -1160,7 +1160,7 @@ void d_png_set_gray_to_rgb(png_structrp png_ptr)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_gray_to_rgb"));
     #endif
     //printf("Calling func d_png_set_gray_to_rgb\n");
-    START_TIMER(png_set_gray_to_rgb);
+    START_TIMER_CORE(png_set_gray_to_rgb);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1174,7 +1174,7 @@ void d_png_set_gray_to_rgb(png_structrp png_ptr)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_set_gray_to_rgb);
+    END_TIMER_CORE(png_set_gray_to_rgb);
 }
 
 int d_png_set_interlace_handling(png_structrp png_ptr)
@@ -1183,7 +1183,7 @@ int d_png_set_interlace_handling(png_structrp png_ptr)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_interlace_handling"));
     #endif
     //printf("Calling func d_png_set_interlace_handling\n");
-    START_TIMER(d_png_set_interlace_handling);
+    START_TIMER_CORE(d_png_set_interlace_handling);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1198,7 +1198,7 @@ int d_png_set_interlace_handling(png_structrp png_ptr)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_set_interlace_handling);
+    END_TIMER_CORE(d_png_set_interlace_handling);
     return ret;
 }
 
@@ -1208,7 +1208,7 @@ void d_png_read_update_info(png_structrp png_ptr, png_inforp info_ptr)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_read_update_info"));
     #endif
     //printf("Calling func d_png_read_update_info\n");
-    START_TIMER(png_read_update_info);
+    START_TIMER_CORE(png_read_update_info);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1223,7 +1223,7 @@ void d_png_read_update_info(png_structrp png_ptr, png_inforp info_ptr)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_read_update_info);
+    END_TIMER_CORE(png_read_update_info);
 }
 
 png_byte d_png_get_channels(png_const_structrp png_ptr, png_const_inforp info_ptr)
@@ -1232,7 +1232,7 @@ png_byte d_png_get_channels(png_const_structrp png_ptr, png_const_inforp info_pt
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_channels"));
     #endif
     //printf("Calling func d_png_get_channels\n");
-    START_TIMER(png_get_channels);
+    START_TIMER_CORE(png_get_channels);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1248,7 +1248,7 @@ png_byte d_png_get_channels(png_const_structrp png_ptr, png_const_inforp info_pt
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_get_channels);
+    END_TIMER_CORE(png_get_channels);
     return ret;
 }
 
@@ -1261,7 +1261,7 @@ png_byte d_png_get_channels(png_const_structrp png_ptr, png_const_inforp info_pt
     #ifdef PRINT_FUNCTION_LOGS
         MOZ_LOG(sPNGLog, LogLevel::Debug, ("my_frame_info_fn_stub"));
     #endif
-    END_TIMER(my_frame_info_fn_stub);
+    END_TIMER_CORE(my_frame_info_fn_stub);
     //printf("Callback my_frame_info_fn_stub\n");
 
     #if(USE_SANDBOXING == 2)
@@ -1278,7 +1278,7 @@ png_byte d_png_get_channels(png_const_structrp png_ptr, png_const_inforp info_pt
     #endif
 
     cb_my_frame_info_fn(png_ptr, frame_num);
-    START_TIMER(my_frame_info_fn_stub);
+    START_TIMER_CORE(my_frame_info_fn_stub);
 }
 
 #if(USE_SANDBOXING == 2)
@@ -1290,7 +1290,7 @@ png_byte d_png_get_channels(png_const_structrp png_ptr, png_const_inforp info_pt
     #ifdef PRINT_FUNCTION_LOGS
         MOZ_LOG(sPNGLog, LogLevel::Debug, ("my_frame_end_fn_stub"));
     #endif
-    END_TIMER(my_frame_end_fn_stub);
+    END_TIMER_CORE(my_frame_end_fn_stub);
     //printf("Callback my_frame_end_fn_stub\n");
 
     #if(USE_SANDBOXING == 2)
@@ -1307,7 +1307,7 @@ png_byte d_png_get_channels(png_const_structrp png_ptr, png_const_inforp info_pt
     #endif
 
     cb_my_frame_end_fn(png_ptr, frame_num);
-    START_TIMER(my_frame_end_fn_stub);
+    START_TIMER_CORE(my_frame_end_fn_stub);
 }
 
 void d_png_set_progressive_frame_fn(png_structp png_ptr, png_progressive_frame_ptr frame_info_fn, png_progressive_frame_ptr frame_end_fn)
@@ -1316,7 +1316,7 @@ void d_png_set_progressive_frame_fn(png_structp png_ptr, png_progressive_frame_p
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_progressive_frame_fn"));
     #endif
     //printf("Calling func d_png_set_progressive_frame_fn\n");
-    START_TIMER(d_png_set_progressive_frame_fn);
+    START_TIMER_CORE(d_png_set_progressive_frame_fn);
 
     cb_my_frame_info_fn = frame_info_fn;
     cb_my_frame_end_fn = frame_end_fn;
@@ -1338,7 +1338,7 @@ void d_png_set_progressive_frame_fn(png_structp png_ptr, png_progressive_frame_p
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_set_progressive_frame_fn);
+    END_TIMER_CORE(d_png_set_progressive_frame_fn);
 }
 
 png_byte d_png_get_first_frame_is_hidden(png_structp png_ptr, png_infop info_ptr)
@@ -1347,7 +1347,7 @@ png_byte d_png_get_first_frame_is_hidden(png_structp png_ptr, png_infop info_ptr
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_first_frame_is_hidden"));
     #endif
     //printf("Calling func d_png_get_first_frame_is_hidden\n");
-    START_TIMER(d_png_get_first_frame_is_hidden);
+    START_TIMER_CORE(d_png_get_first_frame_is_hidden);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1363,7 +1363,7 @@ png_byte d_png_get_first_frame_is_hidden(png_structp png_ptr, png_infop info_ptr
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_get_first_frame_is_hidden);
+    END_TIMER_CORE(d_png_get_first_frame_is_hidden);
     return ret;
 }
 
@@ -1373,7 +1373,7 @@ void d_png_progressive_combine_row(png_const_structrp png_ptr, png_bytep old_row
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_progressive_combine_row"));
     #endif
     //printf("Calling func d_png_progressive_combine_row\n");
-    START_TIMER(png_progressive_combine_row);
+    START_TIMER_CORE(png_progressive_combine_row);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(old_row) + sizeof(new_row), 0 /* size of any arrays being pushed on the stack */);
@@ -1389,7 +1389,7 @@ void d_png_progressive_combine_row(png_const_structrp png_ptr, png_bytep old_row
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_progressive_combine_row);
+    END_TIMER_CORE(png_progressive_combine_row);
 }
 
 png_size_t d_png_process_data_pause(png_structrp png_ptr, int save)
@@ -1398,7 +1398,7 @@ png_size_t d_png_process_data_pause(png_structrp png_ptr, int save)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_process_data_pause"));
     #endif
     //printf("Calling func d_png_process_data_pause\n");
-    START_TIMER(d_png_process_data_pause);
+    START_TIMER_CORE(d_png_process_data_pause);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(save), 0 /* size of any arrays being pushed on the stack */);
@@ -1414,7 +1414,7 @@ png_size_t d_png_process_data_pause(png_structrp png_ptr, int save)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_process_data_pause);
+    END_TIMER_CORE(d_png_process_data_pause);
     return ret;
 }
 
@@ -1424,7 +1424,7 @@ void d_png_process_data(png_structrp png_ptr, png_inforp info_ptr, png_bytep buf
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_process_data"));
     #endif
     //printf("Calling func d_png_process_data\n");
-    START_TIMER(png_process_data);
+    START_TIMER_CORE(png_process_data);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr) + sizeof(buffer) + sizeof(buffer_size), 0 /* size of any arrays being pushed on the stack */);
@@ -1441,7 +1441,7 @@ void d_png_process_data(png_structrp png_ptr, png_inforp info_ptr, png_bytep buf
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_process_data);
+    END_TIMER_CORE(png_process_data);
 }
 
 png_uint_32 d_png_get_valid(png_const_structrp png_ptr, png_const_inforp info_ptr, png_uint_32 flag)
@@ -1450,7 +1450,7 @@ png_uint_32 d_png_get_valid(png_const_structrp png_ptr, png_const_inforp info_pt
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_valid"));
     #endif
     //printf("Calling func d_png_get_valid\n");
-    START_TIMER(png_get_valid);
+    START_TIMER_CORE(png_get_valid);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr) + sizeof(flag), 0 /* size of any arrays being pushed on the stack */);
@@ -1467,7 +1467,7 @@ png_uint_32 d_png_get_valid(png_const_structrp png_ptr, png_const_inforp info_pt
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_get_valid);
+    END_TIMER_CORE(png_get_valid);
     return ret;
 }
 
@@ -1477,7 +1477,7 @@ png_uint_32 d_png_get_num_plays(png_structp png_ptr, png_infop info_ptr)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_num_plays"));
     #endif
     //printf("Calling func d_png_get_num_plays\n");
-    START_TIMER(d_png_get_num_plays);
+    START_TIMER_CORE(d_png_get_num_plays);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1493,7 +1493,7 @@ png_uint_32 d_png_get_num_plays(png_structp png_ptr, png_infop info_ptr)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_get_num_plays);
+    END_TIMER_CORE(d_png_get_num_plays);
     return ret;
 }
 
@@ -1503,7 +1503,7 @@ png_uint_32 d_png_get_next_frame_x_offset(png_structp png_ptr, png_infop info_pt
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_next_frame_x_offset"));
     #endif
     //printf("Calling func d_png_get_next_frame_x_offset\n");
-    START_TIMER(d_png_get_next_frame_x_offset);
+    START_TIMER_CORE(d_png_get_next_frame_x_offset);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1519,7 +1519,7 @@ png_uint_32 d_png_get_next_frame_x_offset(png_structp png_ptr, png_infop info_pt
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_get_next_frame_x_offset);
+    END_TIMER_CORE(d_png_get_next_frame_x_offset);
     return ret;
 }
 
@@ -1529,7 +1529,7 @@ png_uint_32 d_png_get_next_frame_y_offset(png_structp png_ptr, png_infop info_pt
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_next_frame_y_offset"));
     #endif
     //printf("Calling func d_png_get_next_frame_y_offset\n");
-    START_TIMER(d_png_get_next_frame_y_offset);
+    START_TIMER_CORE(d_png_get_next_frame_y_offset);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1545,7 +1545,7 @@ png_uint_32 d_png_get_next_frame_y_offset(png_structp png_ptr, png_infop info_pt
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_get_next_frame_y_offset);
+    END_TIMER_CORE(d_png_get_next_frame_y_offset);
     return ret;
 }
 
@@ -1555,7 +1555,7 @@ png_uint_32 d_png_get_next_frame_width(png_structp png_ptr, png_infop info_ptr)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_next_frame_width"));
     #endif
     //printf("Calling func d_png_get_next_frame_width\n");
-    START_TIMER(d_png_get_next_frame_width);
+    START_TIMER_CORE(d_png_get_next_frame_width);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1571,7 +1571,7 @@ png_uint_32 d_png_get_next_frame_width(png_structp png_ptr, png_infop info_ptr)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_get_next_frame_width);
+    END_TIMER_CORE(d_png_get_next_frame_width);
     return ret;
 }
 
@@ -1581,7 +1581,7 @@ png_uint_32 d_png_get_next_frame_height(png_structp png_ptr, png_infop info_ptr)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_next_frame_height"));
     #endif
     //printf("Calling func d_png_get_next_frame_height\n");
-    START_TIMER(d_png_get_next_frame_height);
+    START_TIMER_CORE(d_png_get_next_frame_height);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1597,7 +1597,7 @@ png_uint_32 d_png_get_next_frame_height(png_structp png_ptr, png_infop info_ptr)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_get_next_frame_height);
+    END_TIMER_CORE(d_png_get_next_frame_height);
     return ret;
 }
 
@@ -1607,7 +1607,7 @@ void d_png_error(png_const_structrp png_ptr, png_const_charp error_message)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_error"));
     #endif
     //printf("Calling func d_png_error\n");
-    START_TIMER(d_png_error);
+    START_TIMER_CORE(d_png_error);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(error_message), STRING_SIZE(error_message));
@@ -1622,7 +1622,7 @@ void d_png_error(png_const_structrp png_ptr, png_const_charp error_message)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_error);
+    END_TIMER_CORE(d_png_error);
 }
 
 png_voidp d_png_get_progressive_ptr(png_const_structrp png_ptr)
@@ -1631,7 +1631,7 @@ png_voidp d_png_get_progressive_ptr(png_const_structrp png_ptr)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_progressive_ptr"));
     #endif
     //printf("Calling func d_png_get_progressive_ptr\n");
-    START_TIMER(d_png_get_progressive_ptr);
+    START_TIMER_CORE(d_png_get_progressive_ptr);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1647,7 +1647,7 @@ png_voidp d_png_get_progressive_ptr(png_const_structrp png_ptr)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_get_progressive_ptr);
+    END_TIMER_CORE(d_png_get_progressive_ptr);
     return ret;
 }
 
@@ -1657,7 +1657,7 @@ void d_png_longjmp(png_const_structrp png_ptr, int val)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_longjmp"));
     #endif
     //printf("Calling func d_png_longjmp\n");
-    START_TIMER(d_png_longjmp);
+    START_TIMER_CORE(d_png_longjmp);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(val), 0 /* size of any arrays being pushed on the stack */);
@@ -1672,7 +1672,7 @@ void d_png_longjmp(png_const_structrp png_ptr, int val)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_longjmp);
+    END_TIMER_CORE(d_png_longjmp);
 }
 
 #if(USE_SANDBOXING == 2)
@@ -1684,7 +1684,7 @@ void d_png_longjmp(png_const_structrp png_ptr, int val)
     #ifdef PRINT_FUNCTION_LOGS
         MOZ_LOG(sPNGLog, LogLevel::Debug, ("my_longjmp_fn_stub"));
     #endif
-    END_TIMER(my_longjmp_fn_stub);
+    END_TIMER_CORE(my_longjmp_fn_stub);
     //printf("Callback my_longjmp_fn_stub\n");
 
     #if(USE_SANDBOXING == 2)
@@ -1701,7 +1701,7 @@ void d_png_longjmp(png_const_structrp png_ptr, int val)
     #endif
 
     cb_my_longjmp_fn(env, val);
-    START_TIMER(my_longjmp_fn_stub);
+    START_TIMER_CORE(my_longjmp_fn_stub);
 }
 
 jmp_buf* d_png_set_longjmp_fn(png_structrp png_ptr, png_longjmp_ptr longjmp_fn, size_t jmp_buf_size)
@@ -1710,7 +1710,7 @@ jmp_buf* d_png_set_longjmp_fn(png_structrp png_ptr, png_longjmp_ptr longjmp_fn, 
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_longjmp_fn"));
     #endif
     //printf("Calling func d_png_set_longjmp_fn\n");
-    START_TIMER(png_set_longjmp_fn);
+    START_TIMER_CORE(png_set_longjmp_fn);
 
     cb_my_longjmp_fn = longjmp_fn;
 
@@ -1731,7 +1731,7 @@ jmp_buf* d_png_set_longjmp_fn(png_structrp png_ptr, png_longjmp_ptr longjmp_fn, 
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_set_longjmp_fn);
+    END_TIMER_CORE(png_set_longjmp_fn);
     return ret;
 }
 
@@ -1741,7 +1741,7 @@ png_uint_32 d_png_get_IHDR(png_const_structrp png_ptr, png_const_inforp info_ptr
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_get_IHDR"));
     #endif
     //printf("Calling func d_png_get_IHDR\n");
-    START_TIMER(png_get_IHDR);
+    START_TIMER_CORE(png_get_IHDR);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr) + sizeof(info_ptr) + sizeof(width) + sizeof(height) + sizeof(bit_depth) + sizeof(color_type) + sizeof(interlace_type) + sizeof(compression_type) + sizeof(filter_type), 0 /* size of any arrays being pushed on the stack */);
@@ -1764,7 +1764,7 @@ png_uint_32 d_png_get_IHDR(png_const_structrp png_ptr, png_const_inforp info_ptr
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(png_get_IHDR);
+    END_TIMER_CORE(png_get_IHDR);
     return ret;
 }
 
@@ -1774,7 +1774,7 @@ void d_png_set_scale_16(png_structrp png_ptr)
       MOZ_LOG(sPNGLog, LogLevel::Debug, ("d_png_set_scale_16"));
     #endif
     //printf("Calling func d_png_set_scale_16\n");
-    START_TIMER(d_png_set_scale_16);
+    START_TIMER_CORE(d_png_set_scale_16);
 
     #if(USE_SANDBOXING == 2)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr), 0 /* size of any arrays being pushed on the stack */);
@@ -1788,5 +1788,5 @@ void d_png_set_scale_16(png_structrp png_ptr)
         #error Missed case of USE_SANDBOXING
     #endif
 
-    END_TIMER(d_png_set_scale_16);
+    END_TIMER_CORE(d_png_set_scale_16);
 }

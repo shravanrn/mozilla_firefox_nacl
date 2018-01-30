@@ -239,7 +239,7 @@ int initializeLibJpegSandbox()
     strcat(full_JPEG_NON_NACL_DL_PATH, JPEG_NON_NACL_DL_PATH);
 
     printf("Loading dynamic library %s\n", full_JPEG_NON_NACL_DL_PATH);
-    jpegDlPtr = dlopen(full_JPEG_NON_NACL_DL_PATH, RTLD_LAZY);
+    jpegDlPtr = dlopen(full_JPEG_NON_NACL_DL_PATH, RTLD_LAZY | RTLD_DEEPBIND);
     if(!jpegDlPtr)
     {
       printf("Loading of dynamic library %s has failed\n", full_JPEG_NON_NACL_DL_PATH);
