@@ -37,7 +37,7 @@
 #elif(USE_SANDBOXING == 3)
   #include "ProcessSandbox.h"
 
-  ProcessSandbox* sandbox;
+  static ProcessSandbox* sandbox;
 
 #endif
 

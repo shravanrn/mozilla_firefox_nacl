@@ -47,7 +47,7 @@ ps32: inithasrun
 	if [ ! -d ../firefox_32bit_optdebug_ps ]; then cp -r ../firefox_32bit_optdebug_static ../firefox_32bit_optdebug_ps; fi
 	cp ../mozconfig32_ps ../mozconfig
 	cp ../media/libjpeg_naclport/moz_ps_32.build ../media/libjpeg_naclport/moz.build
-	#cp ../media/libpng_naclport/moz_ps_32.build ../media/libpng_naclport/moz.build
+	cp ../media/libpng_naclport/moz_ps_32.build ../media/libpng_naclport/moz.build
 	cd .. && ./mach build
 
 static64: inithasrun
@@ -74,7 +74,7 @@ ps64: inithasrun
 	if [ ! -d ../firefox_64bit_optdebug_ps ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_ps; fi
 	cp ../mozconfig64_ps ../mozconfig
 	cp ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
-	#cp ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
+	cp ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
 	cd .. && ./mach build
 
 dynamic64_dbg: inithasrun

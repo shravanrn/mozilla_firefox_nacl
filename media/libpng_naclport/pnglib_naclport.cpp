@@ -13,7 +13,7 @@
   #error "USE_SANDBOXING value not provided"
 #endif
 
-#if(USE_SANDBOXING != 0 && USE_SANDBOXING != 1 && USE_SANDBOXING != 2)
+#if(USE_SANDBOXING != 0 && USE_SANDBOXING != 1 && USE_SANDBOXING != 2 && USE_SANDBOXING != 3)
   #error "Bad USE_SANDBOXING value provided"
 #endif
 
@@ -30,6 +30,11 @@
   #define LONGJMP_FN_SLOT 7
 
   NaClSandbox* pngSandbox;
+
+#elif(USE_SANDBOXING == 3)
+  #include "ProcessSandbox.h"
+
+  static ProcessSandbox* sandbox;
 
 #endif
 
@@ -116,6 +121,7 @@ typedef jmp_buf* (*t_png_set_longjmp_fn)(png_structrp png_ptr, png_longjmp_ptr l
 typedef png_uint_32 (*t_png_get_IHDR)(png_const_structrp png_ptr, png_const_inforp info_ptr, png_uint_32 *width, png_uint_32 *height, int *bit_depth, int *color_type, int *interlace_type, int *compression_type, int *filter_type);
 typedef void (*t_png_set_scale_16)(png_structrp png_ptr);
 
+#if(USE_SANDBOXING != 3)
 t_png_get_next_frame_delay_num    ptr_png_get_next_frame_delay_num;
 t_png_get_next_frame_delay_den    ptr_png_get_next_frame_delay_den;
 t_png_get_next_frame_dispose_op   ptr_png_get_next_frame_dispose_op;
@@ -159,6 +165,7 @@ t_png_longjmp                     ptr_png_longjmp;
 t_png_set_longjmp_fn              ptr_png_set_longjmp_fn;
 t_png_get_IHDR                    ptr_png_get_IHDR;
 t_png_set_scale_16                ptr_png_set_scale_16;
+#endif
 
 //Callback stubs
 png_error_ptr             cb_my_err_fn;
@@ -280,10 +287,22 @@ int initializeLibPngSandbox()
       return 0;
     }
   }
+  #elif(USE_SANDBOXING == 3)
+  {
+    char full_PS_OTHERSIDE_PATH[1024];
+
+    strcpy(full_PS_OTHERSIDE_PATH, SandboxingCodeRootFolder);
+    strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
+
+    printf("Creating process sandbox\n");
+    sandbox = new ProcessSandbox(full_PS_OTHERSIDE_PATH, 0, 2);
+  }
   #endif
 
   printf("Loading symbols.\n");
   int failed = 0;
+
+#if(USE_SANDBOXING != 3)
 
   #if(USE_SANDBOXING == 2)
     #define loadSymbol(symbol) do { \
@@ -349,6 +368,54 @@ int initializeLibPngSandbox()
 
   #undef loadSymbol
 
+#else  // USE_SANDBOXING == 3
+
+  #define ptr_png_get_next_frame_delay_num      (sandbox->inv_png_get_next_frame_delay_num)
+  #define ptr_png_get_next_frame_delay_den      (sandbox->inv_png_get_next_frame_delay_den)
+  #define ptr_png_get_next_frame_dispose_op     (sandbox->inv_png_get_next_frame_dispose_op)
+  #define ptr_png_get_next_frame_blend_op       (sandbox->inv_png_get_next_frame_blend_op)
+  #define ptr_png_create_read_struct            (sandbox->inv_png_create_read_struct)
+  #define ptr_png_create_info_struct            (sandbox->inv_png_create_info_struct)
+  #define ptr_png_destroy_read_struct           (sandbox->inv_png_destroy_read_struct)
+  #define ptr_png_set_keep_unknown_chunks       (sandbox->inv_png_set_keep_unknown_chunks)
+  #define ptr_png_set_user_limits               (sandbox->inv_png_set_user_limits)
+  #define ptr_png_set_chunk_malloc_max          (sandbox->inv_png_set_chunk_malloc_max)
+  #define ptr_png_set_check_for_invalid_index   (sandbox->inv_png_set_check_for_invalid_index)
+  #define ptr_png_set_option                    (sandbox->inv_png_set_option)
+  #define ptr_png_set_progressive_read_fn       (sandbox->inv_png_set_progressive_read_fn)
+  #define ptr_png_get_gAMA                      (sandbox->inv_png_get_gAMA)
+  #define ptr_png_set_gAMA                      (sandbox->inv_png_set_gAMA)
+  #define ptr_png_set_gamma                     (sandbox->inv_png_set_gamma)
+  #define ptr_png_get_iCCP                      (sandbox->inv_png_get_iCCP)
+  #define ptr_png_get_sRGB                      (sandbox->inv_png_get_sRGB)
+  #define ptr_png_get_cHRM                      (sandbox->inv_png_get_cHRM)
+  #define ptr_png_set_expand                    (sandbox->inv_png_set_expand)
+  #define ptr_png_get_tRNS                      (sandbox->inv_png_get_tRNS)
+  #define ptr_png_free_data                     (sandbox->inv_png_free_data)
+  #define ptr_png_set_gray_to_rgb               (sandbox->inv_png_set_gray_to_rgb)
+  #define ptr_png_set_interlace_handling        (sandbox->inv_png_set_interlace_handling)
+  #define ptr_png_read_update_info              (sandbox->inv_png_read_update_info)
+  #define ptr_png_get_channels                  (sandbox->inv_png_get_channels)
+  #define ptr_png_set_progressive_frame_fn      (sandbox->inv_png_set_progressive_frame_fn)
+  #define ptr_png_get_first_frame_is_hidden     (sandbox->inv_png_get_first_frame_is_hidden)
+  #define ptr_png_progressive_combine_row       (sandbox->inv_png_progressive_combine_row)
+  #define ptr_png_process_data_pause            (sandbox->inv_png_process_data_pause)
+  #define ptr_png_process_data                  (sandbox->inv_png_process_data)
+  #define ptr_png_get_valid                     (sandbox->inv_png_get_valid)
+  #define ptr_png_get_num_plays                 (sandbox->inv_png_get_num_plays)
+  #define ptr_png_get_next_frame_x_offset       (sandbox->inv_png_get_next_frame_x_offset)
+  #define ptr_png_get_next_frame_y_offset       (sandbox->inv_png_get_next_frame_y_offset)
+  #define ptr_png_get_next_frame_width          (sandbox->inv_png_get_next_frame_width)
+  #define ptr_png_get_next_frame_height         (sandbox->inv_png_get_next_frame_height)
+  #define ptr_png_error                         (sandbox->inv_png_error)
+  #define ptr_png_get_progressive_ptr           (sandbox->inv_png_get_progressive_ptr)
+  #define ptr_png_longjmp                       (sandbox->inv_png_longjmp)
+  #define ptr_png_set_longjmp_fn                (sandbox->inv_png_set_longjmp_fn)
+  #define ptr_png_get_IHDR                      (sandbox->inv_png_get_IHDR)
+  #define ptr_png_set_scale_16                  (sandbox->inv_png_set_scale_16)
+
+#endif
+
   if(failed) { return 0; }
 
   printf("Loaded symbols\n");
@@ -390,8 +457,10 @@ int isAddressInNonPngSandboxMemoryOrNull(uintptr_t uaddr)
 }
 void* mallocInPngSandbox(size_t size)
 {
- #if(USE_SANDBOXING == 2)
+  #if(USE_SANDBOXING == 2)
     return mallocInSandbox(pngSandbox, size);
+  #elif(USE_SANDBOXING == 3)
+    return sandbox->mallocInSandbox(size);
   #else
     return malloc(size);
   #endif 
@@ -400,6 +469,8 @@ void freeInPngSandbox(void* ptr)
 {
   #if(USE_SANDBOXING == 2)
     freeInSandbox(pngSandbox, ptr);
+  #elif(USE_SANDBOXING == 3)
+    sandbox->freeInSandbox(ptr);
   #else
     free(ptr);
   #endif 
@@ -419,7 +490,7 @@ png_uint_16 d_png_get_next_frame_delay_num(png_structp png_ptr, png_infop info_p
         PUSH_PTR_TO_STACK(threadData, png_infop, info_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_get_next_frame_delay_num);
         png_uint_16 ret = (png_uint_16)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_16 ret = ptr_png_get_next_frame_delay_num(png_ptr, info_ptr);
     #elif(USE_SANDBOXING == 0)
         png_uint_16 ret = png_get_next_frame_delay_num(png_ptr, info_ptr);
@@ -445,7 +516,7 @@ png_uint_16 d_png_get_next_frame_delay_den(png_structp png_ptr, png_infop info_p
         PUSH_PTR_TO_STACK(threadData, png_infop, info_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_get_next_frame_delay_den);
         png_uint_16 ret = (png_uint_16)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_16 ret = ptr_png_get_next_frame_delay_den(png_ptr, info_ptr);
     #elif(USE_SANDBOXING == 0)
         png_uint_16 ret = png_get_next_frame_delay_den(png_ptr, info_ptr);
@@ -471,7 +542,7 @@ png_byte d_png_get_next_frame_dispose_op(png_structp png_ptr, png_infop info_ptr
         PUSH_PTR_TO_STACK(threadData, png_infop, info_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_get_next_frame_dispose_op);
         png_byte ret = (png_byte)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_byte ret = ptr_png_get_next_frame_dispose_op(png_ptr, info_ptr);
     #elif(USE_SANDBOXING == 0)
         png_byte ret = png_get_next_frame_dispose_op(png_ptr, info_ptr);
@@ -497,7 +568,7 @@ png_byte d_png_get_next_frame_blend_op(png_structp png_ptr, png_infop info_ptr)
         PUSH_PTR_TO_STACK(threadData, png_infop, info_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_get_next_frame_blend_op);
         png_byte ret = (png_byte)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_byte ret = ptr_png_get_next_frame_blend_op(png_ptr, info_ptr);
     #elif(USE_SANDBOXING == 0)
         png_byte ret = png_get_next_frame_blend_op(png_ptr, info_ptr);
@@ -529,7 +600,7 @@ png_byte d_png_get_next_frame_blend_op(png_structp png_ptr, png_infop info_ptr)
         png_const_charp error_msg = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, png_const_charp);
 
         //We should not assume anything about - need to have some sort of validation here
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     #elif(USE_SANDBOXING == 0)
     #else
         #error Missed case of USE_SANDBOXING
@@ -558,7 +629,7 @@ png_byte d_png_get_next_frame_blend_op(png_structp png_ptr, png_infop info_ptr)
         png_const_charp warning_msg = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, png_const_charp);
 
         //We should not assume anything about - need to have some sort of validation here
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     #elif(USE_SANDBOXING == 0)
     #else
         #error Missed case of USE_SANDBOXING
@@ -591,7 +662,7 @@ PNG_ALLOCATED png_structp d_png_create_read_struct(png_const_charp user_png_ver,
         PUSH_VAL_TO_STACK(threadData, png_error_ptr, warnRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_create_read_struct);
         png_structp ret = (png_structp)functionCallReturnPtr(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_structp ret = ptr_png_create_read_struct(user_png_ver, error_ptr, my_err_fn_stub, my_warn_fn_stub);
     #elif(USE_SANDBOXING == 0)
         png_structp ret = png_create_read_struct(user_png_ver, error_ptr, my_err_fn_stub, my_warn_fn_stub);
@@ -616,7 +687,7 @@ PNG_ALLOCATED png_infop d_png_create_info_struct(png_const_structrp png_ptr)
         PUSH_PTR_TO_STACK(threadData, png_const_structrp, png_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_create_info_struct);
         png_infop ret = (png_infop)functionCallReturnPtr(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_infop ret = ptr_png_create_info_struct(png_ptr);
     #elif(USE_SANDBOXING == 0)
         png_infop ret = png_create_info_struct(png_ptr);
@@ -642,7 +713,7 @@ void d_png_destroy_read_struct(png_structpp png_ptr_ptr, png_infopp info_ptr_ptr
         PUSH_PTR_TO_STACK(threadData, png_infopp, info_ptr_ptr);
         PUSH_PTR_TO_STACK(threadData, png_infopp, end_info_ptr_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_destroy_read_struct);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_destroy_read_struct(png_ptr_ptr, info_ptr_ptr, end_info_ptr_ptr);
     #elif(USE_SANDBOXING == 0)
         png_destroy_read_struct(png_ptr_ptr, info_ptr_ptr, end_info_ptr_ptr);
@@ -669,7 +740,7 @@ void d_png_set_keep_unknown_chunks(png_structrp png_ptr, int keep, png_const_byt
         PUSH_PTR_TO_STACK(threadData, png_const_bytep, chunk_list);
         PUSH_VAL_TO_STACK(threadData, int, num_chunks_in);
         invokeFunctionCall(threadData, (void *)ptr_png_set_keep_unknown_chunks);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_set_keep_unknown_chunks(png_ptr, keep, chunk_list, num_chunks_in);
     #elif(USE_SANDBOXING == 0)
         png_set_keep_unknown_chunks(png_ptr, keep, chunk_list, num_chunks_in);
@@ -695,7 +766,7 @@ void d_png_set_user_limits (png_structrp png_ptr, png_uint_32 user_width_max, pn
         PUSH_VAL_TO_STACK(threadData, png_uint_32, user_width_max);
         PUSH_VAL_TO_STACK(threadData, png_uint_32, user_height_max);
         invokeFunctionCall(threadData, (void *)ptr_png_set_user_limits);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_set_user_limits(png_ptr, user_width_max, user_height_max);
     #elif(USE_SANDBOXING == 0)
         png_set_user_limits(png_ptr, user_width_max, user_height_max);
@@ -719,7 +790,7 @@ void d_png_set_chunk_malloc_max (png_structrp png_ptr, png_alloc_size_t user_chu
         PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
         PUSH_VAL_TO_STACK(threadData, png_alloc_size_t, user_chunk_malloc_max);
         invokeFunctionCall(threadData, (void *)ptr_png_set_chunk_malloc_max);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_set_chunk_malloc_max(png_ptr, user_chunk_malloc_max);
     #elif(USE_SANDBOXING == 0)
         png_set_chunk_malloc_max(png_ptr, user_chunk_malloc_max);
@@ -744,7 +815,7 @@ void d_png_set_check_for_invalid_index(png_structrp png_ptr, int allowed)
         PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
         PUSH_VAL_TO_STACK(threadData, int, allowed);
         invokeFunctionCall(threadData, (void *)ptr_png_set_check_for_invalid_index);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_set_check_for_invalid_index(png_ptr, allowed);
     #elif(USE_SANDBOXING == 0)
         png_set_check_for_invalid_index(png_ptr, allowed);
@@ -771,7 +842,7 @@ int d_png_set_option(png_structrp png_ptr, int option, int onoff)
         PUSH_VAL_TO_STACK(threadData, int, onoff);
         invokeFunctionCall(threadData, (void *)ptr_png_set_option);
         int ret = (int)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         int ret = ptr_png_set_option(png_ptr, option, onoff);
     #elif(USE_SANDBOXING == 0)
         int ret = png_set_option(png_ptr, option, onoff);
@@ -802,7 +873,7 @@ int d_png_set_option(png_structrp png_ptr, int option, int onoff)
         png_infop info_ptr = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, png_infop);
 
         //We should not assume anything about - need to have some sort of validation here
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     #elif(USE_SANDBOXING == 0)
     #else
         #error Missed case of USE_SANDBOXING
@@ -833,7 +904,7 @@ int d_png_set_option(png_structrp png_ptr, int option, int onoff)
         int pass = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(threadData, int);
 
         //We should not assume anything about - need to have some sort of validation here
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     #elif(USE_SANDBOXING == 0)
     #else
         #error Missed case of USE_SANDBOXING
@@ -862,7 +933,7 @@ int d_png_set_option(png_structrp png_ptr, int option, int onoff)
         png_infop info_ptr = COMPLETELY_UNTRUSTED_CALLBACK_PTR_PARAM(threadData, png_infop);
 
         //We should not assume anything about - need to have some sort of validation here
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     #elif(USE_SANDBOXING == 0)
     #else
         #error Missed case of USE_SANDBOXING
@@ -897,7 +968,7 @@ void d_png_set_progressive_read_fn(png_structrp png_ptr, png_voidp progressive_p
         PUSH_VAL_TO_STACK(threadData, png_progressive_row_ptr, rowRegisteredCallback);
         PUSH_VAL_TO_STACK(threadData, png_progressive_end_ptr, endRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_set_progressive_read_fn);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_set_progressive_read_fn(png_ptr, progressive_ptr, info_fn, row_fn, end_fn);
     #elif(USE_SANDBOXING == 0)
         png_set_progressive_read_fn(png_ptr, progressive_ptr, info_fn, row_fn, end_fn);
@@ -923,7 +994,7 @@ png_uint_32 d_png_get_gAMA(png_const_structrp png_ptr, png_const_inforp info_ptr
         PUSH_PTR_TO_STACK(threadData, double *, file_gamma);
         invokeFunctionCall(threadData, (void *)ptr_png_get_gAMA);
         png_uint_32 ret = (png_uint_32)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_32 ret = ptr_png_get_gAMA(png_ptr, info_ptr, file_gamma);
     #elif(USE_SANDBOXING == 0)
         png_uint_32 ret = png_get_gAMA(png_ptr, info_ptr, file_gamma);
@@ -949,7 +1020,7 @@ void d_png_set_gAMA(png_const_structrp png_ptr, png_inforp info_ptr, double file
         PUSH_PTR_TO_STACK(threadData, png_inforp, info_ptr);
         PUSH_FLOAT_TO_STACK(threadData, double, file_gamma);
         invokeFunctionCall(threadData, (void *)ptr_png_set_gAMA);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_set_gAMA(png_ptr, info_ptr, file_gamma);
     #elif(USE_SANDBOXING == 0)
         png_set_gAMA(png_ptr, info_ptr, file_gamma);
@@ -974,7 +1045,7 @@ void d_png_set_gamma(png_structrp png_ptr, double scrn_gamma, double file_gamma)
         PUSH_FLOAT_TO_STACK(threadData, double, scrn_gamma);
         PUSH_FLOAT_TO_STACK(threadData, double, file_gamma);
         invokeFunctionCall(threadData, (void *)ptr_png_set_gamma);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_set_gamma(png_ptr, scrn_gamma, file_gamma);
     #elif(USE_SANDBOXING == 0)
         png_set_gamma(png_ptr, scrn_gamma, file_gamma);
@@ -1003,7 +1074,7 @@ png_uint_32 d_png_get_iCCP(png_const_structrp png_ptr, png_inforp info_ptr, png_
         PUSH_PTR_TO_STACK(threadData, png_uint_32 *, proflen);
         invokeFunctionCall(threadData, (void *)ptr_png_get_iCCP);
         png_uint_32 ret = (png_uint_32)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_32 ret = ptr_png_get_iCCP(png_ptr,info_ptr,name,compression_type,profile,proflen);
     #elif(USE_SANDBOXING == 0)
         png_uint_32 ret = png_get_iCCP(png_ptr,info_ptr,name,compression_type,profile,proflen);
@@ -1030,7 +1101,7 @@ png_uint_32 d_png_get_sRGB(png_const_structrp png_ptr, png_const_inforp info_ptr
         PUSH_PTR_TO_STACK(threadData, int *, file_srgb_intent);
         invokeFunctionCall(threadData, (void *)ptr_png_get_sRGB);
         png_uint_32 ret = (png_uint_32)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_32 ret = ptr_png_get_sRGB(png_ptr, info_ptr, file_srgb_intent);
     #elif(USE_SANDBOXING == 0)
         png_uint_32 ret = png_get_sRGB(png_ptr, info_ptr, file_srgb_intent);
@@ -1064,7 +1135,7 @@ png_uint_32 d_png_get_cHRM(png_const_structrp png_ptr, png_const_inforp info_ptr
         PUSH_PTR_TO_STACK(threadData, double *, blue_y);
         invokeFunctionCall(threadData, (void *)ptr_png_get_cHRM);
         png_uint_32 ret = (png_uint_32)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_32 ret = ptr_png_get_cHRM(png_ptr, info_ptr, white_x, white_y, red_x, red_y, green_x, green_y, blue_x, blue_y);
     #elif(USE_SANDBOXING == 0)
         png_uint_32 ret = png_get_cHRM(png_ptr, info_ptr, white_x, white_y, red_x, red_y, green_x, green_y, blue_x, blue_y);
@@ -1088,7 +1159,7 @@ void d_png_set_expand(png_structrp png_ptr)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr), 0 /* size of any arrays being pushed on the stack */);
         PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_set_expand);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_set_expand(png_ptr);
     #elif(USE_SANDBOXING == 0)
         png_set_expand(png_ptr);
@@ -1116,7 +1187,7 @@ png_uint_32 d_png_get_tRNS(png_const_structrp png_ptr, png_inforp info_ptr, png_
         PUSH_PTR_TO_STACK(threadData, png_color_16p *, trans_color);
         invokeFunctionCall(threadData, (void *)ptr_png_get_tRNS);
         png_uint_32 ret = (png_uint_32)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_32 ret = ptr_png_get_tRNS(png_ptr, info_ptr, trans_alpha, num_trans, trans_color);
     #elif(USE_SANDBOXING == 0)
         png_uint_32 ret = png_get_tRNS(png_ptr, info_ptr, trans_alpha, num_trans, trans_color);
@@ -1143,7 +1214,7 @@ void d_png_free_data(png_const_structrp png_ptr, png_inforp info_ptr, png_uint_3
         PUSH_PTR_TO_STACK(threadData, png_uint_32, mask);
         PUSH_VAL_TO_STACK(threadData, int, num);
         invokeFunctionCall(threadData, (void *)ptr_png_free_data);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_free_data(png_ptr, info_ptr, mask, num);
     #elif(USE_SANDBOXING == 0)
         png_free_data(png_ptr, info_ptr, mask, num);
@@ -1166,7 +1237,7 @@ void d_png_set_gray_to_rgb(png_structrp png_ptr)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr), 0 /* size of any arrays being pushed on the stack */);
         PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_set_gray_to_rgb);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_set_gray_to_rgb(png_ptr);
     #elif(USE_SANDBOXING == 0)
         png_set_gray_to_rgb(png_ptr);
@@ -1190,7 +1261,7 @@ int d_png_set_interlace_handling(png_structrp png_ptr)
         PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_set_interlace_handling);
         int ret = (int)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         int ret = ptr_png_set_interlace_handling(png_ptr);
     #elif(USE_SANDBOXING == 0)
         int ret = png_set_interlace_handling(png_ptr);
@@ -1215,7 +1286,7 @@ void d_png_read_update_info(png_structrp png_ptr, png_inforp info_ptr)
         PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
         PUSH_PTR_TO_STACK(threadData, png_inforp, info_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_read_update_info);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_read_update_info(png_ptr, info_ptr);
     #elif(USE_SANDBOXING == 0)
         png_read_update_info(png_ptr, info_ptr);
@@ -1240,7 +1311,7 @@ png_byte d_png_get_channels(png_const_structrp png_ptr, png_const_inforp info_pt
         PUSH_PTR_TO_STACK(threadData, png_const_inforp, info_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_get_channels);
         png_byte ret = (png_byte)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_byte ret = ptr_png_get_channels(png_ptr, info_ptr);
     #elif(USE_SANDBOXING == 0)
         png_byte ret = png_get_channels(png_ptr, info_ptr);
@@ -1271,7 +1342,7 @@ png_byte d_png_get_channels(png_const_structrp png_ptr, png_const_inforp info_pt
         png_uint_32 frame_num = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(threadData, png_uint_32);
 
         //We should not assume anything about - need to have some sort of validation here
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     #elif(USE_SANDBOXING == 0)
     #else
         #error Missed case of USE_SANDBOXING
@@ -1300,7 +1371,7 @@ png_byte d_png_get_channels(png_const_structrp png_ptr, png_const_inforp info_pt
         png_uint_32 frame_num = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(threadData, png_uint_32);
 
         //We should not assume anything about - need to have some sort of validation here
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     #elif(USE_SANDBOXING == 0)
     #else
         #error Missed case of USE_SANDBOXING
@@ -1330,7 +1401,7 @@ void d_png_set_progressive_frame_fn(png_structp png_ptr, png_progressive_frame_p
         PUSH_VAL_TO_STACK(threadData, png_progressive_info_ptr, frameInfoRegisteredCallback);
         PUSH_VAL_TO_STACK(threadData, png_progressive_end_ptr, frameEndRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_set_progressive_frame_fn);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_set_progressive_frame_fn(png_ptr, my_frame_info_fn_stub, my_frame_end_fn_stub);
     #elif(USE_SANDBOXING == 0)
         png_set_progressive_frame_fn(png_ptr, my_frame_info_fn_stub, my_frame_end_fn_stub);
@@ -1355,7 +1426,7 @@ png_byte d_png_get_first_frame_is_hidden(png_structp png_ptr, png_infop info_ptr
         PUSH_PTR_TO_STACK(threadData, png_infop, info_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_get_first_frame_is_hidden);
         png_byte ret = (png_byte)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_byte ret = ptr_png_get_first_frame_is_hidden(png_ptr, info_ptr);
     #elif(USE_SANDBOXING == 0)
         png_byte ret = png_get_first_frame_is_hidden(png_ptr, info_ptr);
@@ -1381,7 +1452,7 @@ void d_png_progressive_combine_row(png_const_structrp png_ptr, png_bytep old_row
         PUSH_PTR_TO_STACK(threadData, png_bytep, old_row);
         PUSH_PTR_TO_STACK(threadData, png_const_bytep, new_row);
         invokeFunctionCall(threadData, (void *)ptr_png_progressive_combine_row);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_progressive_combine_row(png_ptr, old_row, new_row);
     #elif(USE_SANDBOXING == 0)
         png_progressive_combine_row(png_ptr, old_row, new_row);
@@ -1406,7 +1477,7 @@ png_size_t d_png_process_data_pause(png_structrp png_ptr, int save)
         PUSH_VAL_TO_STACK(threadData, int, save);
         invokeFunctionCall(threadData, (void *)ptr_png_process_data_pause);
         png_size_t ret = (png_size_t)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_size_t ret = ptr_png_process_data_pause(png_ptr, save);
     #elif(USE_SANDBOXING == 0)
         png_size_t ret = png_process_data_pause(png_ptr, save);
@@ -1433,7 +1504,7 @@ void d_png_process_data(png_structrp png_ptr, png_inforp info_ptr, png_bytep buf
         PUSH_PTR_TO_STACK(threadData, png_bytep, buffer);
         PUSH_VAL_TO_STACK(threadData, png_size_t, buffer_size);
         invokeFunctionCall(threadData, (void *)ptr_png_process_data);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_process_data(png_ptr, info_ptr, buffer, buffer_size);
     #elif(USE_SANDBOXING == 0)
         png_process_data(png_ptr, info_ptr, buffer, buffer_size);
@@ -1459,7 +1530,7 @@ png_uint_32 d_png_get_valid(png_const_structrp png_ptr, png_const_inforp info_pt
         PUSH_VAL_TO_STACK(threadData, png_uint_32, flag);
         invokeFunctionCall(threadData, (void *)ptr_png_get_valid);
         png_uint_32 ret = (png_uint_32)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_32 ret = ptr_png_get_valid(png_ptr, info_ptr, flag);
     #elif(USE_SANDBOXING == 0)
         png_uint_32 ret = png_get_valid(png_ptr, info_ptr, flag);
@@ -1485,7 +1556,7 @@ png_uint_32 d_png_get_num_plays(png_structp png_ptr, png_infop info_ptr)
         PUSH_PTR_TO_STACK(threadData, png_infop, info_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_get_num_plays);
         png_uint_32 ret = (png_uint_32)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_32 ret = ptr_png_get_num_plays(png_ptr, info_ptr);
     #elif(USE_SANDBOXING == 0)
         png_uint_32 ret = png_get_num_plays(png_ptr, info_ptr);
@@ -1511,7 +1582,7 @@ png_uint_32 d_png_get_next_frame_x_offset(png_structp png_ptr, png_infop info_pt
         PUSH_PTR_TO_STACK(threadData, png_infop, info_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_get_next_frame_x_offset);
         png_uint_32 ret = (png_uint_32)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_32 ret = ptr_png_get_next_frame_x_offset(png_ptr, info_ptr);
     #elif(USE_SANDBOXING == 0)
         png_uint_32 ret = png_get_next_frame_x_offset(png_ptr, info_ptr);
@@ -1537,7 +1608,7 @@ png_uint_32 d_png_get_next_frame_y_offset(png_structp png_ptr, png_infop info_pt
         PUSH_PTR_TO_STACK(threadData, png_infop, info_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_get_next_frame_y_offset);
         png_uint_32 ret = (png_uint_32)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_32 ret = ptr_png_get_next_frame_y_offset(png_ptr, info_ptr);
     #elif(USE_SANDBOXING == 0)
         png_uint_32 ret = png_get_next_frame_y_offset(png_ptr, info_ptr);
@@ -1563,7 +1634,7 @@ png_uint_32 d_png_get_next_frame_width(png_structp png_ptr, png_infop info_ptr)
         PUSH_PTR_TO_STACK(threadData, png_infop, info_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_get_next_frame_width);
         png_uint_32 ret = (png_uint_32)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_32 ret = ptr_png_get_next_frame_width(png_ptr, info_ptr);
     #elif(USE_SANDBOXING == 0)
         png_uint_32 ret = png_get_next_frame_width(png_ptr, info_ptr);
@@ -1589,7 +1660,7 @@ png_uint_32 d_png_get_next_frame_height(png_structp png_ptr, png_infop info_ptr)
         PUSH_PTR_TO_STACK(threadData, png_infop, info_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_get_next_frame_height);
         png_uint_32 ret = (png_uint_32)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_32 ret = ptr_png_get_next_frame_height(png_ptr, info_ptr);
     #elif(USE_SANDBOXING == 0)
         png_uint_32 ret = png_get_next_frame_height(png_ptr, info_ptr);
@@ -1614,7 +1685,7 @@ void d_png_error(png_const_structrp png_ptr, png_const_charp error_message)
         PUSH_PTR_TO_STACK(threadData, png_structp, png_ptr);
         PUSH_STRING_TO_STACK(threadData, error_message);
         invokeFunctionCall(threadData, (void *)ptr_png_error);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_error(png_ptr, error_message);
     #elif(USE_SANDBOXING == 0)
         png_error(png_ptr, error_message);
@@ -1639,7 +1710,7 @@ png_voidp d_png_get_progressive_ptr(png_const_structrp png_ptr)
         invokeFunctionCall(threadData, (void *)ptr_png_get_progressive_ptr);
         //this returns a pointer supplied by the user - an opaque address which is not converted. So return it as a value
         png_voidp ret = (png_voidp)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_voidp ret = ptr_png_get_progressive_ptr(png_ptr);
     #elif(USE_SANDBOXING == 0)
         png_voidp ret = png_get_progressive_ptr(png_ptr);
@@ -1664,7 +1735,7 @@ void d_png_longjmp(png_const_structrp png_ptr, int val)
         PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
         PUSH_VAL_TO_STACK(threadData, int, val);
         invokeFunctionCall(threadData, (void *)ptr_png_longjmp);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_longjmp(png_ptr, val);
     #elif(USE_SANDBOXING == 0)
         png_longjmp(png_ptr, val);
@@ -1694,7 +1765,7 @@ void d_png_longjmp(png_const_structrp png_ptr, int val)
         int val = COMPLETELY_UNTRUSTED_CALLBACK_STACK_PARAM(threadData, int);
 
         //We should not assume anything about - need to have some sort of validation here
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
     #elif(USE_SANDBOXING == 0)
     #else
         #error Missed case of USE_SANDBOXING
@@ -1723,7 +1794,7 @@ jmp_buf* d_png_set_longjmp_fn(png_structrp png_ptr, png_longjmp_ptr longjmp_fn, 
         PUSH_VAL_TO_STACK(threadData, size_t, jmp_buf_size);
         invokeFunctionCall(threadData, (void *)ptr_png_set_longjmp_fn);
         jmp_buf* ret = (jmp_buf*)functionCallReturnPtr(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         jmp_buf* ret = ptr_png_set_longjmp_fn(png_ptr, longjmp_fn, jmp_buf_size);
     #elif(USE_SANDBOXING == 0)
         jmp_buf* ret = png_set_longjmp_fn(png_ptr, longjmp_fn, jmp_buf_size);
@@ -1756,7 +1827,7 @@ png_uint_32 d_png_get_IHDR(png_const_structrp png_ptr, png_const_inforp info_ptr
         PUSH_PTR_TO_STACK(threadData, int *, filter_type);
         invokeFunctionCall(threadData, (void *)ptr_png_get_IHDR);
         png_uint_32 ret = (png_uint_32)functionCallReturnRawPrimitiveInt(threadData);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         png_uint_32 ret = ptr_png_get_IHDR(png_ptr, info_ptr, width, height, bit_depth, color_type, interlace_type, compression_type, filter_type);
     #elif(USE_SANDBOXING == 0)
         png_uint_32 ret = png_get_IHDR(png_ptr, info_ptr, width, height, bit_depth, color_type, interlace_type, compression_type, filter_type);
@@ -1780,7 +1851,7 @@ void d_png_set_scale_16(png_structrp png_ptr)
         NaClSandbox_Thread* threadData = preFunctionCall(pngSandbox, sizeof(png_ptr), 0 /* size of any arrays being pushed on the stack */);
         PUSH_PTR_TO_STACK(threadData, png_structrp, png_ptr);
         invokeFunctionCall(threadData, (void *)ptr_png_set_scale_16);
-    #elif(USE_SANDBOXING == 1)
+    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
         ptr_png_set_scale_16(png_ptr);
     #elif(USE_SANDBOXING == 0)
         png_set_scale_16(png_ptr);
