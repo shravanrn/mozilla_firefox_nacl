@@ -33,10 +33,10 @@ UNIFIED_SOURCES += [
 # Pick from one of the values below
 #
 # Don't copy sandbox data to intermediate buffers
-# DEFINES['USE_SANDBOXING_BUFFERS'] = 0
+DEFINES['USE_SANDBOXING_BUFFERS'] = 0
 #
 # Copy sandbox data to intermediate buffers
-DEFINES['USE_SANDBOXING_BUFFERS'] = 1
+# DEFINES['USE_SANDBOXING_BUFFERS'] = 1
 
 include('/ipc/chromium/chromium-config.mozbuild')
 

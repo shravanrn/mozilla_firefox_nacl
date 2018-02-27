@@ -281,11 +281,13 @@ nsPNGDecoder::EndImageFrame()
                 mAnimInfo.mBlend, Some(mFrameRect));
 }
 
-#ifdef PNG_HANDLE_AS_UNKNOWN_SUPPORTED
-  png_byte* color_chunks_replace = 0;
-  png_byte* unused_chunks_replace = 0;
-  bool chunks_generated_started = 0;
-  bool chunks_generated_finished = 0;
+#ifdef PNG_HANDLE_AS_UNKNOWN_SUPPORTED 
+  #if(USE_SANDBOXING_BUFFERS != 0)
+    png_byte* color_chunks_replace = 0;
+    png_byte* unused_chunks_replace = 0;
+    bool chunks_generated_started = 0;
+    bool chunks_generated_finished = 0;
+  #endif
 #endif
 
 nsresult
@@ -299,36 +301,55 @@ nsPNGDecoder::InitInternal()
     bool(GetSurfaceFlags() & SurfaceFlags::NO_PREMULTIPLY_ALPHA);
 
 #ifdef PNG_HANDLE_AS_UNKNOWN_SUPPORTED
-  static png_byte color_chunks_orig[]=
-       { 99,  72,  82,  77, '\0',   // cHRM
-        105,  67,  67,  80, '\0'};  // iCCP
-  static png_byte unused_chunks_orig[]=
-       { 98,  75,  71,  68, '\0',   // bKGD
-        104,  73,  83,  84, '\0',   // hIST
-        105,  84,  88, 116, '\0',   // iTXt
-        111,  70,  70, 115, '\0',   // oFFs
-        112,  67,  65,  76, '\0',   // pCAL
-        115,  67,  65,  76, '\0',   // sCAL
-        112,  72,  89, 115, '\0',   // pHYs
-        115,  66,  73,  84, '\0',   // sBIT
-        115,  80,  76,  84, '\0',   // sPLT
-        116,  69,  88, 116, '\0',   // tEXt
-        116,  73,  77,  69, '\0',   // tIME
-        122,  84,  88, 116, '\0'};  // zTXt
-  if(chunks_generated_started)
-  {
-    while(!chunks_generated_finished){}
-  }
-  else
-  {
-    chunks_generated_started = 1;
-    color_chunks_replace = (png_byte*) mallocInPngSandbox(sizeof(color_chunks_orig));
-    unused_chunks_replace = (png_byte*) mallocInPngSandbox(sizeof(unused_chunks_orig));
-    memcpy(color_chunks_replace, color_chunks_orig, sizeof(color_chunks_orig));
-    memcpy(unused_chunks_replace, unused_chunks_orig, sizeof(unused_chunks_orig));
-    chunks_generated_finished = 1;
-  }
+  #if(USE_SANDBOXING_BUFFERS != 0)
+    static png_byte color_chunks_orig[]=
+         { 99,  72,  82,  77, '\0',   // cHRM
+          105,  67,  67,  80, '\0'};  // iCCP
+    static png_byte unused_chunks_orig[]=
+         { 98,  75,  71,  68, '\0',   // bKGD
+          104,  73,  83,  84, '\0',   // hIST
+          105,  84,  88, 116, '\0',   // iTXt
+          111,  70,  70, 115, '\0',   // oFFs
+          112,  67,  65,  76, '\0',   // pCAL
+          115,  67,  65,  76, '\0',   // sCAL
+          112,  72,  89, 115, '\0',   // pHYs
+          115,  66,  73,  84, '\0',   // sBIT
+          115,  80,  76,  84, '\0',   // sPLT
+          116,  69,  88, 116, '\0',   // tEXt
+          116,  73,  77,  69, '\0',   // tIME
+          122,  84,  88, 116, '\0'};  // zTXt
 
+    if(chunks_generated_started)
+    {
+      while(!chunks_generated_finished){}
+    }
+    else
+    {
+      chunks_generated_started = 1;
+      color_chunks_replace = (png_byte*) mallocInPngSandbox(sizeof(color_chunks_orig));
+      unused_chunks_replace = (png_byte*) mallocInPngSandbox(sizeof(unused_chunks_orig));
+      memcpy(color_chunks_replace, color_chunks_orig, sizeof(color_chunks_orig));
+      memcpy(unused_chunks_replace, unused_chunks_orig, sizeof(unused_chunks_orig));
+      chunks_generated_finished = 1;
+    }
+  #elif
+    static png_byte color_chunks_started[]=
+         { 99,  72,  82,  77, '\0',   // cHRM
+          105,  67,  67,  80, '\0'};  // iCCP
+    static png_byte unused_chunks_started[]=
+         { 98,  75,  71,  68, '\0',   // bKGD
+          104,  73,  83,  84, '\0',   // hIST
+          105,  84,  88, 116, '\0',   // iTXt
+          111,  70,  70, 115, '\0',   // oFFs
+          112,  67,  65,  76, '\0',   // pCAL
+          115,  67,  65,  76, '\0',   // sCAL
+          112,  72,  89, 115, '\0',   // pHYs
+          115,  66,  73,  84, '\0',   // sBIT
+          115,  80,  76,  84, '\0',   // sPLT
+          116,  69,  88, 116, '\0',   // tEXt
+          116,  73,  77,  69, '\0',   // tIME
+          122,  84,  88, 116, '\0'};  // zTXt
+  #endif
 #endif
 
   // Initialize the container's source image header
@@ -436,8 +457,12 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
     return Transition::TerminateFailure();
   }
 
-  char* aData_sandbox = (char*) mallocInPngSandbox(aLength);
-  memcpy(aData_sandbox, aData, aLength);
+  #if(USE_SANDBOXING_BUFFERS != 0)
+    char* aData_sandbox = (char*) mallocInPngSandbox(aLength);
+    memcpy(aData_sandbox, aData, aLength);
+  #else
+    const char* aData_sandbox = aData;
+  #endif
 
   // Pass the data off to libpng.
   mLastChunkLength = aLength;

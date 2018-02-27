@@ -12,7 +12,18 @@ if [[ -f "$1" ]]; then
 	exit 1; 
 fi
 
-FFVersions=("firefox_64bit_optdebug_nacl" "firefox_64bit_optdebug_nonnacl" "firefox_64bit_optdebug_static" "firefox_64bit_optdebug_ps")
+PlatformToUse="64"
+
+if [[ ! -z "$1" ]]; then
+	if [[ "$1" == "32" ]]; then
+		PlatformToUse="32"
+	else
+		echo "Unknown platform: $1"
+		exit 1
+	fi
+fi
+
+FFVersions=("firefox_${PlatformToUse}bit_optdebug_nacl" "firefox_${PlatformToUse}bit_optdebug_nonnacl" "firefox_${PlatformToUse}bit_optdebug_static" "firefox_${PlatformToUse}bit_optdebug_ps" "firefox_${PlatformToUse}bit_optdebug_nacl_nosimd")
 
 for i in ${FFVersions[@]}; do
 	if [[ ! -d "${i}" ]]; then
@@ -103,23 +114,28 @@ function runTest(){
 
 function loadSandboxedFirefox(){
 	sleep 2
-	cp ./mozconfig64_nacl ./mozconfig
+	cp "./mozconfig${PlatformToUse}_nacl" ./mozconfig
 	sleep 2
 }
 function loadUnsandboxedFirefox(){
 	sleep 2
-	cp ./mozconfig64_nonnacl ./mozconfig
+	cp "./mozconfig${PlatformToUse}_nonnacl" ./mozconfig
 	sleep 2	
 }
 function loadStaticFirefox(){
 	sleep 2
-	cp ./mozconfig64_static ./mozconfig
+	cp "./mozconfig${PlatformToUse}_static" ./mozconfig
 	sleep 2	
 }
 function loadPsFirefox(){
     sleep 2
-    cp ./mozconfig64_ps ./mozconfig
+    cp "./mozconfig${PlatformToUse}_ps" ./mozconfig
     sleep 2
+}
+function loadSandboxedNoSimdFirefox(){
+	sleep 2
+	cp "./mozconfig${PlatformToUse}_nacl_nosimd" ./mozconfig
+	sleep 2
 }
 
 for i in 1 2
@@ -152,6 +168,13 @@ do
 	loadStaticFirefox
 
 	echo -e "FFBuild-Static\n" >> "$1"
+	runTest "$1" "jpeg_page_render"
+	# runTest "$1" "jpeg_page_render_25"
+	# runTest "$1" "jpeg_page_render_50"
+	echo -e "\n---------------------\n" >> "$1"
+
+	loadSandboxedNoSimdFirefox
+	echo -e "FFBuild-NoSimd\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
 	# runTest "$1" "jpeg_page_render_25"
 	# runTest "$1" "jpeg_page_render_50"

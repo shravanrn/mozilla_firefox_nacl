@@ -16,7 +16,7 @@ For perf testing the 64 bit version
 ./runPerfTest outputfile.txt
 
 For perf testing the 32 bit version
-./runPerfTest32 outputfile.txt
+./runPerfTest outputfile.txt 32
 
 /////////////////////////////////////////////////////////////////////////////////////
 
