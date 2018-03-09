@@ -85,6 +85,14 @@ nacl64: inithasrun
 	cp ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
 	cd .. && ./mach build
 
+nacl64_cpp: inithasrun
+	if [ ! -d ../firefox_64bit_optdebug_nacl_cpp ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_nacl_cpp; fi
+	cp ../image/decoders/moz_copy_cpp.build ../image/decoders/moz.build
+	cp ../mozconfig64_nacl_cpp ../mozconfig
+	cp ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
+	cp ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
+	cd .. && ./mach build
+
 ps64: inithasrun
 	if [ ! -d ../firefox_64bit_optdebug_ps ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_ps; fi
 	cp ../image/decoders/moz_copy.build ../image/decoders/moz.build

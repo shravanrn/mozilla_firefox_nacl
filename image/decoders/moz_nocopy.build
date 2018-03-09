@@ -38,6 +38,9 @@ DEFINES['USE_SANDBOXING_BUFFERS'] = 0
 # Copy sandbox data to intermediate buffers
 # DEFINES['USE_SANDBOXING_BUFFERS'] = 1
 
+# Comment out the following if you want to use the CPP api of NaClSandbox. The value '42' below is disregarded
+# DEFINES['SANDBOX_USE_CPP_API'] = 42
+
 include('/ipc/chromium/chromium-config.mozbuild')
 
 LOCAL_INCLUDES += [

@@ -177,6 +177,15 @@ png_progressive_frame_ptr cb_my_frame_info_fn;
 png_progressive_frame_ptr cb_my_frame_end_fn;
 png_longjmp_ptr           cb_my_longjmp_fn;
 
+#ifdef SANDBOX_USE_CPP_API
+  sandbox_callback_helper<png_error_ptr>* cpp_cb_png_error_fn;
+  sandbox_callback_helper<png_error_ptr>* cpp_cb_png_warn_fn;
+  sandbox_callback_helper<png_progressive_info_ptr>* cpp_cb_png_progressive_info_fn;
+  sandbox_callback_helper<png_progressive_row_ptr>* cpp_cb_png_progressive_row_fn;
+  sandbox_callback_helper<png_progressive_end_ptr>* cpp_cb_png_progressive_end_fn;
+  sandbox_callback_helper<png_progressive_frame_ptr>* cpp_cb_png_progressive_frame_info_fn;
+#endif
+
 unsigned long long getTimeSpentInPng()
 {
   #ifdef PRINT_FUNCTION_TIMES
@@ -216,7 +225,7 @@ unsigned long long getInvocationsInPngCore()
 
 #endif
 
-int initializeLibPngSandbox()
+int initializeLibPngSandbox(void(*additionalSetup)())
 {
   if(pngStartedInit)
   {
@@ -419,6 +428,11 @@ int initializeLibPngSandbox()
   if(failed) { return 0; }
 
   printf("Loaded symbols\n");
+
+  if(additionalSetup != nullptr)
+  {
+    additionalSetup();
+  }
   pngfinishedInit = 1;
 
   return 1;

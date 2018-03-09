@@ -6,7 +6,7 @@ unsigned long long getInvocationsInPng();
 unsigned long long getTimeSpentInPngCore();
 unsigned long long getInvocationsInPngCore();
 
-int initializeLibPngSandbox();
+int initializeLibPngSandbox(void(*additionalSetup)());
 uintptr_t getUnsandboxedPngPtr(uintptr_t uaddr);
 uintptr_t getSandboxedPngPtr(uintptr_t uaddr);
 int isAddressInPngSandboxMemoryOrNull(uintptr_t uaddr);

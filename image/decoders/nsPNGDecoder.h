@@ -100,8 +100,13 @@ private:
   size_t mLastChunkLength;
 
 public:
-  png_structp mPNG;
-  png_infop mInfo;
+  #ifdef SANDBOX_USE_CPP_API
+    unverified_data<png_structp> mPNG;
+    unverified_data<png_infop> mInfo;
+  #else
+    png_structp mPNG;
+    png_infop mInfo;
+  #endif
   nsIntRect mFrameRect;
   uint8_t* mCMSLine;
   uint8_t* interlacebuf;
