@@ -12,6 +12,7 @@
 #include "Decoder.h"
 #include "IDecodingTask.h"
 #include "nsPNGDecoder.h"
+#include "nsPNGDecoder_clib.h"
 #include "nsGIFDecoder2.h"
 #include "nsJPEGDecoder.h"
 #include "nsBMPDecoder.h"
@@ -79,7 +80,10 @@ DecoderFactory::GetDecoder(DecoderType aType,
 
   switch (aType) {
     case DecoderType::PNG:
-      decoder = new nsPNGDecoder(aImage);
+      {
+      nsPNGDecoder_clib* clib = nsPNGDecoder_clib_constructor(aImage);
+      decoder = new nsPNGDecoder(clib, aImage);
+      }
       break;
     case DecoderType::GIF:
       decoder = new nsGIFDecoder2(aImage);
@@ -254,7 +258,11 @@ DecoderFactory::CreateDecoderForICOResource(DecoderType aType,
 
     case DecoderType::PNG:
       MOZ_ASSERT(!aDataOffset);
-      decoder = new nsPNGDecoder(aICODecoder->GetImageMaybeNull());
+      {
+      RasterImage* aImage = aICODecoder->GetImageMaybeNull();
+      nsPNGDecoder_clib* clib = nsPNGDecoder_clib_constructor(aImage);
+      decoder = new nsPNGDecoder(clib, aImage);
+      }
       break;
 
     default:

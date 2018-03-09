@@ -3,6 +3,9 @@
 				dynamic64 dynamic32 \
 				nacl64 nacl32 \
 				ps64 ps32 \
+				dynamic_decoder_64 dynamic_decoder_32 \
+				nacl_decoder_64 nacl_decoder_32 \
+				ps_decoder_64 ps_decoder_32 \
 				dynamic64_dbg nacl64_dbg \
 				run32_static run32_non_nacl run32_nacl run32_ps run32_perf \
 				run64_static run64_nonnacl run64_nacl run64_ps run64_perf \
@@ -17,17 +20,19 @@ inithasrun:
 	echo hi > "inithasrun"
 
 .NOTPARALLEL: build32 build64 static32 static64 dynamic32 dynamic64 nacl32 nacl64 ps32 ps64 \
+							dynamic_decoder_32 dynamic_decoder_64 nacl_decoder_32 nacl_decoder_64 ps_decoder_32 ps_decoder_64 \
 							dynamic64_dbg nacl64_dbg
 
-build32: static32 dynamic32 nacl32 ps32 nacl32_nosimd
+build32: static32 dynamic32 nacl32 ps32 nacl32_nosimd dynamic_decoder_32 nacl_decoder_32 ps_decoder_32
 
-build64: static64 dynamic64 nacl64 ps64 nacl64_nosimd
+build64: static64 dynamic64 nacl64 ps64 nacl64_nosimd dynamic_decoder_64 nacl_decoder_64 ps_decoder_64
 
 static32: inithasrun
 	cp ../mozconfig32_static ../mozconfig
 	cp ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
 	cp ../media/libjpeg_naclport/moz_static_32.build ../media/libjpeg_naclport/moz.build
 	cp ../media/libpng_naclport/moz_static_32.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_static_32.build ../image/decoders/moz.build
 	cd .. && ./mach build
 
 dynamic32: inithasrun
@@ -36,6 +41,7 @@ dynamic32: inithasrun
 	cp ../mozconfig32_nonnacl ../mozconfig
 	cp ../media/libjpeg_naclport/moz_nonnacl_32.build ../media/libjpeg_naclport/moz.build
 	cp ../media/libpng_naclport/moz_nonnacl_32.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_static_32.build ../image/decoders/moz.build
 	cd .. && ./mach build
 
 nacl32: inithasrun
@@ -44,6 +50,7 @@ nacl32: inithasrun
 	cp ../mozconfig32_nacl ../mozconfig
 	cp ../media/libjpeg_naclport/moz_nacl_32.build ../media/libjpeg_naclport/moz.build
 	cp ../media/libpng_naclport/moz_nacl_32.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_static_32.build ../image/decoders/moz.build
 	cd .. && ./mach build
 
 ps32: inithasrun
@@ -52,6 +59,31 @@ ps32: inithasrun
 	cp ../mozconfig32_ps ../mozconfig
 	cp ../media/libjpeg_naclport/moz_ps_32.build ../media/libjpeg_naclport/moz.build
 	cp ../media/libpng_naclport/moz_ps_32.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_static_32.build ../image/decoders/moz.build
+	cd .. && ./mach build
+
+dynamic_decoder_32: inithasrun
+	if [ ! -d ../firefox_32bit_optdebug_dyndec ]; then cp -r ../firefox_32bit_optdebug_static ../firefox_32bit_optdebug_dyndec; fi
+	cp ../mozconfig32_dyndec ../mozconfig
+	cp ../media/libjpeg_naclport/moz_static_32.build ../media/libjpeg_naclport/moz.build
+	cp ../media/libpng_naclport/moz_static_32.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_dyn_32.build ../image/decoders/moz.build
+	cd .. && ./mach build
+
+nacl_decoder_32: inithasrun
+	if [ ! -d ../firefox_32bit_optdebug_nacldec ]; then cp -r ../firefox_32bit_optdebug_static ../firefox_32bit_optdebug_nacldec; fi
+	cp ../mozconfig32_nacldec ../mozconfig
+	cp ../media/libjpeg_naclport/moz_static_32.build ../media/libjpeg_naclport/moz.build
+	cp ../media/libpng_naclport/moz_static_32.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_nacl_32.build ../image/decoders/moz.build
+	cd .. && ./mach build
+
+ps_decoder_32: inithasrun
+	if [ ! -d ../firefox_32bit_optdebug_psdec ]; then cp -r ../firefox_32bit_optdebug_static ../firefox_32bit_optdebug_psdec; fi
+	cp ../mozconfig32_psdec ../mozconfig
+	cp ../media/libjpeg_naclport/moz_static_32.build ../media/libjpeg_naclport/moz.build
+	cp ../media/libpng_naclport/moz_static_32.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_ps_32.build ../image/decoders/moz.build
 	cd .. && ./mach build
 
 nacl32_nosimd: inithasrun
@@ -67,6 +99,7 @@ static64: inithasrun
 	cp ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
 	cp ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	cp ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_static_64.build ../image/decoders/moz.build
 	cd .. && ./mach build
 
 dynamic64: inithasrun
@@ -75,6 +108,7 @@ dynamic64: inithasrun
 	cp ../mozconfig64_nonnacl ../mozconfig
 	cp ../media/libjpeg_naclport/moz_nonnacl.build ../media/libjpeg_naclport/moz.build
 	cp ../media/libpng_naclport/moz_nonnacl.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_static_64.build ../image/decoders/moz.build
 	cd .. && ./mach build
 
 nacl64: inithasrun
@@ -83,6 +117,7 @@ nacl64: inithasrun
 	cp ../mozconfig64_nacl ../mozconfig
 	cp ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
 	cp ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_static_64.build ../image/decoders/moz.build
 	cd .. && ./mach build
 
 ps64: inithasrun
@@ -91,6 +126,31 @@ ps64: inithasrun
 	cp ../mozconfig64_ps ../mozconfig
 	cp ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	cp ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_static_64.build ../image/decoders/moz.build
+	cd .. && ./mach build
+
+dynamic_decoder_64: inithasrun
+	if [ ! -d ../firefox_64bit_optdebug_dyndec ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_dyndec; fi
+	cp ../mozconfig64_dyndec ../mozconfig
+	cp ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
+	cp ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_dyn_64.build ../image/decoders/moz.build
+	cd .. && ./mach build
+
+nacl_decoder_64: inithasrun
+	if [ ! -d ../firefox_64bit_optdebug_nacldec ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_nacldec; fi
+	cp ../mozconfig64_nacldec ../mozconfig
+	cp ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
+	cp ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_nacl_64.build ../image/decoders/moz.build
+	cd .. && ./mach build
+
+ps_decoder_64: inithasrun
+	if [ ! -d ../firefox_64bit_optdebug_psdec ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_psdec; fi
+	cp ../mozconfig64_psdec ../mozconfig
+	cp ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
+	cp ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_ps_64.build ../image/decoders/moz.build
 	cd .. && ./mach build
 
 nacl64_nosimd: inithasrun
@@ -106,6 +166,7 @@ dynamic64_dbg: inithasrun
 	cp ../mozconfig64_nonnacl_debug ../mozconfig
 	cp ../media/libjpeg_naclport/moz_nonnacl_debug.build ../media/libjpeg_naclport/moz.build
 	cp ../media/libpng_naclport/moz_nonnacl_debug.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_static_64.build ../image/decoders/moz.build
 	cd .. && ./mach build
 
 nacl64_dbg: inithasrun
@@ -113,6 +174,7 @@ nacl64_dbg: inithasrun
 	cp ../mozconfig64_nacl_debug ../mozconfig
 	cp ../media/libjpeg_naclport/moz_nacl_debug.build ../media/libjpeg_naclport/moz.build
 	cp ../media/libpng_naclport/moz_nacl_debug.build ../media/libpng_naclport/moz.build
+	cp ../image/decoders/moz_static_64.build ../image/decoders/moz.build
 	cd .. && ./mach build
 
 run64_static:
@@ -176,7 +238,15 @@ clean:
 	-rm -rf ../firefox_32bit_optdebug_static
 	-rm -rf ../firefox_32bit_optdebug_nonnacl
 	-rm -rf ../firefox_32bit_optdebug_nacl
+	-rm -rf ../firefox_32bit_optdebug_ps
+	-rm -rf ../firefox_32bit_optdebug_dyndec
+	-rm -rf ../firefox_32bit_optdebug_nacldec
+	-rm -rf ../firefox_32bit_optdebug_psdec
 	-rm -rf ../firefox_64bit_optdebug
 	-rm -rf ../firefox_64bit_optdebug_static
 	-rm -rf ../firefox_64bit_optdebug_nonnacl
 	-rm -rf ../firefox_64bit_optdebug_nacl
+	-rm -rf ../firefox_64bit_optdebug_ps
+	-rm -rf ../firefox_64bit_optdebug_dyndec
+	-rm -rf ../firefox_64bit_optdebug_nacldec
+	-rm -rf ../firefox_64bit_optdebug_psdec

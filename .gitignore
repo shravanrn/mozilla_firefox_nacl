@@ -20,7 +20,7 @@ ID
 
 # User files that may appear at the root
 /.mozconfig*
-/mozconfig
+/mozconfig*
 /configure
 /old-configure
 /config.cache

@@ -1,0 +1,29 @@
+nsPNGDecoder.h
+  Main header containing the API used by external users
+  i.e. declaration of the nsPNGDecoder class
+  The nsPNGDecoder class has a private constructor only called by
+    friend class DecoderFactory
+
+nsPNGDecoder.cpp
+  Original implementation of nsPNGDecoder class, untouched
+  This file is not compiled in, and only kept for reference
+
+nsPNGDecoder_sandboxed.cpp
+  Alternate implementation of nsPNGDecoder class, where the implementation
+    relies on a (sandboxed or unsandboxed) (static or dynamic) library,
+    namely our "nsPNGDecoder_clib" library
+
+nsPNGDecoder_clib.h
+  Header file for our (static or dynamic) C-interface library.  This interface
+    is really only used by nsPNGDecoder_sandboxed.cpp.
+
+nsPNGDecoder_clib.cpp
+  Implementation file for our (static or dynamic) C-interface library.
+  Internally, contains declaration and implementation of the
+    "nsPNGDecoder_clib" class, which is basically the original nsPNGDecoder
+    class.  However, it only exposes its functionality via the C-binding
+    functions declared in nsPNGDecoder_clib.h, so as far as anyone external is
+    concerned, it's just a C library.
+  It also calls out to libpng as part of its operations, and is capable of
+    using static/dynamic/sandboxed libpng (I think) regardless of whether
+    nsPNGDecoder_clib is being used statically, dynamically, or sandboxed.

@@ -1,0 +1,85 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+toolkit = CONFIG['MOZ_WIDGET_TOOLKIT']
+
+# The Icon Channel stuff really shouldn't live in decoders/icon, but we'll
+# fix that another time.
+if 'gtk' in toolkit:
+    DIRS += ['icon/gtk', 'icon']
+
+if CONFIG['OS_ARCH'] == 'WINNT':
+    DIRS += ['icon/win', 'icon']
+
+if toolkit == 'cocoa':
+    DIRS += ['icon/mac', 'icon']
+elif toolkit == 'android':
+    DIRS += ['icon/android', 'icon']
+
+UNIFIED_SOURCES += [
+    'EXIF.cpp',
+    'iccjpeg.c',
+    'nsBMPDecoder.cpp',
+    'nsGIFDecoder2.cpp',
+    'nsICODecoder.cpp',
+    'nsIconDecoder.cpp',
+    'nsJPEGDecoder.cpp',
+    'nsPNGDecoder_clib.cpp',
+    'nsPNGDecoder_sandboxed.cpp',
+]
+
+include('/ipc/chromium/chromium-config.mozbuild')
+
+# Pick from one of the values below
+#
+# Static use of nsPNGDecoder
+# DEFINES['USE_SANDBOXING'] = 0
+#
+# Dynamic use of nsPNGDecoder
+# DEFINES['USE_SANDBOXING'] = 1
+#
+# Sandboxed dynamic use of nsPNGDecoder, using NaCl sandbox
+# DEFINES['USE_SANDBOXING'] = 2
+#
+# Sandboxed dynamic use of nsPNGDecoder, using process sandbox
+DEFINES['USE_SANDBOXING'] = 3
+
+# Comment out the following if you don't want to print the time spent in the png decoder.
+# The value '42' here is disregarded
+DEFINES['PRINT_FUNCTION_TIMES'] = 42
+
+# Comment out if you don't want logging.  The value '42' here is disregarded
+# DEFINES['PRINT_FUNCTION_LOGS'] = 42
+
+# Paths
+DEFINES['PNGDEC_NON_NACL_DL_PATH'] = '"mozilla-release/tbd"'
+DEFINES['STARTUP_LIBRARY_PATH'] = '"Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe"'
+DEFINES['SANDBOX_INIT_APP'] = '"tbd.nexe"'
+DEFINES['USE_PNGDEC'] = 42  # Again, the '42' is disregarded
+DEFINES['PS_OTHERSIDE_PATH'] = '"ProcessSandbox/ProcessSandbox_otherside_pngdec64"'  # path to the ProcessSandbox_otherside executable
+
+LOCAL_INCLUDES += [
+    # Process sandbox
+    '/../ProcessSandbox',
+    # NaCl sandbox
+    '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
+    # Access to Skia headers for Downscaler.
+    '/gfx/2d',
+    # Decoders need ImageLib headers.
+    '/image'
+]
+
+LOCAL_INCLUDES += CONFIG['SKIA_INCLUDES']
+
+# Link with NaCl sandbox
+OS_LIBS += ['-L../../../../Sandboxing_NaCl/native_client/scons-out-firefox/opt-linux-x86-64/lib', '-ldyn_ldr', '-lsel', '-lnacl_error_code', '-lenv_cleanser', '-lnrd_xfer', '-lnacl_perf_counter', '-lnacl_base', '-limc', '-lnacl_fault_inject', '-lnacl_interval', '-lplatform_qual_lib', '-lvalidators', '-ldfa_validate_caller_x86_64', '-lcpu_features', '-lvalidation_cache', '-lplatform', '-lgio', '-lnccopy_x86_64', '-lrt', '-lpthread']
+# Link with process sandbox
+OS_LIBS += ['../../../../ProcessSandbox/ProcessSandbox_pngdec64.a']
+
+FINAL_LIBRARY = 'xul'
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-error=shadow']
