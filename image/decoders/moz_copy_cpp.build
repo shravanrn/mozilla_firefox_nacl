@@ -44,6 +44,7 @@ DEFINES['SANDBOX_USE_CPP_API'] = 42
 include('/ipc/chromium/chromium-config.mozbuild')
 
 LOCAL_INCLUDES += [
+    '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
     # Access to Skia headers for Downscaler.
     '/gfx/2d',
     # Decoders need ImageLib headers.

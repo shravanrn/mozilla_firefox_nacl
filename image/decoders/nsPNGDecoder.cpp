@@ -46,7 +46,6 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
 #endif
 
 #ifdef SANDBOX_USE_CPP_API
-  #include "pnglib_structs_for_cpp_api.h"
   std::set<void*> pngRendererList;
   sandbox_nacl_load_library_api(pnglib);
 

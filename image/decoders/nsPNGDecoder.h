@@ -16,6 +16,12 @@
 
 namespace mozilla {
 namespace image {
+
+#ifdef SANDBOX_USE_CPP_API
+  #include "nacl_sandbox.h"
+  #include "pnglib_structs_for_cpp_api.h"
+#endif
+
 class RasterImage;
 
 class nsPNGDecoder : public Decoder
