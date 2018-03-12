@@ -18,7 +18,11 @@ namespace mozilla {
 namespace image {
 
 #ifdef SANDBOX_USE_CPP_API
-  #include "nacl_sandbox.h"
+  #define NACL_SANDBOX_API_NO_STL_DS
+  #define NACL_SANDBOX_API_NO_OPTIONAL
+    #include "nacl_sandbox.h"
+  #undef NACL_SANDBOX_API_NO_OPTIONAL
+  #undef NACL_SANDBOX_API_NO_STL_DS
   #include "pnglib_structs_for_cpp_api.h"
 #endif
 
