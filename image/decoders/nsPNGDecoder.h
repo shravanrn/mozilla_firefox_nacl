@@ -136,7 +136,11 @@ public:
   {
     AnimFrameInfo();
 #ifdef PNG_APNG_SUPPORTED
-    AnimFrameInfo(png_structp aPNG, png_infop aInfo);
+    #ifdef SANDBOX_USE_CPP_API
+      AnimFrameInfo(unverified_data<png_structp> aPNG, unverified_data<png_infop> aInfo);
+    #else
+      AnimFrameInfo(png_structp aPNG, png_infop aInfo);
+    #endif
 #endif
 
     DisposalMethod mDispose;

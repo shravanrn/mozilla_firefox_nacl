@@ -10,7 +10,9 @@ with Files("**"):
 EXPORTS += [
     'png.h',
     'pngconf.h',
-    'pnglibconf.h'
+    'pnginfo.h',
+    'pnglibconf.h',
+    'pngstruct.h',
 ]
 
 UNIFIED_SOURCES += [

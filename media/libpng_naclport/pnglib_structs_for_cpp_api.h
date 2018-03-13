@@ -1,13 +1,5 @@
 //Auto generated with the modified clang - Pass the arg "-Xclang -fdump-struct-layouts-for-sbox" to clang while compiling
 
-#define sandbox_fields_reflection_pnglib_class___jmp_buf_tag(f, g) \
-	f(long [8], __jmpbuf) \
-	g() \
-	f(int, __mask_was_saved) \
-	g() \
-	f(__sigset_t, __saved_mask) \
-	g()
-
 #define sandbox_fields_reflection_pnglib_class_z_stream_s(f, g) \
 	f(const Bytef *, next_in) \
 	g() \
@@ -143,16 +135,6 @@
 	g() \
 	f(void *, io_ptr) \
 	g() \
-	f(void (*)(png_structp, png_row_infop, png_bytep), read_user_transform_fn) \
-	g() \
-	f(void (*)(png_structp, png_row_infop, png_bytep), write_user_transform_fn) \
-	g() \
-	f(void *, user_transform_ptr) \
-	g() \
-	f(unsigned char, user_transform_depth) \
-	g() \
-	f(unsigned char, user_transform_channels) \
-	g() \
 	f(unsigned int, mode) \
 	g() \
 	f(unsigned int, flags) \
@@ -176,16 +158,6 @@
 	f(int, zlib_mem_level) \
 	g() \
 	f(int, zlib_strategy) \
-	g() \
-	f(int, zlib_text_level) \
-	g() \
-	f(int, zlib_text_method) \
-	g() \
-	f(int, zlib_text_window_bits) \
-	g() \
-	f(int, zlib_text_mem_level) \
-	g() \
-	f(int, zlib_text_strategy) \
 	g() \
 	f(int, zlib_set_level) \
 	g() \
@@ -217,10 +189,6 @@
 	g() \
 	f(png_byte *, row_buf) \
 	g() \
-	f(png_byte *, try_row) \
-	g() \
-	f(png_byte *, tst_row) \
-	g() \
 	f(unsigned long, info_rowbytes) \
 	g() \
 	f(unsigned int, idat_size) \
@@ -230,8 +198,6 @@
 	f(png_color *, palette) \
 	g() \
 	f(unsigned short, num_palette) \
-	g() \
-	f(int, num_palette_max) \
 	g() \
 	f(unsigned short, num_trans) \
 	g() \
@@ -265,16 +231,6 @@
 	g() \
 	f(unsigned char, zstream_start) \
 	g() \
-	f(unsigned short, filler) \
-	g() \
-	f(unsigned char, background_gamma_type) \
-	g() \
-	f(int, background_gamma) \
-	g() \
-	f(struct png_color_16_struct, background) \
-	g() \
-	f(struct png_color_16_struct, background_1) \
-	g() \
 	f(void (*)(png_structp), output_flush_fn) \
 	g() \
 	f(unsigned int, flush_dist) \
@@ -289,17 +245,7 @@
 	g() \
 	f(png_uint_16 **, gamma_16_table) \
 	g() \
-	f(png_byte *, gamma_from_1) \
-	g() \
-	f(png_byte *, gamma_to_1) \
-	g() \
-	f(png_uint_16 **, gamma_16_from_1) \
-	g() \
-	f(png_uint_16 **, gamma_16_to_1) \
-	g() \
 	f(struct png_color_8_struct, sig_bit) \
-	g() \
-	f(struct png_color_8_struct, shift) \
 	g() \
 	f(png_byte *, trans_alpha) \
 	g() \
@@ -339,37 +285,9 @@
 	g() \
 	f(int, cur_palette) \
 	g() \
-	f(png_byte *, palette_lookup) \
-	g() \
-	f(png_byte *, quantize_index) \
-	g() \
 	f(unsigned int, options) \
 	g() \
-	f(char [29], time_buffer) \
-	g() \
 	f(unsigned int, free_me) \
-	g() \
-	f(void *, user_chunk_ptr) \
-	g() \
-	f(int (*)(png_structp, png_unknown_chunkp), read_user_chunk_fn) \
-	g() \
-	f(int, unknown_default) \
-	g() \
-	f(unsigned int, num_chunk_list) \
-	g() \
-	f(png_byte *, chunk_list) \
-	g() \
-	f(unsigned char, rgb_to_gray_status) \
-	g() \
-	f(unsigned char, rgb_to_gray_coefficients_set) \
-	g() \
-	f(unsigned short, rgb_to_gray_red_coeff) \
-	g() \
-	f(unsigned short, rgb_to_gray_green_coeff) \
-	g() \
-	f(unsigned int, mng_features_permitted) \
-	g() \
-	f(unsigned char, filter_type) \
 	g() \
 	f(unsigned int, apng_flags) \
 	g() \
@@ -389,19 +307,7 @@
 	g() \
 	f(unsigned int, num_frames_written) \
 	g() \
-	f(void *, mem_ptr) \
-	g() \
-	f(png_voidp (*)(png_structp, png_alloc_size_t), malloc_fn) \
-	g() \
-	f(void (*)(png_structp, png_voidp), free_fn) \
-	g() \
 	f(png_byte *, big_row_buf) \
-	g() \
-	f(png_byte *, quantize_sort) \
-	g() \
-	f(png_byte *, index_to_palette) \
-	g() \
-	f(png_byte *, palette_to_index) \
 	g() \
 	f(unsigned char, compression_type) \
 	g() \
@@ -413,17 +319,11 @@
 	g() \
 	f(unsigned long, user_chunk_malloc_max) \
 	g() \
-	f(struct png_unknown_chunk_t, unknown_chunk) \
-	g() \
 	f(unsigned long, old_big_row_buf_size) \
 	g() \
 	f(png_byte *, read_buffer) \
 	g() \
 	f(unsigned long, read_buffer_size) \
-	g() \
-	f(unsigned int, IDAT_read_size) \
-	g() \
-	f(unsigned int, io_state) \
 	g() \
 	f(png_byte *, big_prev_row) \
 	g() \
@@ -517,71 +417,11 @@
 	g() \
 	f(unsigned int, iccp_proflen) \
 	g() \
-	f(int, num_text) \
-	g() \
-	f(int, max_text) \
-	g() \
-	f(png_text *, text) \
-	g() \
-	f(struct png_time_struct, mod_time) \
-	g() \
-	f(struct png_color_8_struct, sig_bit) \
-	g() \
 	f(png_byte *, trans_alpha) \
 	g() \
 	f(struct png_color_16_struct, trans_color) \
 	g() \
-	f(struct png_color_16_struct, background) \
-	g() \
-	f(int, x_offset) \
-	g() \
-	f(int, y_offset) \
-	g() \
-	f(unsigned char, offset_unit_type) \
-	g() \
-	f(unsigned int, x_pixels_per_unit) \
-	g() \
-	f(unsigned int, y_pixels_per_unit) \
-	g() \
-	f(unsigned char, phys_unit_type) \
-	g() \
-	f(int, num_exif) \
-	g() \
-	f(png_byte *, exif) \
-	g() \
-	f(png_uint_16 *, hist) \
-	g() \
-	f(char *, pcal_purpose) \
-	g() \
-	f(int, pcal_X0) \
-	g() \
-	f(int, pcal_X1) \
-	g() \
-	f(char *, pcal_units) \
-	g() \
-	f(char **, pcal_params) \
-	g() \
-	f(unsigned char, pcal_type) \
-	g() \
-	f(unsigned char, pcal_nparams) \
-	g() \
 	f(unsigned int, free_me) \
-	g() \
-	f(png_unknown_chunk *, unknown_chunks) \
-	g() \
-	f(int, unknown_chunks_num) \
-	g() \
-	f(png_sPLT_t *, splt_palettes) \
-	g() \
-	f(int, splt_palettes_num) \
-	g() \
-	f(unsigned char, scal_unit) \
-	g() \
-	f(char *, scal_s_width) \
-	g() \
-	f(char *, scal_s_height) \
-	g() \
-	f(png_byte **, row_pointers) \
 	g() \
 	f(unsigned int, num_frames) \
 	g() \
@@ -658,22 +498,39 @@
 	f(unsigned int, owned_file) \
 	g()
 
+#define sandbox_fields_reflection_pnglib_class_qcms_CIE_xyY(f, g) \
+	f(double, x) \
+	g() \
+	f(double, y) \
+	g() \
+	f(double, Y) \
+	g()
+
+#define sandbox_fields_reflection_pnglib_class_qcms_CIE_xyYTRIPLE(f, g) \
+	f(qcms_CIE_xyY, red) \
+	g() \
+	f(qcms_CIE_xyY, green) \
+	g() \
+	f(qcms_CIE_xyY, blue) \
+	g()
+
 #define sandbox_fields_reflection_pnglib_allClasses(f) \
-	f(__jmp_buf_tag, pnglib) \
-	f(png_XYZ, pnglib) \
+	f(z_stream_s, pnglib) \
 	f(png_color_16_struct, pnglib) \
 	f(png_color_8_struct, pnglib) \
-	f(png_color_struct, pnglib) \
-	f(png_colorspace, pnglib) \
-	f(png_compression_buffer, pnglib) \
-	f(png_control, pnglib) \
-	f(png_info_def, pnglib) \
-	f(png_row_info_struct, pnglib) \
-	f(png_sPLT_entry_struct, pnglib) \
-	f(png_sPLT_struct, pnglib) \
-	f(png_struct_def, pnglib) \
-	f(png_text_struct, pnglib) \
-	f(png_time_struct, pnglib) \
 	f(png_unknown_chunk_t, pnglib) \
 	f(png_xy, pnglib) \
-	f(z_stream_s, pnglib)
+	f(png_XYZ, pnglib) \
+	f(png_colorspace, pnglib) \
+	f(png_row_info_struct, pnglib) \
+	f(png_compression_buffer, pnglib) \
+	f(png_color_struct, pnglib) \
+	f(png_time_struct, pnglib) \
+	f(png_struct_def, pnglib) \
+	f(png_info_def, pnglib) \
+	f(png_text_struct, pnglib) \
+	f(png_sPLT_struct, pnglib) \
+	f(png_sPLT_entry_struct, pnglib) \
+	f(png_control, pnglib) \
+	f(qcms_CIE_xyY, pnglib) \
+	f(qcms_CIE_xyYTRIPLE, pnglib)
