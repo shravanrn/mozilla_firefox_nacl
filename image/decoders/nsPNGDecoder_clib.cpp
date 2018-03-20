@@ -1332,8 +1332,13 @@ nsPNGDecoder_clib::IsValidICOResource() const
   }
 }
 
+} // namespace image
+} // namespace mozilla
+
 // And finally, at long last, we have the implementations of the functions defined in
 //   nsPNGDecoder_clib.h, which constitute the public interface of this file
+
+typedef mozilla::image::nsPNGDecoder_clib nsPNGDecoder_clib;
 
 nsPNGDecoder_clib* nsPNGDecoder_clib_constructor(RasterImage* aImage) {
   return new nsPNGDecoder_clib(aImage);
@@ -1343,82 +1348,79 @@ void nsPNGDecoder_clib_destructor(nsPNGDecoder_clib* clib) {
   delete clib;
 }
 
-bool pngdec_IsValidICOResource(const nsPNGDecoder_clib* clib) {
+bool IsValidICOResource(const nsPNGDecoder_clib* clib) {
   return clib->IsValidICOResource();
 }
 
-void const* getPtrToMPNG(const nsPNGDecoder_clib* clib) {
-  return (void const*) &clib->mPNG;
+void* getPtrToMPNG(const nsPNGDecoder_clib* clib) {
+  return (void*) &clib->mPNG;
 }
 
-void const* getPtrToMInfo(const nsPNGDecoder_clib* clib) {
-  return (void const*) &clib->mInfo;
+void* getPtrToMInfo(const nsPNGDecoder_clib* clib) {
+  return (void*) &clib->mInfo;
 }
 
-void const* getPtrToMFrameRect(const nsPNGDecoder_clib* clib) {
-  return (void const*) &clib->mFrameRect;
+void* getPtrToMFrameRect(const nsPNGDecoder_clib* clib) {
+  return (void*) &clib->mFrameRect;
 }
 
-uint8_t* const* getPtrToMCMSLine(const nsPNGDecoder_clib* clib) {
-  return &clib->mCMSLine;
+uint8_t** getPtrToMCMSLine(const nsPNGDecoder_clib* clib) {
+  return (uint8_t**) &clib->mCMSLine;
 }
 
-uint8_t* const* getPtrToInterlaceBuf(const nsPNGDecoder_clib* clib) {
-  return &clib->interlacebuf;
+uint8_t** getPtrToInterlaceBuf(const nsPNGDecoder_clib* clib) {
+  return (uint8_t**) &clib->interlacebuf;
 }
 
-void* const* getPtrToMInProfile(const nsPNGDecoder_clib* clib) {
-  return (void* const*) &clib->mInProfile;
+void** getPtrToMInProfile(const nsPNGDecoder_clib* clib) {
+  return (void**) &clib->mInProfile;
 }
 
-void* const* getPtrToMTransform(const nsPNGDecoder_clib* clib) {
-  return (void* const*) &clib->mTransform;
+void** getPtrToMTransform(const nsPNGDecoder_clib* clib) {
+  return (void**) &clib->mTransform;
 }
 
-void const* getPtrToMFormat(const nsPNGDecoder_clib* clib) {
-  return (void const*) &clib->mFormat;
+void* getPtrToMFormat(const nsPNGDecoder_clib* clib) {
+  return (void*) &clib->mFormat;
 }
 
-uint32_t const* getPtrToMCMSMode(const nsPNGDecoder_clib* clib) {
-  return &clib->mCMSMode;
+uint32_t* getPtrToMCMSMode(const nsPNGDecoder_clib* clib) {
+  return (uint32_t*) &clib->mCMSMode;
 }
 
-uint8_t const* getPtrToMChannels(const nsPNGDecoder_clib* clib) {
-  return &clib->mChannels;
+uint8_t* getPtrToMChannels(const nsPNGDecoder_clib* clib) {
+  return (uint8_t*) &clib->mChannels;
 }
 
-uint8_t const* getPtrToMPass(const nsPNGDecoder_clib* clib) {
-  return &clib->mPass;
+uint8_t* getPtrToMPass(const nsPNGDecoder_clib* clib) {
+  return (uint8_t*) &clib->mPass;
 }
 
-bool const* getPtrToMFrameIsHidden(const nsPNGDecoder_clib* clib) {
-  return &clib->mFrameIsHidden;
+bool* getPtrToMFrameIsHidden(const nsPNGDecoder_clib* clib) {
+  return (bool*) &clib->mFrameIsHidden;
 }
 
-bool const* getPtrToMDisablePremultipliedAlpha(const nsPNGDecoder_clib* clib) {
-  return &clib->mDisablePremultipliedAlpha;
+bool* getPtrToMDisablePremultipliedAlpha(const nsPNGDecoder_clib* clib) {
+  return (bool*) &clib->mDisablePremultipliedAlpha;
 }
 
-void const* getPtrToMAnimInfo(const nsPNGDecoder_clib* clib) {
-  return (void const*) &clib->mAnimInfo;
+void* getPtrToMAnimInfo(const nsPNGDecoder_clib* clib) {
+  return (void*) &clib->mAnimInfo;
 }
 
-void const* getPtrToMPipe(const nsPNGDecoder_clib* clib) {
-  return (void const*) &clib->mPipe;
+void* getPtrToMPipe(const nsPNGDecoder_clib* clib) {
+  return (void*) &clib->mPipe;
 }
 
-uint32_t const* getPtrToMNumFrames(const nsPNGDecoder_clib* clib) {
-  return &clib->mNumFrames;
+uint32_t* getPtrToMNumFrames(const nsPNGDecoder_clib* clib) {
+  return (uint32_t*) &clib->mNumFrames;
 }
 
-void* const* DoDecode(nsPNGDecoder_clib* clib, void* it, void* res) {
+void** DoDecode(nsPNGDecoder_clib* clib, void* it, void* res) {
   // TODO: I think we have to return pointer here (as declared), but the original method
   // just returns LexerResult.  Hence the blatant memory leak, later we'll do something
   // smarter
   LexerResult* lexerResult = (LexerResult*)malloc(sizeof(LexerResult));
   *lexerResult = clib->DoDecode(*(SourceBufferIterator*)it, (IResumable*)res);
-  return (void* const*) lexerResult;
+  return (void**) lexerResult;
 }
-
-} // namespace image
-} // namespace mozilla
