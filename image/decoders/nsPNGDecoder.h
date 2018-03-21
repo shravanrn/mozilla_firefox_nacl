@@ -81,8 +81,13 @@ private:
 
   // Convenience methods to make interacting with StreamingLexer from inside
   // a libpng callback easier.
-  void DoTerminate(png_structp aPNGStruct, TerminalState aState);
-  void DoYield(png_structp aPNGStruct);
+  #ifdef SANDBOX_USE_CPP_API
+    void DoTerminate(unverified_data<png_structp> aPNGStruct, TerminalState aState);
+    void DoYield(unverified_data<png_structp> aPNGStruct);
+  #else
+    void DoTerminate(png_structp aPNGStruct, TerminalState aState);
+    void DoYield(png_structp aPNGStruct);
+  #endif
 
   enum class State
   {
@@ -157,18 +162,26 @@ public:
 
   // libpng callbacks
   // We put these in the class so that they can access protected members.
-  static void PNGAPI info_callback(png_structp png_ptr, png_infop info_ptr);
-  static void PNGAPI row_callback(png_structp png_ptr, png_bytep new_row,
-                                  png_uint_32 row_num, int pass);
-#ifdef PNG_APNG_SUPPORTED
-  static void PNGAPI frame_info_callback(png_structp png_ptr,
-                                         png_uint_32 frame_num);
-#endif
-  static void PNGAPI end_callback(png_structp png_ptr, png_infop info_ptr);
-  static void PNGAPI error_callback(png_structp png_ptr,
-                                    png_const_charp error_msg);
-  static void PNGAPI warning_callback(png_structp png_ptr,
-                                      png_const_charp warning_msg);
+  #ifdef SANDBOX_USE_CPP_API
+    int lastKnownPassNumber = 0;
+    static void PNGAPI info_callback(unverified_data<png_structp> png_ptr, unverified_data<png_infop> info_ptr);
+    static void PNGAPI row_callback(unverified_data<png_structp> png_ptr, unverified_data<png_bytep> new_row, unverified_data<png_uint_32> row_num, unverified_data<int> pass);
+    #ifdef PNG_APNG_SUPPORTED
+      static void PNGAPI frame_info_callback(unverified_data<png_structp> png_ptr, unverified_data<png_uint_32> frame_num);
+    #endif
+    static void PNGAPI end_callback(unverified_data<png_structp> png_ptr, unverified_data<png_infop> info_ptr);
+    static void PNGAPI error_callback(unverified_data<png_structp> png_ptr, unverified_data<png_const_charp> error_msg);
+    static void PNGAPI warning_callback(unverified_data<png_structp> png_ptr, unverified_data<png_const_charp> warning_msg);
+  #else
+    static void PNGAPI info_callback(png_structp png_ptr, png_infop info_ptr);
+    static void PNGAPI row_callback(png_structp png_ptr, png_bytep new_row, png_uint_32 row_num, int pass);
+    #ifdef PNG_APNG_SUPPORTED
+      static void PNGAPI frame_info_callback(png_structp png_ptr, png_uint_32 frame_num);
+    #endif
+    static void PNGAPI end_callback(png_structp png_ptr, png_infop info_ptr);
+    static void PNGAPI error_callback(png_structp png_ptr, png_const_charp error_msg);
+    static void PNGAPI warning_callback(png_structp png_ptr, png_const_charp warning_msg);
+  #endif
 
   // This is defined in the PNG spec as an invariant. We use it to
   // do manual validation without libpng.
