@@ -311,7 +311,7 @@ nsPNGDecoder::~nsPNGDecoder()
       auto new_mInfo_Loc = newInSandbox<png_infop>(pngSandbox);
       *new_mInfo_Loc = mInfo;
 
-      sandbox_invoke_custom(pngSandbox, png_destroy_read_struct, new_mPNG_Loc, mInfo ? new_mInfo_Loc : nullptr, nullptr);
+      sandbox_invoke_custom(pngSandbox, png_destroy_read_struct, new_mPNG_Loc, mInfo ? new_mInfo_Loc : nullptr, (png_infopp) nullptr);
     #else
       png_structp* new_mPNG_Loc = (png_structp*) mallocInPngSandbox(sizeof(png_structp));
       *new_mPNG_Loc = (png_structp)getSandboxedPngPtr((uintptr_t)mPNG);
@@ -326,7 +326,7 @@ nsPNGDecoder::~nsPNGDecoder()
     free(mCMSLine);
   }
   if (interlacebuf) {
-    free(interlacebuf);
+    freeInPngSandbox(interlacebuf);
   }
   if (mInProfile) {
     qcms_profile_release(mInProfile);
@@ -553,7 +553,7 @@ nsPNGDecoder::InitInternal()
   // Always decode to 24 bit pixdepth
 
   #ifdef SANDBOX_USE_CPP_API
-    mPNG = sandbox_invoke_custom(pngSandbox, png_create_read_struct, PNG_LIBPNG_VER_STRING,
+    mPNG = sandbox_invoke_custom(pngSandbox, png_create_read_struct, sandbox_stackarr(PNG_LIBPNG_VER_STRING),
                                 nullptr, cpp_cb_png_error_fn,
                                 cpp_cb_png_warn_fn);
   #else
