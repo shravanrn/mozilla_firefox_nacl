@@ -123,6 +123,14 @@ nacl64_dbg: inithasrun
 	cp ../media/libpng_naclport/moz_nacl_debug.build ../media/libpng_naclport/moz.build
 	cd .. && ./mach build
 
+nacl64_cpp_dbg: inithasrun
+	if [ ! -d ../firefox_64bit_optdebug_nacl_cpp_debug ] && [ -d ../firefox_64bit_optdebug_nacl_debug ]; then cp -r ../firefox_64bit_optdebug_nacl_debug ../firefox_64bit_optdebug_nacl_cpp_debug; fi
+	cp ../image/decoders/moz_copy_cpp.build ../image/decoders/moz.build
+	cp ../mozconfig64_nacl_cpp_debug ../mozconfig
+	cp ../media/libjpeg_naclport/moz_nacl_debug.build ../media/libjpeg_naclport/moz.build
+	cp ../media/libpng_naclport/moz_nacl_debug.build ../media/libpng_naclport/moz.build
+	cd .. && ./mach build
+
 run64_static:
 	cp ../mozconfig64_static ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
@@ -177,6 +185,10 @@ run64_nonnacldebug: dynamic64_dbg
 
 run64_nacldebug: nacl64_dbg
 	cp ../mozconfig64_nacl_debug ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
+
+run64_naclcppdebug: nacl64_cpp_dbg
+	cp ../mozconfig64_nacl_cpp_debug ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 clean:
