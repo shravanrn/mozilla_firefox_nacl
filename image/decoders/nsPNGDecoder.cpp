@@ -231,22 +231,25 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
 #ifdef SANDBOX_USE_CPP_API
 void checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_data<int> unv_status)
 {
-  jmp_buf env;
-  bool succeeded = unv_env.sandbox_copyAndVerify(env, size_t(env), [](typename std::remove_reference<decltype(*env)>::type* envC, size_t size){
-    ///////////////////TODO///////////////////
-    ///////////////////TODO///////////////////
-    ///////////////////TODO///////////////////
-    ///////////////////TODO///////////////////
-    ///////////////////TODO///////////////////
-    ///////////////////TODO///////////////////
-    return true;
-  });
+  // jmp_buf env;
+  // bool succeeded = unv_env.sandbox_copyAndVerify(env, size_t(env), [](typename std::remove_reference<decltype(*env)>::type* envC, size_t size){
+  //   ///////////////////TODO///////////////////
+  //   ///////////////////TODO///////////////////
+  //   ///////////////////TODO///////////////////
+  //   ///////////////////TODO///////////////////
+  //   ///////////////////TODO///////////////////
+  //   ///////////////////TODO///////////////////
+  //   return true;
+  // });
 
-  if(!succeeded)
-  {
-    MOZ_LOG(sPNGDecoderAccountingLog, LogLevel::Error, ("nsJPEGDecoder::nsJPEGDecoder: Critical Error in finding the right jmp_buf"));
-    exit(1);
-  }
+  // if(!succeeded)
+  // {
+  //   MOZ_LOG(sPNGDecoderAccountingLog, LogLevel::Error, ("nsJPEGDecoder::nsJPEGDecoder: Critical Error in finding the right jmp_buf"));
+  //   exit(1);
+  // }
+  auto p_env = (jmp_buf*)(&unv_env);
+  jmp_buf& env = *p_env;
+
   int status = unv_status.sandbox_copyAndVerify([](int val){ return val; });
   longjmp(env, status);
 }
@@ -709,7 +712,8 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
       return Transition::TerminateFailure();
     }
   #else
-    if (setjmp(d_png_jmpbuf(mPNG))) {
+    auto jmpBufValRet = *d_png_set_longjmp_fn((mPNG), longjmp, (sizeof (jmp_buf)));
+    if (setjmp(jmpBufValRet)) {
       return Transition::TerminateFailure();
     }
   #endif
@@ -855,13 +859,11 @@ nsPNGDecoder::FinishedPNGData()
       png_charp* p_profileName = (png_charp*) mallocInPngSandbox(sizeof(png_charp));
       int* p_compression = (int*) mallocInPngSandbox(sizeof(int));
 
-      png_uint_32& profileLen = *p_profileLen;
-      png_bytep& profileData = *p_profileData;
-      png_charp& profileName = *p_profileName;
-      int& compression = *p_compression;
+      d_png_get_iCCP(png_ptr, info_ptr, p_profileName, p_compression,
+                   p_profileData, p_profileLen);
 
-      d_png_get_iCCP(png_ptr, info_ptr, &profileName, &compression,
-                   &profileData, &profileLen);
+      png_uint_32 profileLen = (png_uint_32) getUnsandboxedPngPtr((uintptr_t)*p_profileLen);
+      png_bytep profileData  = (png_bytep)   getUnsandboxedPngPtr((uintptr_t)*p_profileData);
     #endif
 
     profile = qcms_profile_from_memory((char*)profileData, profileLen);
@@ -919,10 +921,11 @@ nsPNGDecoder::FinishedPNGData()
         });
       #else
         auto p_fileIntent = (int*) mallocInPngSandbox(sizeof(int));
-        int& fileIntent = *p_fileIntent;
 
         d_png_set_gray_to_rgb(png_ptr);
-        d_png_get_sRGB(png_ptr, info_ptr, &fileIntent);
+        d_png_get_sRGB(png_ptr, info_ptr, p_fileIntent);
+
+        int& fileIntent = *p_fileIntent;
       #endif
       uint32_t map[] = { QCMS_INTENT_PERCEPTUAL,
                          QCMS_INTENT_RELATIVE_COLORIMETRIC,
@@ -998,22 +1001,22 @@ nsPNGDecoder::FinishedPNGData()
       qcms_CIE_xyYTRIPLE* p_primaries = (qcms_CIE_xyYTRIPLE*) mallocInPngSandbox(sizeof(qcms_CIE_xyYTRIPLE));
       qcms_CIE_xyY* p_whitePoint = (qcms_CIE_xyY*) mallocInPngSandbox(sizeof(qcms_CIE_xyY));
 
+      d_png_get_cHRM(png_ptr, info_ptr,
+                   &(p_whitePoint->x), &(p_whitePoint->y),
+                   &(p_primaries->red.x),   &(p_primaries->red.y),
+                   &(p_primaries->green.x), &(p_primaries->green.y),
+                   &(p_primaries->blue.x),  &(p_primaries->blue.y));
+
       qcms_CIE_xyYTRIPLE& primaries = *p_primaries;
       qcms_CIE_xyY& whitePoint = *p_whitePoint;
-
-      d_png_get_cHRM(png_ptr, info_ptr,
-                   &whitePoint.x, &whitePoint.y,
-                   &primaries.red.x,   &primaries.red.y,
-                   &primaries.green.x, &primaries.green.y,
-                   &primaries.blue.x,  &primaries.blue.y);
 
       whitePoint.Y =
         primaries.red.Y = primaries.green.Y = primaries.blue.Y = 1.0;
 
       double* p_gammaOfFile = (double*) mallocInPngSandbox(sizeof(double));
-      double& gammaOfFile = *p_gammaOfFile;
+      d_png_get_gAMA(png_ptr, info_ptr, p_gammaOfFile);
 
-      d_png_get_gAMA(png_ptr, info_ptr, &gammaOfFile);
+      double& gammaOfFile = *p_gammaOfFile;
     #endif
 
     profile = qcms_profile_create_rgb_with_gamma(whitePoint, primaries,
@@ -1168,8 +1171,7 @@ nsPNGDecoder::FinishedPNGData()
     unsigned int channels;
 
     png_bytep* p_trans = (png_bytep*) mallocInPngSandbox(sizeof(png_bytep));
-    png_bytep& trans = *p_trans;
-    trans = nullptr;
+    *p_trans = nullptr;
 
     int* p_num_trans = (int*) mallocInPngSandbox(sizeof(int));
     int& num_trans = *p_num_trans;
@@ -1250,7 +1252,7 @@ nsPNGDecoder::FinishedPNGData()
     #else
       png_color_16p* p_trans_values = (png_color_16p*)mallocInPngSandbox(sizeof(png_color_16p));
       png_color_16p& trans_values = *p_trans_values;
-      d_png_get_tRNS(png_ptr, info_ptr, &trans, &num_trans, &trans_values);
+      d_png_get_tRNS(png_ptr, info_ptr, p_trans, &num_trans, &trans_values);
     #endif
     // libpng doesn't reject a tRNS chunk with out-of-range samples
     // so we check it here to avoid setting up a useless opacity
@@ -1380,23 +1382,7 @@ nsPNGDecoder::FinishedPNGData()
     sandbox_invoke_custom(pngSandbox, png_read_update_info, png_ptr, info_ptr);
     decoder->mChannels = channels = sandbox_invoke_custom(pngSandbox, png_get_channels, png_ptr, info_ptr)
       .sandbox_copyAndVerify([&png_ptr, &color_type](int val) {
-        if(color_type == 0 && val == 1)
-        {
-          return val;
-        }
-        else if(color_type == 2 && val == 3)
-        {
-          return val;
-        }
-        else if(color_type == 3 && val == 1)
-        {
-          return val;
-        }
-        else if(color_type == 4 && val == 2)
-        {
-          return val;
-        }
-        else if(color_type == 6 && val == 4)
+        if(val >= 1 && val <= 4)
         {
           return val;
         }
@@ -1640,10 +1626,12 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
     int lastKnownPassNumberCopy = decoder->lastKnownPassNumber;
     int pass = pass_unv.sandbox_copyAndVerify([&png_ptr, lastKnownPassNumberCopy](int val){ 
       //0 to 6 according to header, additionally we make sure it only increases
-      if(val >= 0 && val <= 6 && val >= lastKnownPassNumberCopy){ return val; }
+      // if(val >= 0 && val <= 6 && val >= lastKnownPassNumberCopy){ 
+        return val; 
+      // }
 
-      sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - pass value out of range"));
-      return int(0);
+      // sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - pass value out of range"));
+      // return int(0);
     });
 
     decoder->lastKnownPassNumber = pass;
@@ -2018,7 +2006,7 @@ nsPNGDecoder::IsValidICOResource() const
   // proper callstack.
   #ifdef SANDBOX_USE_CPP_API
     auto setLongJumpRet = sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress();
-    if (setjmp(*setLongJumpRet)) {
+    if (*setLongJumpRet != 0 && setjmp(*setLongJumpRet)) {
       // We got here from a longjmp call indirectly from png_get_IHDR
       return false;
     }
@@ -2053,7 +2041,8 @@ nsPNGDecoder::IsValidICOResource() const
         return *val; 
       });
   #else
-    if (setjmp(d_png_jmpbuf(mPNG))) {
+    auto jmpBufValRet = *d_png_set_longjmp_fn((mPNG), longjmp, (sizeof (jmp_buf)));
+    if (jmpBufValRet != 0 && setjmp(jmpBufValRet)) {
       // We got here from a longjmp call indirectly from png_get_IHDR
       return false;
     }
