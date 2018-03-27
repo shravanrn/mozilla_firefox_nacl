@@ -28,8 +28,8 @@ UNIFIED_SOURCES += [
     'nsIconDecoder.cpp',
     'nsJPEGDecoder.cpp',
     'nsPNGDecoder.cpp',
-    'nsPNGDecoder_sandboxed.cpp',
     'nsPNGDecoder_clib.cpp',
+    'nsPNGDecoder_sandboxed.cpp',
 ]
 
 include('/ipc/chromium/chromium-config.mozbuild')
@@ -61,14 +61,14 @@ DEFINES['STARTUP_LIBRARY_PATH'] = '"Sandboxing_NaCl/native_client/scons-out/nacl
 DEFINES['SANDBOX_INIT_APP'] = '"tbd.nexe"'
 
 LOCAL_INCLUDES += [
+    # Process sandbox
+    '/../ProcessSandbox'
+    # NaCl sandbox
+    '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
     # Access to Skia headers for Downscaler.
     '/gfx/2d',
     # Decoders need ImageLib headers.
     '/image',
-    # NaCl sandbox
-    '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
-    # Process sandbox
-    '/../ProcessSandbox'
 ]
 
 LOCAL_INCLUDES += CONFIG['SKIA_INCLUDES']
