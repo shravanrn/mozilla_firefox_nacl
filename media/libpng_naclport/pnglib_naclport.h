@@ -50,6 +50,11 @@ unsigned long long getInvocationsInPng();
 unsigned long long getTimeSpentInPngCore();
 unsigned long long getInvocationsInPngCore();
 
+void pngStartTimer();
+void pngStartTimerCore();
+void pngEndTimer();
+void pngEndTimerCore();
+
 int initializeLibPngSandbox(void(*additionalSetup)());
 uintptr_t getUnsandboxedPngPtr(uintptr_t uaddr);
 uintptr_t getSandboxedPngPtr(uintptr_t uaddr);

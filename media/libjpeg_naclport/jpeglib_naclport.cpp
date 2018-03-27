@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <unistd.h>
+#include <mutex>
 
 #include "jpeglib_naclport.h"
 
@@ -75,10 +76,6 @@
   #define START_TIMER_CORE(NAME) do {} while(0)
   #define END_TIMER_CORE(NAME) do {} while(0)
 #endif
-
-void* jpegDlPtr;
-int jpegStartedInit = 0;
-int jpegFinishedInit = 0;
 
 typedef struct jpeg_error_mgr * (*t_jpeg_std_error) (struct jpeg_error_mgr * err);
 typedef void (*t_jpeg_CreateCompress) (j_compress_ptr cinfo, int version, size_t structsize);
@@ -173,18 +170,13 @@ unsigned long long getInvocationsInJpegCore()
 
 #if(USE_SANDBOXING == 2)
 
-  int naclStartedInit = 0;
+  std::mutex naclInitMutex;
   int naclFinishedInit = 0;
 
   void ensureNaClSandboxInit()
   {
-      if(naclStartedInit)
-      {
-          while(!naclFinishedInit){}
-          return;
-      }
-
-      naclStartedInit = 1;
+      std::lock_guard<std::mutex> guard(naclInitMutex);
+      if(naclFinishedInit == 1) { return; }
 
       printf("Initializing NaCl Sandbox\n");
 
@@ -198,22 +190,24 @@ unsigned long long getInvocationsInJpegCore()
 
 #endif
 
+void* jpegDlPtr;
+std::mutex jpegInitMutex;
+int jpegFinishedInit = 0;
+
 int initializeLibJpegSandbox()
 {
-  if(jpegStartedInit)
-  {
-    while(!jpegFinishedInit){}
-    return 1;
-  }
+  std::lock_guard<std::mutex> guard(jpegInitMutex);
+  if(jpegFinishedInit == 1) { return 1; }
 
   //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_NON_NACL_DL_PATH, PS_OTHERSIDE_PATH are defined as macros in the moz.build of this folder
-
-  jpegStartedInit = 1;
 
   char SandboxingCodeRootFolder[1024];
   int index;
 
-  getcwd(SandboxingCodeRootFolder, 256);
+  if(!getcwd(SandboxingCodeRootFolder, 256))
+  {
+    abort();
+  }
 
   char * found = strstr(SandboxingCodeRootFolder, "/mozilla-release");
   if (found == NULL)

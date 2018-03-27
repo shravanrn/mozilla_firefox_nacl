@@ -1,6 +1,7 @@
 #include "pnglib_naclport.h"
 #include <dlfcn.h>
 #include <unistd.h>
+#include <mutex>
 
 #ifdef PRINT_FUNCTION_LOGS
   using mozilla::LogLevel;
@@ -72,10 +73,6 @@
   #define START_TIMER_CORE(NAME) do {} while(0)
   #define END_TIMER_CORE(NAME) do {} while(0)
 #endif
-
-void* pngDlPtr;
-int pngStartedInit = 0;
-int pngfinishedInit = 0;
 
 #if(USE_SANDBOXING != 3)
 t_png_get_next_frame_delay_num    ptr_png_get_next_frame_delay_num;
@@ -175,28 +172,50 @@ unsigned long long getInvocationsInPngCore()
   #endif
 }
 
+void pngStartTimer()
+{
+  START_TIMER("");
+}
+
+void pngStartTimerCore()
+{
+  START_TIMER_CORE("");
+}
+
+void pngEndTimer()
+{
+  END_TIMER("");
+}
+
+void pngEndTimerCore()
+{
+  END_TIMER_CORE("");
+}
+
 #if(USE_SANDBOXING == 2)
 
   extern void ensureNaClSandboxInit();
 
 #endif
 
+void* pngDlPtr;
+std::mutex pngInitMutex;
+int pngFinishedInit = 0;
+
 int initializeLibPngSandbox(void(*additionalSetup)())
 {
-  if(pngStartedInit)
-  {
-    while(!pngfinishedInit){}
-    return 1;
-  }
-  
-  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, PNG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
+  std::lock_guard<std::mutex> guard(pngInitMutex);
+  if(pngFinishedInit == 1) { return 1; }
 
-  pngStartedInit = 1;
+  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, PNG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
 
   char SandboxingCodeRootFolder[1024];
   int index;
 
-  getcwd(SandboxingCodeRootFolder, 256);
+  if(!getcwd(SandboxingCodeRootFolder, 256))
+  {
+    abort();
+  }
 
   char * found = strstr(SandboxingCodeRootFolder, "/mozilla-release");
   if (found == NULL)
@@ -211,7 +230,7 @@ int initializeLibPngSandbox(void(*additionalSetup)())
   #if(USE_SANDBOXING == 0)
   {
     printf("Using static libpng\n");
-    pngfinishedInit = 1;
+    pngFinishedInit = 1;
     return 1;
   }
   #elif(USE_SANDBOXING == 1)
@@ -389,7 +408,7 @@ int initializeLibPngSandbox(void(*additionalSetup)())
   {
     additionalSetup();
   }
-  pngfinishedInit = 1;
+  pngFinishedInit = 1;
 
   return 1;
 }
