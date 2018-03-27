@@ -67,9 +67,6 @@ void* pngDecDlPtr;
 int pngDecStartedInit = 0;
 int pngDecFinishedInit = 0;
 
-namespace mozilla {
-namespace image {
-
 // USE_SANDBOXING is defined in the moz.build of this folder
 #ifndef USE_SANDBOXING
   #error "USE_SANDBOXING value not provided"
@@ -85,6 +82,9 @@ namespace image {
   #include "ProcessSandbox.h"
   static ProcessSandbox* sandbox;
 #endif
+
+namespace mozilla {
+namespace image {
 
 typedef nsPNGDecoder_clib*  (*t_constructor)            (RasterImage* aImage);
 typedef void                (*t_destructor)             (nsPNGDecoder_clib*);

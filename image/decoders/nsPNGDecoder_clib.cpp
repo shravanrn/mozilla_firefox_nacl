@@ -1340,8 +1340,8 @@ nsPNGDecoder_clib::IsValidICOResource() const
 
 typedef mozilla::image::nsPNGDecoder_clib nsPNGDecoder_clib;
 
-nsPNGDecoder_clib* nsPNGDecoder_clib_constructor(RasterImage* aImage) {
-  return new nsPNGDecoder_clib(aImage);
+nsPNGDecoder_clib* nsPNGDecoder_clib_constructor(void* aImage) {
+  return new nsPNGDecoder_clib((mozilla::image::RasterImage*)aImage);
 }
 
 void nsPNGDecoder_clib_destructor(nsPNGDecoder_clib* clib) {
@@ -1420,7 +1420,7 @@ void** DoDecode(nsPNGDecoder_clib* clib, void* it, void* res) {
   // TODO: I think we have to return pointer here (as declared), but the original method
   // just returns LexerResult.  Hence the blatant memory leak, later we'll do something
   // smarter
-  LexerResult* lexerResult = (LexerResult*)malloc(sizeof(LexerResult));
-  *lexerResult = clib->DoDecode(*(SourceBufferIterator*)it, (IResumable*)res);
+  mozilla::image::LexerResult* lexerResult = (mozilla::image::LexerResult*)malloc(sizeof(mozilla::image::LexerResult));
+  *lexerResult = clib->DoDecode(*(mozilla::image::SourceBufferIterator*)it, (mozilla::image::IResumable*)res);
   return (void**) lexerResult;
 }
