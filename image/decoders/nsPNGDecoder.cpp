@@ -103,13 +103,6 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
      png_size_t size;
      png_byte location; /* mode of operation at read time */
   } png_unknown_chunk;
-  // typedef struct png_xy
-  // {
-  //    png_fixed_point redx, redy;
-  //    png_fixed_point greenx, greeny;
-  //    png_fixed_point bluex, bluey;
-  //    png_fixed_point whitex, whitey;
-  // } png_xy;
   typedef struct png_text_struct
   {
      int  compression;       /* compression value:
@@ -149,8 +142,56 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   sandbox_callback_helper<void(unverified_data<png_structp>,unverified_data<png_uint_32>)>* cpp_cb_png_progressive_frame_info_fn;
   sandbox_callback_helper<void(unverified_data<jmp_buf>, unverified_data<int>)>* cpp_cb_longjmp_fn;
 
-  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoker_with_ptr<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, nullptr, ##__VA_ARGS__)
-  #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoker_with_ptr_ret_unsandboxed_ptr<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, nullptr, ##__VA_ARGS__)
+  // #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoker_with_ptr<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, nullptr, ##__VA_ARGS__)
+  // #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoker_with_ptr_ret_unsandboxed_ptr<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, nullptr, ##__VA_ARGS__)
+
+  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, ##__VA_ARGS__)
+  #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoke_custom_ret_unsandboxed_ptr_helper<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, ##__VA_ARGS__)
+
+  //////////////////////////////////////////////////////////
+
+  template<typename TFunc, typename... TArgs>
+  inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
+  unverified_data<return_argument<TFunc>>
+  >::type sandbox_invoke_custom_helper(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
+  {
+    pngStartTimer();
+    auto ret = sandbox_invoker_with_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
+    pngEndTimer();
+    return ret;
+  }
+
+  template<typename TFunc, typename... TArgs>
+  inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
+  void
+  >::type sandbox_invoke_custom_helper(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
+  {
+    pngStartTimer();
+    sandbox_invoker_with_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
+    pngEndTimer();
+  }
+
+  template<typename TFunc, typename... TArgs>
+  inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
+  unverified_data<return_argument<TFunc>>
+  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
+  {
+    pngStartTimer();
+    auto ret = sandbox_invoker_with_ptr_ret_unsandboxed_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
+    pngEndTimer();
+    return ret;
+  }
+
+  template<typename TFunc, typename... TArgs>
+  inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
+  void
+  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
+  {
+    pngStartTimer();
+    sandbox_invoker_with_ptr_ret_unsandboxed_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
+    pngEndTimer();
+  }
+
 #endif
 
 nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
@@ -707,13 +748,13 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
 
   // libpng uses setjmp/longjmp for error handling.
   #ifdef SANDBOX_USE_CPP_API
-    auto setLongJumpRet = sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress();
-    if (setjmp(*setLongJumpRet)) {
+    auto setLongJumpRet = *(sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress());
+    if (setLongJumpRet != 0 && setjmp(setLongJumpRet)) {
       return Transition::TerminateFailure();
     }
   #else
-    auto jmpBufValRet = *d_png_set_longjmp_fn((mPNG), longjmp, (sizeof (jmp_buf)));
-    if (setjmp(jmpBufValRet)) {
+    auto setLongJumpRet = *d_png_set_longjmp_fn((mPNG), longjmp, (sizeof (jmp_buf)));
+    if (setLongJumpRet != 0 && setjmp(setLongJumpRet)) {
       return Transition::TerminateFailure();
     }
   #endif
@@ -1065,6 +1106,7 @@ nsPNGDecoder::FinishedPNGData()
 #endif
 {
   #ifdef SANDBOX_USE_CPP_API
+    pngEndTimer();
     auto p_width  = newInSandbox<png_uint_32>(pngSandbox);
     auto p_height = newInSandbox<png_uint_32>(pngSandbox);
 
@@ -1521,6 +1563,10 @@ nsPNGDecoder::FinishedPNGData()
       #endif
     }
   }
+
+  #ifdef SANDBOX_USE_CPP_API
+    pngStartTimer();
+  #endif
 }
 
 void
@@ -1599,6 +1645,7 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
    * old row and the new row.
    */
   #ifdef SANDBOX_USE_CPP_API
+    pngEndTimerCore();
     void* getProgPtrRet = sandbox_invoke_custom_ret_unsandboxed_ptr(pngSandbox, png_get_progressive_ptr, png_ptr);
     auto iter = pngRendererList.find(getProgPtrRet);
 
@@ -1678,6 +1725,7 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
   #ifdef SANDBOX_USE_CPP_API
     auto rowToWriteVer = rowToWrite.sandbox_onlyVerifyAddressRange(decoder->mChannels * width);
     decoder->WriteRow(rowToWriteVer);
+    pngStartTimerCore();
   #else
     decoder->WriteRow(rowToWrite);
   #endif
@@ -1833,6 +1881,7 @@ nsPNGDecoder::FinishInternal()
 #endif
 {
   #ifdef SANDBOX_USE_CPP_API
+    pngEndTimer();
     void* getProgPtrRet = sandbox_invoke_custom_ret_unsandboxed_ptr(pngSandbox, png_get_progressive_ptr, png_ptr);
     auto iter = pngRendererList.find(getProgPtrRet);
 
@@ -1910,7 +1959,11 @@ nsPNGDecoder::FinishInternal()
 
   // Yield to the caller to notify them that the previous frame is now complete.
   decoder->mNextFrameInfo = Some(info);
-  return decoder->DoYield(png_ptr);
+  decoder->DoYield(png_ptr);
+
+  #ifdef SANDBOX_USE_CPP_API
+    pngStartTimer();
+  #endif  
 }
 #endif
 
@@ -1932,6 +1985,7 @@ nsPNGDecoder::FinishInternal()
    * marks the image as finished.
    */
   #ifdef SANDBOX_USE_CPP_API
+    pngEndTimer();
     void* getProgPtrRet = sandbox_invoke_custom_ret_unsandboxed_ptr(pngSandbox, png_get_progressive_ptr, png_ptr);
     auto iter = pngRendererList.find(getProgPtrRet);
 
@@ -1954,7 +2008,11 @@ nsPNGDecoder::FinishInternal()
   printf("%10llu,PNG_Time,%d,%10llu,%10llu,%10llu,%10llu\n", invPng, getppid(), getTimeSpentInPng(), getInvocationsInPngCore(), getTimeSpentInPngCore(), timeInPng);
   invPng++;
 
-  return decoder->DoTerminate(png_ptr, TerminalState::SUCCESS);
+  decoder->DoTerminate(png_ptr, TerminalState::SUCCESS);
+
+  #ifdef SANDBOX_USE_CPP_API
+    pngStartTimer();
+  #endif
 }
 
 
@@ -1965,11 +2023,13 @@ nsPNGDecoder::FinishInternal()
 #endif
 {
   #ifdef SANDBOX_USE_CPP_API
+    pngEndTimer();
     const char* error_msg = error_msg_unv.sandbox_copyAndVerifyString([](const char* val) { return strlen(val) < 10000; }, nullptr);
   #endif
   MOZ_LOG(sPNGLog, LogLevel::Error, ("libpng error: %s\n", error_msg));
   #ifdef SANDBOX_USE_CPP_API
     sandbox_invoke_custom(pngSandbox, png_longjmp, png_ptr, 1);
+    pngStartTimer();
   #else
     d_png_longjmp(png_ptr, 1);
   #endif
@@ -1983,9 +2043,13 @@ nsPNGDecoder::FinishInternal()
 #endif
 {
   #ifdef SANDBOX_USE_CPP_API
+    pngEndTimer();
     const char* warning_msg = warning_msg_unv.sandbox_copyAndVerifyString([](const char* val) { return strlen(val) < 10000; }, nullptr);
   #endif
   MOZ_LOG(sPNGLog, LogLevel::Warning, ("libpng warning: %s\n", warning_msg));
+  #ifdef SANDBOX_USE_CPP_API
+    pngStartTimer();
+  #endif
 }
 
 Maybe<Telemetry::HistogramID>
@@ -2005,8 +2069,8 @@ nsPNGDecoder::IsValidICOResource() const
   // we need to save the jump buffer here. Otherwise we'll end up without a
   // proper callstack.
   #ifdef SANDBOX_USE_CPP_API
-    auto setLongJumpRet = sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress();
-    if (*setLongJumpRet != 0 && setjmp(*setLongJumpRet)) {
+    auto setLongJumpRet = *(sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress());
+    if (setLongJumpRet != 0 && setjmp(setLongJumpRet)) {
       // We got here from a longjmp call indirectly from png_get_IHDR
       return false;
     }
@@ -2041,8 +2105,8 @@ nsPNGDecoder::IsValidICOResource() const
         return *val; 
       });
   #else
-    auto jmpBufValRet = *d_png_set_longjmp_fn((mPNG), longjmp, (sizeof (jmp_buf)));
-    if (jmpBufValRet != 0 && setjmp(jmpBufValRet)) {
+    auto setLongJumpRet = *d_png_set_longjmp_fn((mPNG), longjmp, (sizeof (jmp_buf)));
+    if (setLongJumpRet != 0 && setjmp(setLongJumpRet)) {
       // We got here from a longjmp call indirectly from png_get_IHDR
       return false;
     }
