@@ -14,16 +14,16 @@ fi
 
 PlatformToUse="64"
 
-if [[ ! -z "$1" ]]; then
-	if [[ "$1" == "32" ]]; then
+if [[ ! -z "$2" ]]; then
+	if [[ "$2" == "32" ]]; then
 		PlatformToUse="32"
 	else
-		echo "Unknown platform: $1"
+		echo "Unknown platform: $2"
 		exit 1
 	fi
 fi
 
-FFVersions=("firefox_${PlatformToUse}bit_optdebug_nacl" "firefox_${PlatformToUse}bit_optdebug_nonnacl" "firefox_${PlatformToUse}bit_optdebug_static" "firefox_${PlatformToUse}bit_optdebug_ps" "firefox_${PlatformToUse}bit_optdebug_nacl_nosimd")
+FFVersions=("firefox_${PlatformToUse}bit_optdebug_nacl" "firefox_${PlatformToUse}bit_optdebug_nonnacl" "firefox_${PlatformToUse}bit_optdebug_static"  "firefox_${PlatformToUse}bit_optdebug_nacl_cpp")
 
 for i in ${FFVersions[@]}; do
 	if [[ ! -d "${i}" ]]; then
@@ -100,7 +100,7 @@ function writeTimingLinesToOutput() {
 function runTest(){
 	rm -f ./testing/mozharness/build/local.json
 	rm -f ./talos_output.txt
-	sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
+	#sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 	sleep 5
 	taskset -c 3 ./mach talos-test --activeTests $2 2>&1 | tee ./talos_output.txt
 	cat ./testing/mozharness/build/local.json >> "$1"
@@ -132,9 +132,9 @@ function loadPsFirefox(){
     cp "./mozconfig${PlatformToUse}_ps" ./mozconfig
     sleep 2
 }
-function loadSandboxedNoSimdFirefox(){
+function loadSandboxedCppFirefox(){
 	sleep 2
-	cp "./mozconfig${PlatformToUse}_nacl_nosimd" ./mozconfig
+	cp "./mozconfig${PlatformToUse}_nacl_cpp" ./mozconfig
 	sleep 2
 }
 
@@ -145,39 +145,23 @@ do
 
 	echo -e "FFBuild-NACL-SIMD\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
-	# runTest "$1" "jpeg_page_render_25"
-	# runTest "$1" "jpeg_page_render_50"
-	echo -e "\n---------------------\n" >> "$1"
-
-    loadPsFirefox
-
-	echo -e "FFBuild-PS-SIMD\n" >> "$1"
-	runTest "$1" "jpeg_page_render"
-	# runTest "$1" "jpeg_page_render_25"
-	# runTest "$1" "jpeg_page_render_50"
 	echo -e "\n---------------------\n" >> "$1"
 
 	loadUnsandboxedFirefox
 
 	echo -e "FFBuild-Non-NACL\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
-	# runTest "$1" "jpeg_page_render_25"
-	# runTest "$1" "jpeg_page_render_50"
 	echo -e "\n---------------------\n" >> "$1"
 
 	loadStaticFirefox
 
 	echo -e "FFBuild-Static\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
-	# runTest "$1" "jpeg_page_render_25"
-	# runTest "$1" "jpeg_page_render_50"
 	echo -e "\n---------------------\n" >> "$1"
 
-	loadSandboxedNoSimdFirefox
-	echo -e "FFBuild-NoSimd\n" >> "$1"
+	loadSandboxedCppFirefox
+	echo -e "FFBuild-NaClCPP\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
-	# runTest "$1" "jpeg_page_render_25"
-	# runTest "$1" "jpeg_page_render_50"
 	echo -e "\n---------------------\n" >> "$1"
 
 done
