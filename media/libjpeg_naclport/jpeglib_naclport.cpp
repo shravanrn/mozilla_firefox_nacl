@@ -269,7 +269,7 @@ int initializeLibJpegSandbox()
     strcpy(full_PS_OTHERSIDE_PATH, SandboxingCodeRootFolder);
     strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
 
-    printf("Creating process sandbox\n");
+    printf("Creating JPEG process sandbox\n");
     sandbox = new PROCESS_SANDBOX_CLASSNAME(full_PS_OTHERSIDE_PATH, 0, 2);
   }
   #endif
