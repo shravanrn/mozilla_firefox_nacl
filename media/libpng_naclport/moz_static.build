@@ -41,8 +41,8 @@ DEFINES['SANDBOX_INIT_APP'] = '"libpng_nacl/builds/x64/nacl_build/mainCombine/li
 
 LOCAL_INCLUDES += [
     ############ Update this path as required
-    '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
-    '/media/libpng'
+    '/../libpng_nacl',
+    '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr'
 ]
 
 ############ Update this path as required
