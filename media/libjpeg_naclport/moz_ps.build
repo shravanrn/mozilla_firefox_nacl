@@ -50,6 +50,6 @@ LOCAL_INCLUDES += [
 ]
 
 ############ Update this path as required
-OS_LIBS += ['../../../../ProcessSandbox/ProcessSandbox_jpeg64.a']
+OS_LIBS += ['-L../../../../ProcessSandbox', '-lProcessSandbox_jpeg64']
 
 FINAL_LIBRARY = 'gkmedias'
