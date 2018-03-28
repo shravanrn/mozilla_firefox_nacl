@@ -35,7 +35,7 @@
 #elif(USE_SANDBOXING == 3)
   #include "ProcessSandbox.h"
 
-  static ProcessSandbox* sandbox;
+  static PROCESS_SANDBOX_CLASSNAME* sandbox;
 
 #endif
 
@@ -279,7 +279,7 @@ int initializeLibPngSandbox(void(*additionalSetup)())
     strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
 
     printf("Creating process sandbox\n");
-    sandbox = new ProcessSandbox(full_PS_OTHERSIDE_PATH, 0, 2);
+    sandbox = new PROCESS_SANDBOX_CLASSNAME(full_PS_OTHERSIDE_PATH, 0, 2);
   }
   #endif
 
