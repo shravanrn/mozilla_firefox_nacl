@@ -33,7 +33,7 @@ for i in ${FFVersions[@]}; do
 done
 
 #Get root
-sudo echo "Starting. Make sure to disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
+# sudo echo "Starting. Make sure to disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
 
 #param: outputfile
 #param: logfile
@@ -88,7 +88,7 @@ function writeTimingLinesToOutput() {
 		COMMASEPTIME=$(printf "%'.f\n" $((FNTIMESPENT / 25)))
 		COMMASEPCORETIME=$(printf "%'.f\n" $((FNCORETIMESPENT / 25)))
 		COMMASEPDESTROYTIME=$(printf "%'.f\n" $((DESTROYTIMESPENT / 25)))
-		echo "Final $testToRun (for 1 run): inv=$((FNINVOCATIONS / 25)) time=$COMMASEPTIME core_inv=$((FNCOREINVOCATIONS / 25)) time=$COMMASEPCORETIME destroy=$COMMASEPDESTROYTIME" >> "$1"
+		echo "Final $testToRun (for 1 run): inv=$((FNINVOCATIONS / 25)) time=$COMMASEPTIME core_inv=$((FNCOREINVOCATIONS / 25)) core_time=$COMMASEPCORETIME destroy=$COMMASEPDESTROYTIME" >> "$1"
 		echo -e "\n" >> "$1"
 
 		IFS=$OIFS
@@ -138,29 +138,26 @@ function loadSandboxedCppFirefox(){
 	sleep 2
 }
 
-for i in 1 2
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50
 do
 
-	loadSandboxedFirefox
-
-	echo -e "FFBuild-NACL-SIMD\n" >> "$1"
+	loadStaticFirefox
+	echo -e "FFBuild-Stock\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
 	echo -e "\n---------------------\n" >> "$1"
 
 	loadUnsandboxedFirefox
-
-	echo -e "FFBuild-Non-NACL\n" >> "$1"
+	echo -e "FFBuild-DynLib\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
 	echo -e "\n---------------------\n" >> "$1"
 
-	loadStaticFirefox
-
-	echo -e "FFBuild-Static\n" >> "$1"
+	loadSandboxedFirefox
+	echo -e "FFBuild-NaCl\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
 	echo -e "\n---------------------\n" >> "$1"
 
 	loadSandboxedCppFirefox
-	echo -e "FFBuild-NaClCPP\n" >> "$1"
+	echo -e "FFBuild-NaClC++\n" >> "$1"
 	runTest "$1" "jpeg_page_render"
 	echo -e "\n---------------------\n" >> "$1"
 
