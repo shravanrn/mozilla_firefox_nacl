@@ -55,7 +55,7 @@ void pngStartTimerCore();
 void pngEndTimer();
 void pngEndTimerCore();
 
-int initializeLibPngSandbox(void(*additionalSetup)());
+void initializeLibPngSandbox(void(*additionalSetup)());
 uintptr_t getUnsandboxedPngPtr(uintptr_t uaddr);
 uintptr_t getSandboxedPngPtr(uintptr_t uaddr);
 int isAddressInPngSandboxMemoryOrNull(uintptr_t uaddr);

@@ -191,173 +191,168 @@ unsigned long long getInvocationsInJpegCore()
 #endif
 
 void* jpegDlPtr;
-std::mutex jpegInitMutex;
-int jpegFinishedInit = 0;
+std::once_flag jpegFinishedInit;
 
-int initializeLibJpegSandbox()
+void initializeLibJpegSandbox()
 {
-  std::lock_guard<std::mutex> guard(jpegInitMutex);
-  if(jpegFinishedInit == 1) { return 1; }
+  std::call_once(jpegFinishedInit, [](){
+    //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_NON_NACL_DL_PATH, PS_OTHERSIDE_PATH are defined as macros in the moz.build of this folder
 
-  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_NON_NACL_DL_PATH, PS_OTHERSIDE_PATH are defined as macros in the moz.build of this folder
+    char SandboxingCodeRootFolder[1024];
+    int index;
 
-  char SandboxingCodeRootFolder[1024];
-  int index;
-
-  if(!getcwd(SandboxingCodeRootFolder, 256))
-  {
-    abort();
-  }
-
-  char * found = strstr(SandboxingCodeRootFolder, "/mozilla-release");
-  if (found == NULL)
-  {
-    printf("Error initializing start directory for NaCl\n");   
-    exit(1);
-  }
-  
-  index = found - SandboxingCodeRootFolder + 1;
-  SandboxingCodeRootFolder[index] = '\0';
-
-  #if(USE_SANDBOXING == 0)
-  {
-    printf("Using static libjpeg\n");
-    jpegFinishedInit = 1;
-    return 1;
-  }
-  #elif(USE_SANDBOXING == 1)
-  {
-    char full_JPEG_NON_NACL_DL_PATH[1024];
-
-    strcpy(full_JPEG_NON_NACL_DL_PATH, SandboxingCodeRootFolder);
-    strcat(full_JPEG_NON_NACL_DL_PATH, JPEG_NON_NACL_DL_PATH);
-
-    printf("Loading dynamic library %s\n", full_JPEG_NON_NACL_DL_PATH);
-    jpegDlPtr = dlopen(full_JPEG_NON_NACL_DL_PATH, RTLD_LAZY | RTLD_DEEPBIND);
-    if(!jpegDlPtr)
+    if(!getcwd(SandboxingCodeRootFolder, 256))
     {
-      printf("Loading of dynamic library %s has failed\n", full_JPEG_NON_NACL_DL_PATH);
-      return 0;
+      abort();
     }
-  }
-  #elif(USE_SANDBOXING == 2)
-  {
-    char full_STARTUP_LIBRARY_PATH[1024];
-    char full_SANDBOX_INIT_APP[1024];
 
-    strcpy(full_STARTUP_LIBRARY_PATH, SandboxingCodeRootFolder);
-    strcat(full_STARTUP_LIBRARY_PATH, STARTUP_LIBRARY_PATH);
-
-    strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
-    strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
-
-    printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
-
-    ensureNaClSandboxInit();
-    jpegSandbox = createDlSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
-
-    if(!jpegSandbox)
+    char * found = strstr(SandboxingCodeRootFolder, "/mozilla-release");
+    if (found == NULL)
     {
-      printf("Error creating jpeg Sandbox");
-      return 0;
+      printf("Error initializing start directory for NaCl\n");   
+      exit(1);
     }
-  }
-  #elif(USE_SANDBOXING == 3)
-  {
-    char full_PS_OTHERSIDE_PATH[1024];
+    
+    index = found - SandboxingCodeRootFolder + 1;
+    SandboxingCodeRootFolder[index] = '\0';
 
-    strcpy(full_PS_OTHERSIDE_PATH, SandboxingCodeRootFolder);
-    strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
+    #if(USE_SANDBOXING == 0)
+    {
+      printf("Using static libjpeg\n");
+      return;
+    }
+    #elif(USE_SANDBOXING == 1)
+    {
+      char full_JPEG_NON_NACL_DL_PATH[1024];
 
-    printf("Creating JPEG process sandbox\n");
-    sandbox = new PROCESS_SANDBOX_CLASSNAME(full_PS_OTHERSIDE_PATH, 0, 2);
-  }
+      strcpy(full_JPEG_NON_NACL_DL_PATH, SandboxingCodeRootFolder);
+      strcat(full_JPEG_NON_NACL_DL_PATH, JPEG_NON_NACL_DL_PATH);
+
+      printf("Loading dynamic library %s\n", full_JPEG_NON_NACL_DL_PATH);
+      jpegDlPtr = dlopen(full_JPEG_NON_NACL_DL_PATH, RTLD_LAZY | RTLD_DEEPBIND);
+      if(!jpegDlPtr)
+      {
+        printf("Loading of dynamic library %s has failed\n", full_JPEG_NON_NACL_DL_PATH);
+        exit(1);
+      }
+    }
+    #elif(USE_SANDBOXING == 2)
+    {
+      char full_STARTUP_LIBRARY_PATH[1024];
+      char full_SANDBOX_INIT_APP[1024];
+
+      strcpy(full_STARTUP_LIBRARY_PATH, SandboxingCodeRootFolder);
+      strcat(full_STARTUP_LIBRARY_PATH, STARTUP_LIBRARY_PATH);
+
+      strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
+      strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
+
+      printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+
+      ensureNaClSandboxInit();
+      jpegSandbox = createDlSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+
+      if(!jpegSandbox)
+      {
+        printf("Error creating jpeg Sandbox");
+        exit(1);
+      }
+    }
+    #elif(USE_SANDBOXING == 3)
+    {
+      char full_PS_OTHERSIDE_PATH[1024];
+
+      strcpy(full_PS_OTHERSIDE_PATH, SandboxingCodeRootFolder);
+      strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
+
+      printf("Creating JPEG process sandbox\n");
+      sandbox = new PROCESS_SANDBOX_CLASSNAME(full_PS_OTHERSIDE_PATH, 0, 2);
+    }
+    #endif
+
+    printf("Loading symbols.\n");
+    int failed = 0;
+
+  #if(USE_SANDBOXING != 3)
+
+    #if(USE_SANDBOXING == 2)
+      #define loadSymbol(symbol) do { \
+        void* dlSymRes = symbolTableLookupInSandbox(jpegSandbox, #symbol); \
+        if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
+        *((void **) &ptr_##symbol) = dlSymRes; \
+      } while(0)
+
+    #elif(USE_SANDBOXING == 1)
+      #define loadSymbol(symbol) do { \
+        void* dlSymRes = dlsym(jpegDlPtr, #symbol); \
+        if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
+        *((void **) &ptr_##symbol) = dlSymRes; \
+      } while(0)
+
+    #else
+      #define loadSymbol(symbol) do {} while(0)
+    #endif
+
+    loadSymbol(jpeg_std_error);
+    loadSymbol(jpeg_CreateCompress);
+    loadSymbol(jpeg_stdio_dest);
+    loadSymbol(jpeg_set_defaults);
+    loadSymbol(jpeg_set_quality);
+    loadSymbol(jpeg_start_compress);
+    loadSymbol(jpeg_write_scanlines);
+    loadSymbol(jpeg_finish_compress);
+    loadSymbol(jpeg_destroy_compress);
+    loadSymbol(jpeg_CreateDecompress);
+    loadSymbol(jpeg_stdio_src);
+    loadSymbol(jpeg_read_header);
+    loadSymbol(jpeg_start_decompress);
+    loadSymbol(jpeg_read_scanlines);
+    loadSymbol(jpeg_finish_decompress);
+    loadSymbol(jpeg_destroy_decompress);
+    loadSymbol(jpeg_save_markers);
+    loadSymbol(jpeg_has_multiple_scans);
+    loadSymbol(jpeg_calc_output_dimensions);
+    loadSymbol(jpeg_start_output);
+    loadSymbol(jpeg_finish_output);
+    loadSymbol(jpeg_input_complete);
+    loadSymbol(jpeg_consume_input);
+
+    #undef loadSymbol
+
+  #else  // USE_SANDBOXING == 3
+
+    #define ptr_jpeg_std_error              (sandbox->inv_jpeg_std_error)
+    #define ptr_jpeg_CreateCompress         (sandbox->inv_jpeg_CreateCompress)
+    #define ptr_jpeg_stdio_dest             (sandbox->inv_jpeg_stdio_dest)
+    #define ptr_jpeg_set_defaults           (sandbox->inv_jpeg_set_defaults)
+    #define ptr_jpeg_set_quality            (sandbox->inv_jpeg_set_quality)
+    #define ptr_jpeg_start_compress         (sandbox->inv_jpeg_start_compress)
+    #define ptr_jpeg_write_scanlines        (sandbox->inv_jpeg_write_scanlines)
+    #define ptr_jpeg_finish_compress        (sandbox->inv_jpeg_finish_compress)
+    #define ptr_jpeg_destroy_compress       (sandbox->inv_jpeg_destroy_compress)
+    #define ptr_jpeg_CreateDecompress       (sandbox->inv_jpeg_CreateDecompress)
+    #define ptr_jpeg_stdio_src              (sandbox->inv_jpeg_stdio_src)
+    #define ptr_jpeg_read_header            (sandbox->inv_jpeg_read_header)
+    #define ptr_jpeg_start_decompress       (sandbox->inv_jpeg_start_decompress)
+    #define ptr_jpeg_read_scanlines         (sandbox->inv_jpeg_read_scanlines)
+    #define ptr_jpeg_finish_decompress      (sandbox->inv_jpeg_finish_decompress)
+    #define ptr_jpeg_destroy_decompress     (sandbox->inv_jpeg_destroy_decompress)
+    #define ptr_jpeg_save_markers           (sandbox->inv_jpeg_save_markers)
+    #define ptr_jpeg_has_multiple_scans     (sandbox->inv_jpeg_has_multiple_scans)
+    #define ptr_jpeg_calc_output_dimensions (sandbox->inv_jpeg_calc_output_dimensions)
+    #define ptr_jpeg_start_output           (sandbox->inv_jpeg_start_output)
+    #define ptr_jpeg_finish_output          (sandbox->inv_jpeg_finish_output)
+    #define ptr_jpeg_input_complete         (sandbox->inv_jpeg_input_complete)
+    #define ptr_jpeg_consume_input          (sandbox->inv_jpeg_consume_input)
+
   #endif
 
-  printf("Loading symbols.\n");
-  int failed = 0;
+    if(failed) { exit(1); }
 
-#if(USE_SANDBOXING != 3)
-
-  #if(USE_SANDBOXING == 2)
-    #define loadSymbol(symbol) do { \
-      void* dlSymRes = symbolTableLookupInSandbox(jpegSandbox, #symbol); \
-      if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
-      *((void **) &ptr_##symbol) = dlSymRes; \
-    } while(0)
-
-  #elif(USE_SANDBOXING == 1)
-    #define loadSymbol(symbol) do { \
-      void* dlSymRes = dlsym(jpegDlPtr, #symbol); \
-      if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
-      *((void **) &ptr_##symbol) = dlSymRes; \
-    } while(0)
-
-  #else
-    #define loadSymbol(symbol) do {} while(0)
-  #endif
-
-  loadSymbol(jpeg_std_error);
-  loadSymbol(jpeg_CreateCompress);
-  loadSymbol(jpeg_stdio_dest);
-  loadSymbol(jpeg_set_defaults);
-  loadSymbol(jpeg_set_quality);
-  loadSymbol(jpeg_start_compress);
-  loadSymbol(jpeg_write_scanlines);
-  loadSymbol(jpeg_finish_compress);
-  loadSymbol(jpeg_destroy_compress);
-  loadSymbol(jpeg_CreateDecompress);
-  loadSymbol(jpeg_stdio_src);
-  loadSymbol(jpeg_read_header);
-  loadSymbol(jpeg_start_decompress);
-  loadSymbol(jpeg_read_scanlines);
-  loadSymbol(jpeg_finish_decompress);
-  loadSymbol(jpeg_destroy_decompress);
-  loadSymbol(jpeg_save_markers);
-  loadSymbol(jpeg_has_multiple_scans);
-  loadSymbol(jpeg_calc_output_dimensions);
-  loadSymbol(jpeg_start_output);
-  loadSymbol(jpeg_finish_output);
-  loadSymbol(jpeg_input_complete);
-  loadSymbol(jpeg_consume_input);
-
-  #undef loadSymbol
-
-#else  // USE_SANDBOXING == 3
-
-  #define ptr_jpeg_std_error              (sandbox->inv_jpeg_std_error)
-  #define ptr_jpeg_CreateCompress         (sandbox->inv_jpeg_CreateCompress)
-  #define ptr_jpeg_stdio_dest             (sandbox->inv_jpeg_stdio_dest)
-  #define ptr_jpeg_set_defaults           (sandbox->inv_jpeg_set_defaults)
-  #define ptr_jpeg_set_quality            (sandbox->inv_jpeg_set_quality)
-  #define ptr_jpeg_start_compress         (sandbox->inv_jpeg_start_compress)
-  #define ptr_jpeg_write_scanlines        (sandbox->inv_jpeg_write_scanlines)
-  #define ptr_jpeg_finish_compress        (sandbox->inv_jpeg_finish_compress)
-  #define ptr_jpeg_destroy_compress       (sandbox->inv_jpeg_destroy_compress)
-  #define ptr_jpeg_CreateDecompress       (sandbox->inv_jpeg_CreateDecompress)
-  #define ptr_jpeg_stdio_src              (sandbox->inv_jpeg_stdio_src)
-  #define ptr_jpeg_read_header            (sandbox->inv_jpeg_read_header)
-  #define ptr_jpeg_start_decompress       (sandbox->inv_jpeg_start_decompress)
-  #define ptr_jpeg_read_scanlines         (sandbox->inv_jpeg_read_scanlines)
-  #define ptr_jpeg_finish_decompress      (sandbox->inv_jpeg_finish_decompress)
-  #define ptr_jpeg_destroy_decompress     (sandbox->inv_jpeg_destroy_decompress)
-  #define ptr_jpeg_save_markers           (sandbox->inv_jpeg_save_markers)
-  #define ptr_jpeg_has_multiple_scans     (sandbox->inv_jpeg_has_multiple_scans)
-  #define ptr_jpeg_calc_output_dimensions (sandbox->inv_jpeg_calc_output_dimensions)
-  #define ptr_jpeg_start_output           (sandbox->inv_jpeg_start_output)
-  #define ptr_jpeg_finish_output          (sandbox->inv_jpeg_finish_output)
-  #define ptr_jpeg_input_complete         (sandbox->inv_jpeg_input_complete)
-  #define ptr_jpeg_consume_input          (sandbox->inv_jpeg_consume_input)
-
-#endif
-
-  if(failed) { return 0; }
-
-  printf("Loaded symbols\n");
-  jpegFinishedInit = 1;
-
-  return 1;
+    printf("Loaded symbols\n");
+  });
 }
+
 uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr)
 {
   #if(USE_SANDBOXING == 2)

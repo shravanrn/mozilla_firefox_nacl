@@ -199,218 +199,212 @@ void pngEndTimerCore()
 #endif
 
 void* pngDlPtr;
-std::mutex pngInitMutex;
-int pngFinishedInit = 0;
+std::once_flag pngFinishedInit;
 
-int initializeLibPngSandbox(void(*additionalSetup)())
+void initializeLibPngSandbox(void(*additionalSetup)())
 {
-  std::lock_guard<std::mutex> guard(pngInitMutex);
-  if(pngFinishedInit == 1) { return 1; }
+  std::call_once(pngFinishedInit, [](void(*additionalSetup)()){
+    //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, PNG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
 
-  //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, PNG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
+    char SandboxingCodeRootFolder[1024];
+    int index;
 
-  char SandboxingCodeRootFolder[1024];
-  int index;
-
-  if(!getcwd(SandboxingCodeRootFolder, 256))
-  {
-    abort();
-  }
-
-  char * found = strstr(SandboxingCodeRootFolder, "/mozilla-release");
-  if (found == NULL)
-  {
-    printf("Error initializing start directory for NaCl\n");   
-    exit(1);
-  }
-  
-  index = found - SandboxingCodeRootFolder + 1;
-  SandboxingCodeRootFolder[index] = '\0';
-
-  #if(USE_SANDBOXING == 0)
-  {
-    printf("Using static libpng\n");
-    pngFinishedInit = 1;
-    return 1;
-  }
-  #elif(USE_SANDBOXING == 1)
-  {
-    char full_PNG_NON_NACL_DL_PATH[1024];
-
-    strcpy(full_PNG_NON_NACL_DL_PATH, SandboxingCodeRootFolder);
-    strcat(full_PNG_NON_NACL_DL_PATH, PNG_NON_NACL_DL_PATH);
-
-    printf("Loading dynamic library %s\n", full_PNG_NON_NACL_DL_PATH);
-    pngDlPtr = dlopen(full_PNG_NON_NACL_DL_PATH, RTLD_LAZY | RTLD_DEEPBIND);
-
-    if(!pngDlPtr)
+    if(!getcwd(SandboxingCodeRootFolder, 256))
     {
-      printf("Loading of dynamic library %s has failed\n", full_PNG_NON_NACL_DL_PATH);
-      return 0;
+      abort();
     }
-  }  
-  #elif(USE_SANDBOXING == 2)
-  {
-    char full_STARTUP_LIBRARY_PATH[1024];
-    char full_SANDBOX_INIT_APP[1024];
 
-    strcpy(full_STARTUP_LIBRARY_PATH, SandboxingCodeRootFolder);
-    strcat(full_STARTUP_LIBRARY_PATH, STARTUP_LIBRARY_PATH);
-
-    strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
-    strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
-
-    printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
-
-    ensureNaClSandboxInit();
-    pngSandbox = createDlSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
-
-    if(!pngSandbox)
+    char * found = strstr(SandboxingCodeRootFolder, "/mozilla-release");
+    if (found == NULL)
     {
-      printf("Error creating png Sandbox");
-      return 0;
+      printf("Error initializing start directory for NaCl\n");   
+      exit(1);
     }
-  }
-  #elif(USE_SANDBOXING == 3)
-  {
-    char full_PS_OTHERSIDE_PATH[1024];
+    
+    index = found - SandboxingCodeRootFolder + 1;
+    SandboxingCodeRootFolder[index] = '\0';
 
-    strcpy(full_PS_OTHERSIDE_PATH, SandboxingCodeRootFolder);
-    strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
+    #if(USE_SANDBOXING == 0)
+    {
+      printf("Using static libpng\n");
+      return;
+    }
+    #elif(USE_SANDBOXING == 1)
+    {
+      char full_PNG_NON_NACL_DL_PATH[1024];
 
-    printf("Creating PNG process sandbox\n");
-    sandbox = new PROCESS_SANDBOX_CLASSNAME(full_PS_OTHERSIDE_PATH, 0, 2);
-  }
+      strcpy(full_PNG_NON_NACL_DL_PATH, SandboxingCodeRootFolder);
+      strcat(full_PNG_NON_NACL_DL_PATH, PNG_NON_NACL_DL_PATH);
+
+      printf("Loading dynamic library %s\n", full_PNG_NON_NACL_DL_PATH);
+      pngDlPtr = dlopen(full_PNG_NON_NACL_DL_PATH, RTLD_LAZY | RTLD_DEEPBIND);
+
+      if(!pngDlPtr)
+      {
+        printf("Loading of dynamic library %s has failed\n", full_PNG_NON_NACL_DL_PATH);
+        exit(1);
+      }
+    }  
+    #elif(USE_SANDBOXING == 2)
+    {
+      char full_STARTUP_LIBRARY_PATH[1024];
+      char full_SANDBOX_INIT_APP[1024];
+
+      strcpy(full_STARTUP_LIBRARY_PATH, SandboxingCodeRootFolder);
+      strcat(full_STARTUP_LIBRARY_PATH, STARTUP_LIBRARY_PATH);
+
+      strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
+      strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
+
+      printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+
+      ensureNaClSandboxInit();
+      pngSandbox = createDlSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+
+      if(!pngSandbox)
+      {
+        printf("Error creating png Sandbox");
+        exit(1);
+      }
+    }
+    #elif(USE_SANDBOXING == 3)
+    {
+      char full_PS_OTHERSIDE_PATH[1024];
+
+      strcpy(full_PS_OTHERSIDE_PATH, SandboxingCodeRootFolder);
+      strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
+
+      printf("Creating PNG process sandbox\n");
+      sandbox = new PROCESS_SANDBOX_CLASSNAME(full_PS_OTHERSIDE_PATH, 0, 2);
+    }
+    #endif
+
+    printf("Loading symbols.\n");
+    int failed = 0;
+
+  #if(USE_SANDBOXING != 3)
+
+    #if(USE_SANDBOXING == 2)
+      #define loadSymbol(symbol) do { \
+        void* dlSymRes = symbolTableLookupInSandbox(pngSandbox, #symbol); \
+        if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
+        *((void **) &ptr_##symbol) = dlSymRes; \
+      } while(0)
+
+    #elif(USE_SANDBOXING == 1)
+      #define loadSymbol(symbol) do { \
+        void* dlSymRes = dlsym(pngDlPtr, #symbol); \
+        if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
+        *((void **) &ptr_##symbol) = dlSymRes; \
+      } while(0)
+
+    #else
+      #define loadSymbol(symbol) do {} while(0)  
+    #endif
+
+    loadSymbol(png_get_next_frame_delay_num);
+    loadSymbol(png_get_next_frame_delay_den);
+    loadSymbol(png_get_next_frame_dispose_op);
+    loadSymbol(png_get_next_frame_blend_op);
+    loadSymbol(png_create_read_struct);
+    loadSymbol(png_create_info_struct);
+    loadSymbol(png_destroy_read_struct);
+    loadSymbol(png_set_keep_unknown_chunks);
+    loadSymbol(png_set_user_limits);
+    loadSymbol(png_set_chunk_malloc_max);
+    loadSymbol(png_set_check_for_invalid_index);
+    loadSymbol(png_set_option);
+    loadSymbol(png_set_progressive_read_fn);
+    loadSymbol(png_get_gAMA);
+    loadSymbol(png_set_gAMA);
+    loadSymbol(png_set_gamma);
+    loadSymbol(png_get_iCCP);
+    loadSymbol(png_get_sRGB);
+    loadSymbol(png_get_cHRM);
+    loadSymbol(png_set_expand);
+    loadSymbol(png_get_tRNS);
+    loadSymbol(png_free_data);
+    loadSymbol(png_set_gray_to_rgb);
+    loadSymbol(png_set_interlace_handling);
+    loadSymbol(png_read_update_info);
+    loadSymbol(png_get_channels);
+    loadSymbol(png_set_progressive_frame_fn);
+    loadSymbol(png_get_first_frame_is_hidden);
+    loadSymbol(png_progressive_combine_row);
+    loadSymbol(png_process_data_pause);
+    loadSymbol(png_process_data);
+    loadSymbol(png_get_valid);
+    loadSymbol(png_get_num_plays);
+    loadSymbol(png_get_next_frame_x_offset);
+    loadSymbol(png_get_next_frame_y_offset);
+    loadSymbol(png_get_next_frame_width);
+    loadSymbol(png_get_next_frame_height);
+    loadSymbol(png_error);
+    loadSymbol(png_get_progressive_ptr);
+    loadSymbol(png_longjmp);
+    loadSymbol(png_set_longjmp_fn);
+    loadSymbol(png_get_IHDR);
+    loadSymbol(png_set_scale_16);
+
+    #undef loadSymbol
+
+  #else  // USE_SANDBOXING == 3
+
+    #define ptr_png_get_next_frame_delay_num      (sandbox->inv_png_get_next_frame_delay_num)
+    #define ptr_png_get_next_frame_delay_den      (sandbox->inv_png_get_next_frame_delay_den)
+    #define ptr_png_get_next_frame_dispose_op     (sandbox->inv_png_get_next_frame_dispose_op)
+    #define ptr_png_get_next_frame_blend_op       (sandbox->inv_png_get_next_frame_blend_op)
+    #define ptr_png_create_read_struct            (sandbox->inv_png_create_read_struct)
+    #define ptr_png_create_info_struct            (sandbox->inv_png_create_info_struct)
+    #define ptr_png_destroy_read_struct           (sandbox->inv_png_destroy_read_struct)
+    #define ptr_png_set_keep_unknown_chunks       (sandbox->inv_png_set_keep_unknown_chunks)
+    #define ptr_png_set_user_limits               (sandbox->inv_png_set_user_limits)
+    #define ptr_png_set_chunk_malloc_max          (sandbox->inv_png_set_chunk_malloc_max)
+    #define ptr_png_set_check_for_invalid_index   (sandbox->inv_png_set_check_for_invalid_index)
+    #define ptr_png_set_option                    (sandbox->inv_png_set_option)
+    #define ptr_png_set_progressive_read_fn       (sandbox->inv_png_set_progressive_read_fn)
+    #define ptr_png_get_gAMA                      (sandbox->inv_png_get_gAMA)
+    #define ptr_png_set_gAMA                      (sandbox->inv_png_set_gAMA)
+    #define ptr_png_set_gamma                     (sandbox->inv_png_set_gamma)
+    #define ptr_png_get_iCCP                      (sandbox->inv_png_get_iCCP)
+    #define ptr_png_get_sRGB                      (sandbox->inv_png_get_sRGB)
+    #define ptr_png_get_cHRM                      (sandbox->inv_png_get_cHRM)
+    #define ptr_png_set_expand                    (sandbox->inv_png_set_expand)
+    #define ptr_png_get_tRNS                      (sandbox->inv_png_get_tRNS)
+    #define ptr_png_free_data                     (sandbox->inv_png_free_data)
+    #define ptr_png_set_gray_to_rgb               (sandbox->inv_png_set_gray_to_rgb)
+    #define ptr_png_set_interlace_handling        (sandbox->inv_png_set_interlace_handling)
+    #define ptr_png_read_update_info              (sandbox->inv_png_read_update_info)
+    #define ptr_png_get_channels                  (sandbox->inv_png_get_channels)
+    #define ptr_png_set_progressive_frame_fn      (sandbox->inv_png_set_progressive_frame_fn)
+    #define ptr_png_get_first_frame_is_hidden     (sandbox->inv_png_get_first_frame_is_hidden)
+    #define ptr_png_progressive_combine_row       (sandbox->inv_png_progressive_combine_row)
+    #define ptr_png_process_data_pause            (sandbox->inv_png_process_data_pause)
+    #define ptr_png_process_data                  (sandbox->inv_png_process_data)
+    #define ptr_png_get_valid                     (sandbox->inv_png_get_valid)
+    #define ptr_png_get_num_plays                 (sandbox->inv_png_get_num_plays)
+    #define ptr_png_get_next_frame_x_offset       (sandbox->inv_png_get_next_frame_x_offset)
+    #define ptr_png_get_next_frame_y_offset       (sandbox->inv_png_get_next_frame_y_offset)
+    #define ptr_png_get_next_frame_width          (sandbox->inv_png_get_next_frame_width)
+    #define ptr_png_get_next_frame_height         (sandbox->inv_png_get_next_frame_height)
+    #define ptr_png_error                         (sandbox->inv_png_error)
+    #define ptr_png_get_progressive_ptr           (sandbox->inv_png_get_progressive_ptr)
+    #define ptr_png_longjmp                       (sandbox->inv_png_longjmp)
+    #define ptr_png_set_longjmp_fn                (sandbox->inv_png_set_longjmp_fn)
+    #define ptr_png_get_IHDR                      (sandbox->inv_png_get_IHDR)
+    #define ptr_png_set_scale_16                  (sandbox->inv_png_set_scale_16)
+
   #endif
 
-  printf("Loading symbols.\n");
-  int failed = 0;
+    if(failed) { exit(1); }
 
-#if(USE_SANDBOXING != 3)
+    printf("Loaded symbols\n");
 
-  #if(USE_SANDBOXING == 2)
-    #define loadSymbol(symbol) do { \
-      void* dlSymRes = symbolTableLookupInSandbox(pngSandbox, #symbol); \
-      if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
-      *((void **) &ptr_##symbol) = dlSymRes; \
-    } while(0)
-
-  #elif(USE_SANDBOXING == 1)
-    #define loadSymbol(symbol) do { \
-      void* dlSymRes = dlsym(pngDlPtr, #symbol); \
-      if(dlSymRes == NULL) { printf("Symbol resolution failed for" #symbol "\n"); failed = 1; } \
-      *((void **) &ptr_##symbol) = dlSymRes; \
-    } while(0)
-
-  #else
-    #define loadSymbol(symbol) do {} while(0)  
-  #endif
-
-  loadSymbol(png_get_next_frame_delay_num);
-  loadSymbol(png_get_next_frame_delay_den);
-  loadSymbol(png_get_next_frame_dispose_op);
-  loadSymbol(png_get_next_frame_blend_op);
-  loadSymbol(png_create_read_struct);
-  loadSymbol(png_create_info_struct);
-  loadSymbol(png_destroy_read_struct);
-  loadSymbol(png_set_keep_unknown_chunks);
-  loadSymbol(png_set_user_limits);
-  loadSymbol(png_set_chunk_malloc_max);
-  loadSymbol(png_set_check_for_invalid_index);
-  loadSymbol(png_set_option);
-  loadSymbol(png_set_progressive_read_fn);
-  loadSymbol(png_get_gAMA);
-  loadSymbol(png_set_gAMA);
-  loadSymbol(png_set_gamma);
-  loadSymbol(png_get_iCCP);
-  loadSymbol(png_get_sRGB);
-  loadSymbol(png_get_cHRM);
-  loadSymbol(png_set_expand);
-  loadSymbol(png_get_tRNS);
-  loadSymbol(png_free_data);
-  loadSymbol(png_set_gray_to_rgb);
-  loadSymbol(png_set_interlace_handling);
-  loadSymbol(png_read_update_info);
-  loadSymbol(png_get_channels);
-  loadSymbol(png_set_progressive_frame_fn);
-  loadSymbol(png_get_first_frame_is_hidden);
-  loadSymbol(png_progressive_combine_row);
-  loadSymbol(png_process_data_pause);
-  loadSymbol(png_process_data);
-  loadSymbol(png_get_valid);
-  loadSymbol(png_get_num_plays);
-  loadSymbol(png_get_next_frame_x_offset);
-  loadSymbol(png_get_next_frame_y_offset);
-  loadSymbol(png_get_next_frame_width);
-  loadSymbol(png_get_next_frame_height);
-  loadSymbol(png_error);
-  loadSymbol(png_get_progressive_ptr);
-  loadSymbol(png_longjmp);
-  loadSymbol(png_set_longjmp_fn);
-  loadSymbol(png_get_IHDR);
-  loadSymbol(png_set_scale_16);
-
-  #undef loadSymbol
-
-#else  // USE_SANDBOXING == 3
-
-  #define ptr_png_get_next_frame_delay_num      (sandbox->inv_png_get_next_frame_delay_num)
-  #define ptr_png_get_next_frame_delay_den      (sandbox->inv_png_get_next_frame_delay_den)
-  #define ptr_png_get_next_frame_dispose_op     (sandbox->inv_png_get_next_frame_dispose_op)
-  #define ptr_png_get_next_frame_blend_op       (sandbox->inv_png_get_next_frame_blend_op)
-  #define ptr_png_create_read_struct            (sandbox->inv_png_create_read_struct)
-  #define ptr_png_create_info_struct            (sandbox->inv_png_create_info_struct)
-  #define ptr_png_destroy_read_struct           (sandbox->inv_png_destroy_read_struct)
-  #define ptr_png_set_keep_unknown_chunks       (sandbox->inv_png_set_keep_unknown_chunks)
-  #define ptr_png_set_user_limits               (sandbox->inv_png_set_user_limits)
-  #define ptr_png_set_chunk_malloc_max          (sandbox->inv_png_set_chunk_malloc_max)
-  #define ptr_png_set_check_for_invalid_index   (sandbox->inv_png_set_check_for_invalid_index)
-  #define ptr_png_set_option                    (sandbox->inv_png_set_option)
-  #define ptr_png_set_progressive_read_fn       (sandbox->inv_png_set_progressive_read_fn)
-  #define ptr_png_get_gAMA                      (sandbox->inv_png_get_gAMA)
-  #define ptr_png_set_gAMA                      (sandbox->inv_png_set_gAMA)
-  #define ptr_png_set_gamma                     (sandbox->inv_png_set_gamma)
-  #define ptr_png_get_iCCP                      (sandbox->inv_png_get_iCCP)
-  #define ptr_png_get_sRGB                      (sandbox->inv_png_get_sRGB)
-  #define ptr_png_get_cHRM                      (sandbox->inv_png_get_cHRM)
-  #define ptr_png_set_expand                    (sandbox->inv_png_set_expand)
-  #define ptr_png_get_tRNS                      (sandbox->inv_png_get_tRNS)
-  #define ptr_png_free_data                     (sandbox->inv_png_free_data)
-  #define ptr_png_set_gray_to_rgb               (sandbox->inv_png_set_gray_to_rgb)
-  #define ptr_png_set_interlace_handling        (sandbox->inv_png_set_interlace_handling)
-  #define ptr_png_read_update_info              (sandbox->inv_png_read_update_info)
-  #define ptr_png_get_channels                  (sandbox->inv_png_get_channels)
-  #define ptr_png_set_progressive_frame_fn      (sandbox->inv_png_set_progressive_frame_fn)
-  #define ptr_png_get_first_frame_is_hidden     (sandbox->inv_png_get_first_frame_is_hidden)
-  #define ptr_png_progressive_combine_row       (sandbox->inv_png_progressive_combine_row)
-  #define ptr_png_process_data_pause            (sandbox->inv_png_process_data_pause)
-  #define ptr_png_process_data                  (sandbox->inv_png_process_data)
-  #define ptr_png_get_valid                     (sandbox->inv_png_get_valid)
-  #define ptr_png_get_num_plays                 (sandbox->inv_png_get_num_plays)
-  #define ptr_png_get_next_frame_x_offset       (sandbox->inv_png_get_next_frame_x_offset)
-  #define ptr_png_get_next_frame_y_offset       (sandbox->inv_png_get_next_frame_y_offset)
-  #define ptr_png_get_next_frame_width          (sandbox->inv_png_get_next_frame_width)
-  #define ptr_png_get_next_frame_height         (sandbox->inv_png_get_next_frame_height)
-  #define ptr_png_error                         (sandbox->inv_png_error)
-  #define ptr_png_get_progressive_ptr           (sandbox->inv_png_get_progressive_ptr)
-  #define ptr_png_longjmp                       (sandbox->inv_png_longjmp)
-  #define ptr_png_set_longjmp_fn                (sandbox->inv_png_set_longjmp_fn)
-  #define ptr_png_get_IHDR                      (sandbox->inv_png_get_IHDR)
-  #define ptr_png_set_scale_16                  (sandbox->inv_png_set_scale_16)
-
-#endif
-
-  if(failed) { return 0; }
-
-  printf("Loaded symbols\n");
-
-  if(additionalSetup != nullptr)
-  {
-    additionalSetup();
-  }
-  pngFinishedInit = 1;
-
-  return 1;
+    if(additionalSetup != nullptr)
+    {
+      additionalSetup();
+    }
+  }, additionalSetup);
 }
 uintptr_t getUnsandboxedPngPtr(uintptr_t uaddr)
 {

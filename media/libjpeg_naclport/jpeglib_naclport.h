@@ -13,7 +13,7 @@ unsigned long long getInvocationsInJpeg();
 unsigned long long getTimeSpentInJpegCore();
 unsigned long long getInvocationsInJpegCore();
 
-int initializeLibJpegSandbox();
+void initializeLibJpegSandbox();
 uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr);
 uintptr_t getSandboxedJpegPtr(uintptr_t uaddr);
 int isAddressInJpegSandboxMemoryOrNull(uintptr_t uaddr);
