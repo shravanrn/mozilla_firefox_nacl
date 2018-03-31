@@ -90,7 +90,7 @@ def print_final_results(s, opFile):
 
 def main():
 	if len(sys.argv) < 3:
-		print("Expected " + sys.argv[0] + " fileName")
+		print("Expected " + sys.argv[0] + " inputFileName outputPath/Prefix")
 		exit(1)
 	s = PerfState()
 	with open(sys.argv[1]) as f:
