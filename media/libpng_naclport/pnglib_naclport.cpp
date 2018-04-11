@@ -18,6 +18,8 @@
   #error "Bad USE_SANDBOXING value provided"
 #endif
 
+const int getPngSandboxingOption() { return USE_SANDBOXING; }
+
 #if(USE_SANDBOXING == 2)
   #include "dyn_ldr_lib.h"
 
@@ -35,7 +37,7 @@
 #elif(USE_SANDBOXING == 3)
   #include "ProcessSandbox.h"
 
-  static PROCESS_SANDBOX_CLASSNAME* sandbox;
+  PROCESS_SANDBOX_CLASSNAME* pngSandbox;
 
 #endif
 
@@ -275,7 +277,7 @@ void initializeLibPngSandbox(void(*additionalSetup)())
       strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
 
       printf("Creating PNG process sandbox\n");
-      sandbox = new PROCESS_SANDBOX_CLASSNAME(full_PS_OTHERSIDE_PATH, 0, 2);
+      pngSandbox = new PROCESS_SANDBOX_CLASSNAME(full_PS_OTHERSIDE_PATH, 0, 2);
     }
     #endif
 
@@ -350,49 +352,49 @@ void initializeLibPngSandbox(void(*additionalSetup)())
 
   #else  // USE_SANDBOXING == 3
 
-    #define ptr_png_get_next_frame_delay_num      (sandbox->inv_png_get_next_frame_delay_num)
-    #define ptr_png_get_next_frame_delay_den      (sandbox->inv_png_get_next_frame_delay_den)
-    #define ptr_png_get_next_frame_dispose_op     (sandbox->inv_png_get_next_frame_dispose_op)
-    #define ptr_png_get_next_frame_blend_op       (sandbox->inv_png_get_next_frame_blend_op)
-    #define ptr_png_create_read_struct            (sandbox->inv_png_create_read_struct)
-    #define ptr_png_create_info_struct            (sandbox->inv_png_create_info_struct)
-    #define ptr_png_destroy_read_struct           (sandbox->inv_png_destroy_read_struct)
-    #define ptr_png_set_keep_unknown_chunks       (sandbox->inv_png_set_keep_unknown_chunks)
-    #define ptr_png_set_user_limits               (sandbox->inv_png_set_user_limits)
-    #define ptr_png_set_chunk_malloc_max          (sandbox->inv_png_set_chunk_malloc_max)
-    #define ptr_png_set_check_for_invalid_index   (sandbox->inv_png_set_check_for_invalid_index)
-    #define ptr_png_set_option                    (sandbox->inv_png_set_option)
-    #define ptr_png_set_progressive_read_fn       (sandbox->inv_png_set_progressive_read_fn)
-    #define ptr_png_get_gAMA                      (sandbox->inv_png_get_gAMA)
-    #define ptr_png_set_gAMA                      (sandbox->inv_png_set_gAMA)
-    #define ptr_png_set_gamma                     (sandbox->inv_png_set_gamma)
-    #define ptr_png_get_iCCP                      (sandbox->inv_png_get_iCCP)
-    #define ptr_png_get_sRGB                      (sandbox->inv_png_get_sRGB)
-    #define ptr_png_get_cHRM                      (sandbox->inv_png_get_cHRM)
-    #define ptr_png_set_expand                    (sandbox->inv_png_set_expand)
-    #define ptr_png_get_tRNS                      (sandbox->inv_png_get_tRNS)
-    #define ptr_png_free_data                     (sandbox->inv_png_free_data)
-    #define ptr_png_set_gray_to_rgb               (sandbox->inv_png_set_gray_to_rgb)
-    #define ptr_png_set_interlace_handling        (sandbox->inv_png_set_interlace_handling)
-    #define ptr_png_read_update_info              (sandbox->inv_png_read_update_info)
-    #define ptr_png_get_channels                  (sandbox->inv_png_get_channels)
-    #define ptr_png_set_progressive_frame_fn      (sandbox->inv_png_set_progressive_frame_fn)
-    #define ptr_png_get_first_frame_is_hidden     (sandbox->inv_png_get_first_frame_is_hidden)
-    #define ptr_png_progressive_combine_row       (sandbox->inv_png_progressive_combine_row)
-    #define ptr_png_process_data_pause            (sandbox->inv_png_process_data_pause)
-    #define ptr_png_process_data                  (sandbox->inv_png_process_data)
-    #define ptr_png_get_valid                     (sandbox->inv_png_get_valid)
-    #define ptr_png_get_num_plays                 (sandbox->inv_png_get_num_plays)
-    #define ptr_png_get_next_frame_x_offset       (sandbox->inv_png_get_next_frame_x_offset)
-    #define ptr_png_get_next_frame_y_offset       (sandbox->inv_png_get_next_frame_y_offset)
-    #define ptr_png_get_next_frame_width          (sandbox->inv_png_get_next_frame_width)
-    #define ptr_png_get_next_frame_height         (sandbox->inv_png_get_next_frame_height)
-    #define ptr_png_error                         (sandbox->inv_png_error)
-    #define ptr_png_get_progressive_ptr           (sandbox->inv_png_get_progressive_ptr)
-    #define ptr_png_longjmp                       (sandbox->inv_png_longjmp)
-    #define ptr_png_set_longjmp_fn                (sandbox->inv_png_set_longjmp_fn)
-    #define ptr_png_get_IHDR                      (sandbox->inv_png_get_IHDR)
-    #define ptr_png_set_scale_16                  (sandbox->inv_png_set_scale_16)
+    #define ptr_png_get_next_frame_delay_num      (pngSandbox->inv_png_get_next_frame_delay_num)
+    #define ptr_png_get_next_frame_delay_den      (pngSandbox->inv_png_get_next_frame_delay_den)
+    #define ptr_png_get_next_frame_dispose_op     (pngSandbox->inv_png_get_next_frame_dispose_op)
+    #define ptr_png_get_next_frame_blend_op       (pngSandbox->inv_png_get_next_frame_blend_op)
+    #define ptr_png_create_read_struct            (pngSandbox->inv_png_create_read_struct)
+    #define ptr_png_create_info_struct            (pngSandbox->inv_png_create_info_struct)
+    #define ptr_png_destroy_read_struct           (pngSandbox->inv_png_destroy_read_struct)
+    #define ptr_png_set_keep_unknown_chunks       (pngSandbox->inv_png_set_keep_unknown_chunks)
+    #define ptr_png_set_user_limits               (pngSandbox->inv_png_set_user_limits)
+    #define ptr_png_set_chunk_malloc_max          (pngSandbox->inv_png_set_chunk_malloc_max)
+    #define ptr_png_set_check_for_invalid_index   (pngSandbox->inv_png_set_check_for_invalid_index)
+    #define ptr_png_set_option                    (pngSandbox->inv_png_set_option)
+    #define ptr_png_set_progressive_read_fn       (pngSandbox->inv_png_set_progressive_read_fn)
+    #define ptr_png_get_gAMA                      (pngSandbox->inv_png_get_gAMA)
+    #define ptr_png_set_gAMA                      (pngSandbox->inv_png_set_gAMA)
+    #define ptr_png_set_gamma                     (pngSandbox->inv_png_set_gamma)
+    #define ptr_png_get_iCCP                      (pngSandbox->inv_png_get_iCCP)
+    #define ptr_png_get_sRGB                      (pngSandbox->inv_png_get_sRGB)
+    #define ptr_png_get_cHRM                      (pngSandbox->inv_png_get_cHRM)
+    #define ptr_png_set_expand                    (pngSandbox->inv_png_set_expand)
+    #define ptr_png_get_tRNS                      (pngSandbox->inv_png_get_tRNS)
+    #define ptr_png_free_data                     (pngSandbox->inv_png_free_data)
+    #define ptr_png_set_gray_to_rgb               (pngSandbox->inv_png_set_gray_to_rgb)
+    #define ptr_png_set_interlace_handling        (pngSandbox->inv_png_set_interlace_handling)
+    #define ptr_png_read_update_info              (pngSandbox->inv_png_read_update_info)
+    #define ptr_png_get_channels                  (pngSandbox->inv_png_get_channels)
+    #define ptr_png_set_progressive_frame_fn      (pngSandbox->inv_png_set_progressive_frame_fn)
+    #define ptr_png_get_first_frame_is_hidden     (pngSandbox->inv_png_get_first_frame_is_hidden)
+    #define ptr_png_progressive_combine_row       (pngSandbox->inv_png_progressive_combine_row)
+    #define ptr_png_process_data_pause            (pngSandbox->inv_png_process_data_pause)
+    #define ptr_png_process_data                  (pngSandbox->inv_png_process_data)
+    #define ptr_png_get_valid                     (pngSandbox->inv_png_get_valid)
+    #define ptr_png_get_num_plays                 (pngSandbox->inv_png_get_num_plays)
+    #define ptr_png_get_next_frame_x_offset       (pngSandbox->inv_png_get_next_frame_x_offset)
+    #define ptr_png_get_next_frame_y_offset       (pngSandbox->inv_png_get_next_frame_y_offset)
+    #define ptr_png_get_next_frame_width          (pngSandbox->inv_png_get_next_frame_width)
+    #define ptr_png_get_next_frame_height         (pngSandbox->inv_png_get_next_frame_height)
+    #define ptr_png_error                         (pngSandbox->inv_png_error)
+    #define ptr_png_get_progressive_ptr           (pngSandbox->inv_png_get_progressive_ptr)
+    #define ptr_png_longjmp                       (pngSandbox->inv_png_longjmp)
+    #define ptr_png_set_longjmp_fn                (pngSandbox->inv_png_set_longjmp_fn)
+    #define ptr_png_get_IHDR                      (pngSandbox->inv_png_get_IHDR)
+    #define ptr_png_set_scale_16                  (pngSandbox->inv_png_set_scale_16)
 
   #endif
 
@@ -443,7 +445,7 @@ void* mallocInPngSandbox(size_t size)
   #if(USE_SANDBOXING == 2)
     return mallocInSandbox(pngSandbox, size);
   #elif(USE_SANDBOXING == 3)
-    return sandbox->mallocInSandbox(size);
+    return pngSandbox->mallocInSandbox(size);
   #else
     return malloc(size);
   #endif 
@@ -453,7 +455,7 @@ void freeInPngSandbox(void* ptr)
   #if(USE_SANDBOXING == 2)
     freeInSandbox(pngSandbox, ptr);
   #elif(USE_SANDBOXING == 3)
-    sandbox->freeInSandbox(ptr);
+    pngSandbox->freeInSandbox(ptr);
   #else
     free(ptr);
   #endif 
@@ -645,7 +647,13 @@ PNG_ALLOCATED png_structp d_png_create_read_struct(png_const_charp user_png_ver,
         PUSH_VAL_TO_STACK(threadData, png_error_ptr, warnRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_create_read_struct);
         png_structp ret = (png_structp)functionCallReturnPtr(threadData);
-    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
+    #elif(USE_SANDBOXING == 3)
+        unsigned len = strlen(user_png_ver) + 1;
+        char* stringInSandbox = (char*) mallocInPngSandbox(len);
+        strncpy(stringInSandbox, user_png_ver, len);
+        png_structp ret = ptr_png_create_read_struct((png_const_charp)stringInSandbox, error_ptr, error_fn, warn_fn);
+        freeInPngSandbox(stringInSandbox);
+    #elif(USE_SANDBOXING == 1)
         png_structp ret = ptr_png_create_read_struct(user_png_ver, error_ptr, my_err_fn_stub, my_warn_fn_stub);
     #elif(USE_SANDBOXING == 0)
         png_structp ret = png_create_read_struct(user_png_ver, error_ptr, my_err_fn_stub, my_warn_fn_stub);
@@ -951,7 +959,9 @@ void d_png_set_progressive_read_fn(png_structrp png_ptr, png_voidp progressive_p
         PUSH_VAL_TO_STACK(threadData, png_progressive_row_ptr, rowRegisteredCallback);
         PUSH_VAL_TO_STACK(threadData, png_progressive_end_ptr, endRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_set_progressive_read_fn);
-    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
+    #elif(USE_SANDBOXING == 3)
+        ptr_png_set_progressive_read_fn(png_ptr, progressive_ptr, info_fn, row_fn, end_fn);
+    #elif(USE_SANDBOXING == 1)
         ptr_png_set_progressive_read_fn(png_ptr, progressive_ptr, my_info_fn_stub, my_row_fn_stub, my_end_fn_stub);
     #elif(USE_SANDBOXING == 0)
         png_set_progressive_read_fn(png_ptr, progressive_ptr, my_info_fn_stub, my_row_fn_stub, my_end_fn_stub);
@@ -1384,7 +1394,9 @@ void d_png_set_progressive_frame_fn(png_structp png_ptr, png_progressive_frame_p
         PUSH_VAL_TO_STACK(threadData, png_progressive_info_ptr, frameInfoRegisteredCallback);
         PUSH_VAL_TO_STACK(threadData, png_progressive_end_ptr, frameEndRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_set_progressive_frame_fn);
-    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
+    #elif(USE_SANDBOXING == 3)
+        ptr_png_set_progressive_frame_fn(png_ptr, frame_info_fn, frame_end_fn);
+    #elif(USE_SANDBOXING == 1)
         ptr_png_set_progressive_frame_fn(png_ptr, my_frame_info_fn_stub, my_frame_end_fn_stub);
     #elif(USE_SANDBOXING == 0)
         png_set_progressive_frame_fn(png_ptr, my_frame_info_fn_stub, my_frame_end_fn_stub);

@@ -20,7 +20,7 @@
 #include "nsMemory.h"
 #include "nsRect.h"
 #include "nspr.h"
-#include "png.h"
+#include "pnglib_naclport.h"
 #include "RasterImage.h"
 #include "SurfaceCache.h"
 #include "SurfacePipeFactory.h"
@@ -77,6 +77,20 @@ using std::min;
   extern t_png_get_IHDR                    ptr_png_get_IHDR;
   extern t_png_set_scale_16                ptr_png_set_scale_16;
 #endif
+
+// only used if getPngSandboxingOption() == 3
+// but right now, we don't have a way to #ifdef-guard this
+#define USE_LIBPNG
+#include "ProcessSandbox.h"
+#undef USE_LIBPNG
+extern PROCESS_SANDBOX_CLASSNAME* pngSandbox;
+static png_error_ptr errRegisteredCallback;
+static png_error_ptr warnRegisteredCallback;
+static png_progressive_info_ptr infoRegisteredCallback;
+static png_progressive_row_ptr rowRegisteredCallback;
+static png_progressive_end_ptr endRegisteredCallback;
+static png_progressive_frame_ptr frameInfoRegisteredCallback;
+static png_progressive_frame_ptr frameEndRegisteredCallback;
 
 namespace mozilla {
 namespace image {
@@ -322,22 +336,50 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
  , mDisablePremultipliedAlpha(false)
  , mNumFrames(0)
 {
-  #ifdef SANDBOX_USE_CPP_API
-    initializeLibPngSandbox([](){
-      initCPPApi(pngSandbox);
-      cpp_cb_png_error_fn = sandbox_callback(pngSandbox, nsPNGDecoder::error_callback);
-      cpp_cb_png_warn_fn = sandbox_callback(pngSandbox, nsPNGDecoder::warning_callback);
-      cpp_cb_png_progressive_info_fn = sandbox_callback(pngSandbox, nsPNGDecoder::info_callback);
-      cpp_cb_png_progressive_row_fn = sandbox_callback(pngSandbox, nsPNGDecoder::row_callback);
-      cpp_cb_png_progressive_end_fn = sandbox_callback(pngSandbox, nsPNGDecoder::end_callback);
-      #ifdef PNG_APNG_SUPPORTED
-        cpp_cb_png_progressive_frame_info_fn = sandbox_callback(pngSandbox, nsPNGDecoder::frame_info_callback);
+  switch (getPngSandboxingOption()) {
+    case 2: {
+      #ifdef SANDBOX_USE_CPP_API
+        initializeLibPngSandbox([](){
+          initCPPApi(pngSandbox);
+          cpp_cb_png_error_fn = sandbox_callback(pngSandbox, nsPNGDecoder::error_callback);
+          cpp_cb_png_warn_fn = sandbox_callback(pngSandbox, nsPNGDecoder::warning_callback);
+          cpp_cb_png_progressive_info_fn = sandbox_callback(pngSandbox, nsPNGDecoder::info_callback);
+          cpp_cb_png_progressive_row_fn = sandbox_callback(pngSandbox, nsPNGDecoder::row_callback);
+          cpp_cb_png_progressive_end_fn = sandbox_callback(pngSandbox, nsPNGDecoder::end_callback);
+          #ifdef PNG_APNG_SUPPORTED
+            cpp_cb_png_progressive_frame_info_fn = sandbox_callback(pngSandbox, nsPNGDecoder::frame_info_callback);
+          #endif
+          cpp_cb_longjmp_fn = sandbox_callback(pngSandbox, checked_longjmp);
+        });
+      #else
+        initializeLibPngSandbox(nullptr);
       #endif
-      cpp_cb_longjmp_fn = sandbox_callback(pngSandbox, checked_longjmp);
-    });
-  #else
-    initializeLibPngSandbox(nullptr);
-  #endif
+      break;
+    } case 3: {
+      initializeLibPngSandbox([](){
+        errRegisteredCallback  = (png_error_ptr) pngSandbox->registerCallback(0, (void*)nsPNGDecoder::error_callback);
+        warnRegisteredCallback = (png_error_ptr) pngSandbox->registerCallback(0, (void*)nsPNGDecoder::warning_callback);
+        infoRegisteredCallback = (png_progressive_info_ptr) pngSandbox->registerCallback(1, (void*)nsPNGDecoder::info_callback);
+        rowRegisteredCallback  = (png_progressive_row_ptr)  pngSandbox->registerCallback(2, (void*)nsPNGDecoder::row_callback);
+        endRegisteredCallback  = (png_progressive_end_ptr)  pngSandbox->registerCallback(3, (void*)nsPNGDecoder::end_callback);
+        #ifdef PNG_APNG_SUPPORTED
+          frameInfoRegisteredCallback = (png_progressive_frame_ptr) pngSandbox->registerCallback(4, (void*)nsPNGDecoder::frame_info_callback);
+        #endif
+      });
+      break;
+    } default: {
+      errRegisteredCallback = nsPNGDecoder::error_callback;
+      warnRegisteredCallback = nsPNGDecoder::warning_callback;
+      infoRegisteredCallback = nsPNGDecoder::info_callback;
+      rowRegisteredCallback = nsPNGDecoder::row_callback;
+      endRegisteredCallback = nsPNGDecoder::end_callback;
+      #ifdef PNG_APNG_SUPPORTED
+        frameInfoRegisteredCallback = nsPNGDecoder::frame_info_callback;
+      #endif
+      initializeLibPngSandbox(nullptr);
+      break;
+    }
+  }
 }
 
 high_resolution_clock::time_point PngCreateTime;
@@ -602,8 +644,8 @@ nsPNGDecoder::InitInternal()
                                 cpp_cb_png_warn_fn);
   #else
     mPNG = d_png_create_read_struct(PNG_LIBPNG_VER_STRING,
-                                nullptr, nsPNGDecoder::error_callback,
-                                nsPNGDecoder::warning_callback);
+                                nullptr, errRegisteredCallback,
+                                warnRegisteredCallback);
   #endif
 
   if (!mPNG) {
@@ -705,9 +747,9 @@ nsPNGDecoder::InitInternal()
                               cpp_cb_png_progressive_end_fn);
   #else
     d_png_set_progressive_read_fn(mPNG, static_cast<png_voidp>(this),
-                              nsPNGDecoder::info_callback,
-                              nsPNGDecoder::row_callback,
-                              nsPNGDecoder::end_callback);
+                              infoRegisteredCallback,
+                              rowRegisteredCallback,
+                              endRegisteredCallback);
   #endif
 
   return NS_OK;
@@ -1498,7 +1540,7 @@ nsPNGDecoder::FinishedPNGData()
       sandbox_invoke_custom(pngSandbox, png_set_progressive_frame_fn, png_ptr, cpp_cb_png_progressive_frame_info_fn,
                                    nullptr);
     #else
-      d_png_set_progressive_frame_fn(png_ptr, nsPNGDecoder::frame_info_callback,
+      d_png_set_progressive_frame_fn(png_ptr, frameInfoRegisteredCallback,
                                    nullptr);
     #endif
   }

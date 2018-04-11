@@ -17,11 +17,11 @@ inithasrun:
 	echo hi > "inithasrun"
 
 .NOTPARALLEL: build32 build64 static32 static64 dynamic32 dynamic64 nacl32 nacl64 ps32 ps64 \
-							dynamic64_dbg nacl64_dbg
+							dynamic64_dbg nacl64_dbg ps64_dbg
 
 build32: static32 dynamic32 nacl32 ps32 nacl32_nosimd
 
-build64: static64 dynamic64 nacl64 nacl64_cpp
+build64: static64 dynamic64 nacl64 ps64 nacl64_cpp nacl64_nosimd
 
 static32: inithasrun
 	cp ../mozconfig32_static ../mozconfig
@@ -131,6 +131,14 @@ nacl64_cpp_dbg: inithasrun
 	cp ../media/libpng_naclport/moz_nacl_debug.build ../media/libpng_naclport/moz.build
 	cd .. && ./mach build
 
+ps64_dbg: inithasrun
+	if [ ! -d ../firefox_64bit_debug_ps ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_debug_ps; fi
+	cp ../image/decoders/moz_copy.build ../image/decoders/moz.build
+	cp ../mozconfig64_debug_ps ../mozconfig
+	cp ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
+	cp ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
+	cd .. && ./mach build
+
 run64_static:
 	cp ../mozconfig64_static ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
@@ -195,12 +203,19 @@ run64_naclcppdebug:
 	cp ../mozconfig64_nacl_cpp_debug ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
+run64_psdebug:
+	cp ../mozconfig64_debug_ps ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+
 clean:
 	-rm -rf ../firefox_32bit_optdebug
 	-rm -rf ../firefox_32bit_optdebug_static
 	-rm -rf ../firefox_32bit_optdebug_nonnacl
 	-rm -rf ../firefox_32bit_optdebug_nacl
+	-rm -rf ../firefox_32bit_optdebug_ps
 	-rm -rf ../firefox_64bit_optdebug
 	-rm -rf ../firefox_64bit_optdebug_static
 	-rm -rf ../firefox_64bit_optdebug_nonnacl
 	-rm -rf ../firefox_64bit_optdebug_nacl
+	-rm -rf ../firefox_64bit_optdebug_ps
+	-rm -rf ../firefox_64bit_debug_ps
