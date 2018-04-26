@@ -357,13 +357,13 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
       break;
     } case 3: {
       initializeLibPngSandbox([](){
-        errRegisteredCallback  = (png_error_ptr) pngSandbox->registerCallback(0, (void*)nsPNGDecoder::error_callback);
-        warnRegisteredCallback = (png_error_ptr) pngSandbox->registerCallback(0, (void*)nsPNGDecoder::warning_callback);
-        infoRegisteredCallback = (png_progressive_info_ptr) pngSandbox->registerCallback(1, (void*)nsPNGDecoder::info_callback);
-        rowRegisteredCallback  = (png_progressive_row_ptr)  pngSandbox->registerCallback(2, (void*)nsPNGDecoder::row_callback);
-        endRegisteredCallback  = (png_progressive_end_ptr)  pngSandbox->registerCallback(3, (void*)nsPNGDecoder::end_callback);
+        errRegisteredCallback  = pngSandbox->registerCallback<png_error_ptr>(nsPNGDecoder::error_callback);
+        warnRegisteredCallback = pngSandbox->registerCallback<png_error_ptr>(nsPNGDecoder::warning_callback);
+        infoRegisteredCallback = pngSandbox->registerCallback<png_progressive_info_ptr>(nsPNGDecoder::info_callback);
+        rowRegisteredCallback  = pngSandbox->registerCallback<png_progressive_row_ptr>(nsPNGDecoder::row_callback);
+        endRegisteredCallback  = pngSandbox->registerCallback<png_progressive_end_ptr>(nsPNGDecoder::end_callback);
         #ifdef PNG_APNG_SUPPORTED
-          frameInfoRegisteredCallback = (png_progressive_frame_ptr) pngSandbox->registerCallback(4, (void*)nsPNGDecoder::frame_info_callback);
+          frameInfoRegisteredCallback = pngSandbox->registerCallback<png_progressive_frame_ptr>(nsPNGDecoder::frame_info_callback);
         #endif
       });
       break;
