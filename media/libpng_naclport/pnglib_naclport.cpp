@@ -18,7 +18,7 @@
   #error "Bad USE_SANDBOXING value provided"
 #endif
 
-const int getPngSandboxingOption() { return USE_SANDBOXING; }
+int getPngSandboxingOption() { return USE_SANDBOXING; }
 
 #if(USE_SANDBOXING == 2)
   #include "dyn_ldr_lib.h"
@@ -203,9 +203,25 @@ void pngEndTimerCore()
 void* pngDlPtr;
 std::once_flag pngFinishedInit;
 
-void initializeLibPngSandbox(void(*additionalSetup)())
+void initializeLibPngSandbox(void(*additionalSetup)(),
+  png_error_ptr nsPNGDecoder_error_callback,
+  png_error_ptr nsPNGDecoder_warning_callback,
+  png_progressive_info_ptr nsPNGDecoder_info_callback,
+  png_progressive_row_ptr nsPNGDecoder_row_callback,
+  png_progressive_end_ptr nsPNGDecoder_end_callback,
+  png_progressive_frame_ptr nsPNGDecoder_frame_end_callback,
+  png_progressive_frame_ptr nsPNGDecoder_frame_info_callback
+)
 {
-  std::call_once(pngFinishedInit, [](void(*additionalSetup)()){
+  std::call_once(pngFinishedInit, [](void(*additionalSetup)(),
+    png_error_ptr nsPNGDecoder_error_callback,
+    png_error_ptr nsPNGDecoder_warning_callback,
+    png_progressive_info_ptr nsPNGDecoder_info_callback,
+    png_progressive_row_ptr nsPNGDecoder_row_callback,
+    png_progressive_end_ptr nsPNGDecoder_end_callback,
+    png_progressive_frame_ptr nsPNGDecoder_frame_end_callback,
+    png_progressive_frame_ptr nsPNGDecoder_frame_info_callback
+  ){
     //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, PNG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
 
     char SandboxingCodeRootFolder[1024];
@@ -402,11 +418,38 @@ void initializeLibPngSandbox(void(*additionalSetup)())
 
     printf("Loaded symbols\n");
 
+    #if(USE_SANDBOXING == 3)
+      extern png_error_ptr errRegisteredCallback;
+      extern png_error_ptr warnRegisteredCallback;
+      extern png_progressive_info_ptr infoRegisteredCallback;
+      extern png_progressive_row_ptr rowRegisteredCallback;
+      extern png_progressive_end_ptr endRegisteredCallback;
+      extern png_progressive_frame_ptr frameEndRegisteredCallback;
+      extern png_progressive_frame_ptr frameInfoRegisteredCallback;
+      errRegisteredCallback      = pngSandbox->registerCallback<png_error_ptr>(nsPNGDecoder_error_callback, nullptr);
+      warnRegisteredCallback     = pngSandbox->registerCallback<png_error_ptr>(nsPNGDecoder_warning_callback, nullptr);
+      infoRegisteredCallback     = pngSandbox->registerCallback<png_progressive_info_ptr>(nsPNGDecoder_info_callback, nullptr);
+      rowRegisteredCallback      = pngSandbox->registerCallback<png_progressive_row_ptr>(nsPNGDecoder_row_callback, nullptr);
+      endRegisteredCallback      = pngSandbox->registerCallback<png_progressive_end_ptr>(nsPNGDecoder_end_callback, nullptr);
+      frameEndRegisteredCallback = pngSandbox->registerCallback<png_progressive_frame_ptr>(nsPNGDecoder_frame_end_callback, nullptr);
+      #ifdef PNG_APNG_SUPPORTED
+        frameInfoRegisteredCallback = pngSandbox->registerCallback<png_progressive_frame_ptr>(nsPNGDecoder_frame_info_callback, nullptr);
+      #endif
+    #endif
+
     if(additionalSetup != nullptr)
     {
       additionalSetup();
     }
-  }, additionalSetup);
+
+  }, additionalSetup, 
+    nsPNGDecoder_error_callback,
+    nsPNGDecoder_warning_callback,
+    nsPNGDecoder_info_callback,
+    nsPNGDecoder_row_callback,
+    nsPNGDecoder_end_callback,
+    nsPNGDecoder_frame_end_callback,
+    nsPNGDecoder_frame_info_callback);
 }
 uintptr_t getUnsandboxedPngPtr(uintptr_t uaddr)
 {

@@ -17,12 +17,21 @@
 namespace mozilla {
 namespace image {
 
-#ifdef SANDBOX_USE_CPP_API
+#ifdef NACL_SANDBOX_USE_CPP_API
   #define NACL_SANDBOX_API_NO_STL_DS
   #define NACL_SANDBOX_API_NO_OPTIONAL
     #include "nacl_sandbox.h"
   #undef NACL_SANDBOX_API_NO_OPTIONAL
   #undef NACL_SANDBOX_API_NO_STL_DS
+#endif
+
+#ifdef PROCESS_SANDBOX_USE_CPP_API
+  #define PROCESS_SANDBOX_API_NO_OPTIONAL
+    #include "process_sandbox_cpp.h"
+  #undef PROCESS_SANDBOX_API_NO_OPTIONAL
+#endif
+
+#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   #include "pnglib_structs_for_cpp_api.h"
 #endif
 
@@ -81,7 +90,7 @@ private:
 
   // Convenience methods to make interacting with StreamingLexer from inside
   // a libpng callback easier.
-  #ifdef SANDBOX_USE_CPP_API
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     void DoTerminate(unverified_data<png_structp> aPNGStruct, TerminalState aState);
     void DoYield(unverified_data<png_structp> aPNGStruct);
   #else
@@ -115,7 +124,7 @@ private:
   size_t mLastChunkLength;
 
 public:
-  #ifdef SANDBOX_USE_CPP_API
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     unverified_data<png_structp> mPNG;
     unverified_data<png_infop> mInfo;
   #else
@@ -141,7 +150,7 @@ public:
   {
     AnimFrameInfo();
 #ifdef PNG_APNG_SUPPORTED
-    #ifdef SANDBOX_USE_CPP_API
+    #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       AnimFrameInfo(unverified_data<png_structp> aPNG, unverified_data<png_infop> aInfo);
     #else
       AnimFrameInfo(png_structp aPNG, png_infop aInfo);
@@ -162,7 +171,7 @@ public:
 
   // libpng callbacks
   // We put these in the class so that they can access protected members.
-  #ifdef SANDBOX_USE_CPP_API
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     int lastKnownPassNumber = 0;
     static void PNGAPI info_callback(unverified_data<png_structp> png_ptr, unverified_data<png_infop> info_ptr);
     static void PNGAPI row_callback(unverified_data<png_structp> png_ptr, unverified_data<png_bytep> new_row, unverified_data<png_uint_32> row_num, unverified_data<int> pass);

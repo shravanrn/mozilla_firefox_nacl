@@ -55,8 +55,16 @@ void pngStartTimerCore();
 void pngEndTimer();
 void pngEndTimerCore();
 
-void initializeLibPngSandbox(void(*additionalSetup)());
-const int getPngSandboxingOption();
+void initializeLibPngSandbox(void(*additionalSetup)(),
+  png_error_ptr nsPNGDecoder_error_callback,
+  png_error_ptr nsPNGDecoder_warning_callback,
+  png_progressive_info_ptr nsPNGDecoder_info_callback,
+  png_progressive_row_ptr nsPNGDecoder_row_callback,
+  png_progressive_end_ptr nsPNGDecoder_end_callback,
+  png_progressive_frame_ptr nsPNGDecoder_frame_end_callback,
+  png_progressive_frame_ptr nsPNGDecoder_frame_info_callback
+);
+int getPngSandboxingOption();
 uintptr_t getUnsandboxedPngPtr(uintptr_t uaddr);
 uintptr_t getSandboxedPngPtr(uintptr_t uaddr);
 int isAddressInPngSandboxMemoryOrNull(uintptr_t uaddr);

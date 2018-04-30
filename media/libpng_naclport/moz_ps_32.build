@@ -46,8 +46,8 @@ DEFINES['PS_OTHERSIDE_PATH'] = '"ProcessSandbox/ProcessSandbox_otherside_png32"'
 
 LOCAL_INCLUDES += [
     ############ Update this path as required
-    '/../ProcessSandbox',
-    '/media/libpng'
+    '/../libpng_nacl',
+    '/../ProcessSandbox'
 ]
 
 ############ Update this path as required

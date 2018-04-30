@@ -33,21 +33,20 @@ UNIFIED_SOURCES += [
 # Pick from one of the values below
 #
 # Don't copy sandbox data to intermediate buffers
-DEFINES['USE_SANDBOXING_BUFFERS'] = 0
+# DEFINES['USE_SANDBOXING_BUFFERS'] = 0
 #
 # Copy sandbox data to intermediate buffers
-# DEFINES['USE_SANDBOXING_BUFFERS'] = 1
+DEFINES['USE_SANDBOXING_BUFFERS'] = 1
 
 # Comment out the following if you want to use the CPP api of NaClSandbox. The value '42' below is disregarded
 # DEFINES['NACL_SANDBOX_USE_CPP_API'] = 42
 
 # Comment out the following if you want to use the CPP api of ProcessSandbox. The value '42' below is disregarded
-# DEFINES['PROCESS_SANDBOX_USE_CPP_API'] = 42
+DEFINES['PROCESS_SANDBOX_USE_CPP_API'] = 42
 
 include('/ipc/chromium/chromium-config.mozbuild')
 
 LOCAL_INCLUDES += [
-    '/../ProcessSandbox',
     '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
     # Access to Skia headers for Downscaler.
     '/gfx/2d',
