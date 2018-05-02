@@ -245,6 +245,11 @@ void initializeLibPngSandbox(void(*additionalSetup)(),
     #if(USE_SANDBOXING == 0)
     {
       printf("Using static libpng\n");
+      if(additionalSetup != nullptr)
+      {
+        additionalSetup();
+      }
+
       return;
     }
     #elif(USE_SANDBOXING == 1)
@@ -418,6 +423,11 @@ void initializeLibPngSandbox(void(*additionalSetup)(),
 
     printf("Loaded symbols\n");
 
+    if(additionalSetup != nullptr)
+    {
+      additionalSetup();
+    }
+
     #if(USE_SANDBOXING == 3)
       extern png_error_ptr errRegisteredCallback;
       extern png_error_ptr warnRegisteredCallback;
@@ -436,11 +446,6 @@ void initializeLibPngSandbox(void(*additionalSetup)(),
         frameInfoRegisteredCallback = pngSandbox->registerCallback<png_progressive_frame_ptr>(nsPNGDecoder_frame_info_callback, nullptr);
       #endif
     #endif
-
-    if(additionalSetup != nullptr)
-    {
-      additionalSetup();
-    }
 
   }, additionalSetup, 
     nsPNGDecoder_error_callback,

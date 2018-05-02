@@ -135,6 +135,15 @@ t_skip_input_data        cb_skip_input_data;
 t_jpeg_resync_to_restart cb_jpeg_resync_to_restart;
 t_term_source            cb_term_source;
 
+#if(USE_SANDBOXING == 3)
+  t_my_error_exit           my_error_exit_stub_reg{0};
+  t_init_source             init_source_stub_reg{0};
+  t_fill_input_buffer       fill_input_buffer_stub_reg{0};
+  t_skip_input_data         skip_input_data_stub_reg{0};
+  t_jpeg_resync_to_restart  jpeg_resync_to_restart_stub_reg{0};
+  t_term_source             term_source_stub_reg{0};
+#endif
+
 unsigned long long getTimeSpentInJpeg()
 {
   #ifdef PRINT_FUNCTION_TIMES
@@ -265,7 +274,7 @@ void initializeLibJpegSandbox()
       strcpy(full_PS_OTHERSIDE_PATH, SandboxingCodeRootFolder);
       strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
 
-      printf("Creating JPEG process sandbox\n");
+      printf("Creating JPEG process sandbox %s\n", full_PS_OTHERSIDE_PATH);
       sandbox = new PROCESS_SANDBOX_CLASSNAME(full_PS_OTHERSIDE_PATH, 0, 2);
     }
     #endif
@@ -344,6 +353,7 @@ void initializeLibJpegSandbox()
     #define ptr_jpeg_finish_output          (sandbox->inv_jpeg_finish_output)
     #define ptr_jpeg_input_complete         (sandbox->inv_jpeg_input_complete)
     #define ptr_jpeg_consume_input          (sandbox->inv_jpeg_consume_input)
+    #define ptr_alloc_sarray                (sandbox->inv_alloc_sarray_ps)
 
   #endif
 
@@ -978,9 +988,11 @@ void freeInJpegSandbox(void* ptr)
     PUSH_VAL_TO_STACK(threadData, JDIMENSION, numrows);
     invokeFunctionCall(threadData, alloc_sarray);
     JSAMPARRAY ret = (JSAMPARRAY)functionCallReturnPtr(threadData);
-#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
+#elif(USE_SANDBOXING == 1)
     typedef JSAMPARRAY (*t_alloc_sarray)(j_common_ptr, int, JDIMENSION, JDIMENSION);
     t_alloc_sarray ptr_alloc_sarray = (t_alloc_sarray) alloc_sarray;
+    JSAMPARRAY ret = ptr_alloc_sarray(cinfo, pool_id, samplesperrow, numrows);
+#elif(USE_SANDBOXING == 3)
     JSAMPARRAY ret = ptr_alloc_sarray(cinfo, pool_id, samplesperrow, numrows);
 #elif(USE_SANDBOXING == 0)
     typedef JSAMPARRAY (*t_alloc_sarray)(j_common_ptr, int, JDIMENSION, JDIMENSION);
@@ -1205,13 +1217,15 @@ void freeInJpegSandbox(void* ptr)
     uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, MY_ERROR_EXIT_CALLBACK_SLOT, (uintptr_t) my_error_exit_stub);
     if(registeredCallback == 0)
     {
-        //printf("Failed in registering the error handler my_error_exit");
+        printf("Failed in registering the error handler my_error_exit");
     }
     return (t_my_error_exit) registeredCallback;
-#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 0)
     return my_error_exit_stub;
-#elif(USE_SANDBOXING == 0)
-    return my_error_exit_stub;
+#elif(USE_SANDBOXING == 3)
+    if(my_error_exit_stub_reg == nullptr)
+      my_error_exit_stub_reg = sandbox->registerCallback(my_error_exit_stub, (void*) nullptr);
+    return my_error_exit_stub_reg;
 #else
 #error Missed case of USE_SANDBOXING
 #endif
@@ -1228,13 +1242,15 @@ void freeInJpegSandbox(void* ptr)
     uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, INIT_SOURCE_SLOT, (uintptr_t) init_source_stub);
     if(registeredCallback == 0)
     {
-        //printf("Failed in registering the error handler init_source");
+        printf("Failed in registering the error handler init_source");
     }
     return (t_init_source) registeredCallback;
-#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 0)
     return init_source_stub;
-#elif(USE_SANDBOXING == 0)
-    return init_source_stub;
+#elif(USE_SANDBOXING == 3)
+    if(init_source_stub_reg == nullptr)
+      init_source_stub_reg = sandbox->registerCallback(init_source_stub, (void*) nullptr);
+    return init_source_stub_reg;
 #else
 #error Missed case of USE_SANDBOXING
 #endif
@@ -1251,13 +1267,15 @@ void freeInJpegSandbox(void* ptr)
     uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, FILL_INPUT_BUFFER_SLOT, (uintptr_t) skip_input_data_stub);
     if(registeredCallback == 0)
     {
-        //printf("Failed in registering the error handler skip_input_data");
+        printf("Failed in registering the error handler skip_input_data");
     }
     return (t_skip_input_data) registeredCallback;
-#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 0)
     return skip_input_data_stub;
-#elif(USE_SANDBOXING == 0)
-    return skip_input_data_stub;
+#elif(USE_SANDBOXING == 3)
+    if(skip_input_data_stub_reg == nullptr)
+      skip_input_data_stub_reg = sandbox->registerCallback(skip_input_data_stub, (void*) nullptr);
+    return skip_input_data_stub_reg;
 #else
 #error Missed case of USE_SANDBOXING
 #endif
@@ -1274,13 +1292,15 @@ void freeInJpegSandbox(void* ptr)
     uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, SKIP_INPUT_DATA_SLOT, (uintptr_t) fill_input_buffer_stub);
     if(registeredCallback == 0)
     {
-        //printf("Failed in registering the error handler fill_input_buffer");
+        printf("Failed in registering the error handler fill_input_buffer");
     }
     return (t_fill_input_buffer) registeredCallback;
-#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 0)
     return fill_input_buffer_stub;
-#elif(USE_SANDBOXING == 0)
-    return fill_input_buffer_stub;
+#elif(USE_SANDBOXING == 3)
+    if(fill_input_buffer_stub_reg == nullptr)
+      fill_input_buffer_stub_reg = sandbox->registerCallback(fill_input_buffer_stub, (void*) nullptr);
+    return fill_input_buffer_stub_reg;
 #else
 #error Missed case of USE_SANDBOXING
 #endif
@@ -1297,13 +1317,15 @@ void freeInJpegSandbox(void* ptr)
     uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, JPEG_RESYNC_TO_RESTART_SLOT, (uintptr_t) term_source_stub);
     if(registeredCallback == 0)
     {
-        //printf("Failed in registering the error handler term_source");
+        printf("Failed in registering the error handler term_source");
     }
     return (t_term_source) registeredCallback;
-#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 0)
     return term_source_stub;
-#elif(USE_SANDBOXING == 0)
-    return term_source_stub;
+#elif(USE_SANDBOXING == 3)
+    if(term_source_stub_reg == nullptr)
+      term_source_stub_reg = sandbox->registerCallback(term_source_stub, (void*) nullptr);
+    return term_source_stub_reg;
 #else
 #error Missed case of USE_SANDBOXING
 #endif
@@ -1320,13 +1342,15 @@ void freeInJpegSandbox(void* ptr)
     uintptr_t registeredCallback = registerSandboxCallback(jpegSandbox, TERM_SOURCE_SLOT, (uintptr_t) jpeg_resync_to_restart_stub);
     if(registeredCallback == 0)
     {
-        //printf("Failed in registering the error handler jpeg_resync_to_restart");
+        printf("Failed in registering the error handler jpeg_resync_to_restart");
     }
     return (t_jpeg_resync_to_restart) registeredCallback;
-#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
+#elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 0)
     return jpeg_resync_to_restart_stub;
-#elif(USE_SANDBOXING == 0)
-    return jpeg_resync_to_restart_stub;
+#elif(USE_SANDBOXING == 3)
+    if(jpeg_resync_to_restart_stub_reg == nullptr)
+      jpeg_resync_to_restart_stub_reg = sandbox->registerCallback(jpeg_resync_to_restart_stub, (void*) nullptr);
+    return jpeg_resync_to_restart_stub_reg;
 #else
 #error Missed case of USE_SANDBOXING
 #endif

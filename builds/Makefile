@@ -101,6 +101,14 @@ ps64_cpp: inithasrun
 	cp ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
 	cd .. && ./mach build
 
+ps64_cpp_debug: inithasrun
+	if [ ! -d ../firefox_64bit_optdebug_process_cpp_debug ] && [ -d ../firefox_64bit_optdebug_nacl_debug ]; then cp -r ../firefox_64bit_optdebug_nacl_debug ../firefox_64bit_optdebug_process_cpp_debug; fi
+	cp ../image/decoders/moz_copy_process_cpp.build ../image/decoders/moz.build
+	cp ../mozconfig64_process_cpp_debug ../mozconfig
+	cp ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
+	cp ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
+	cd .. && ./mach build
+
 ps64: inithasrun
 	if [ ! -d ../firefox_64bit_optdebug_ps ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_ps; fi
 	cp ../image/decoders/moz_copy.build ../image/decoders/moz.build
@@ -140,7 +148,7 @@ nacl64_cpp_dbg: inithasrun
 	cd .. && ./mach build
 
 ps64_dbg: inithasrun
-	if [ ! -d ../firefox_64bit_debug_ps ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_debug_ps; fi
+	if [ ! -d ../firefox_64bit_optdebug_ps_debug ] && [ -d ../firefox_64bit_optdebug_process_cpp_debug ]; then cp -r ../firefox_64bit_optdebug_process_cpp_debug ../firefox_64bit_optdebug_ps_debug; fi
 	cp ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	cp ../mozconfig64_debug_ps ../mozconfig
 	cp ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
@@ -149,27 +157,31 @@ ps64_dbg: inithasrun
 
 run64_static:
 	cp ../mozconfig64_static ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run64_dynamic:
 	cp ../mozconfig64_nonnacl ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run64_nacl:
 	cp ../mozconfig64_nacl ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run64_ps:
 	cp ../mozconfig64_ps ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
+
+run64_pscpp:
+	cp ../mozconfig64_process_cpp ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run64_nacl_nosimd:
 	cp ../mozconfig64_nacl_nosimd ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run64_naclcpp:
 	cp ../mozconfig64_nacl_cpp ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run64_perf:
 	OUTPUTFILE=$(shell bash -c 'read -s -p "OUTPUTFILE: " opf; echo $$opf')
@@ -177,23 +189,23 @@ run64_perf:
 
 run32_static:
 	cp ../mozconfig32_static ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run32_dynamic:
 	cp ../mozconfig32_nonnacl ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run32_nacl:
 	cp ../mozconfig32_nacl ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run32_ps:
 	cp ../mozconfig32_ps ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run32_nacl_nosimd:
 	cp ../mozconfig32_nacl_nosimd ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run32_perf:
 	OUTPUTFILE=$(shell bash -c 'read -s -p "OUTPUTFILE: " opf; echo $$opf')
@@ -201,19 +213,23 @@ run32_perf:
 
 run64_dynamicdebug:
 	cp ../mozconfig64_nonnacl_debug ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run64_nacldebug:
 	cp ../mozconfig64_nacl_debug ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run64_naclcppdebug:
 	cp ../mozconfig64_nacl_cpp_debug ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 run64_psdebug:
 	cp ../mozconfig64_debug_ps ../mozconfig
-	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
+
+run64_pscppdebug:
+	cp ../mozconfig64_process_cpp_debug ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
 
 clean:
 	-rm -rf ../firefox_32bit_optdebug

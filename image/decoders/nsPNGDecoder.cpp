@@ -32,7 +32,7 @@ using namespace mozilla::gfx;
 using std::min;
 
 #ifdef NACL_SANDBOX_USE_CPP_API
-  extern mozilla::image::NaClSandbox* pngSandbox;
+  extern NaClSandbox* pngSandbox;
   extern t_png_get_next_frame_delay_num    ptr_png_get_next_frame_delay_num;
   extern t_png_get_next_frame_delay_den    ptr_png_get_next_frame_delay_den;
   extern t_png_get_next_frame_dispose_op   ptr_png_get_next_frame_dispose_op;
@@ -87,27 +87,6 @@ using std::min;
   extern PROCESS_SANDBOX_CLASSNAME* pngSandbox;
 #endif
 
-png_error_ptr errRegisteredCallback;
-png_error_ptr warnRegisteredCallback;
-png_progressive_info_ptr infoRegisteredCallback;
-png_progressive_row_ptr rowRegisteredCallback;
-png_progressive_end_ptr endRegisteredCallback;
-png_progressive_frame_ptr frameInfoRegisteredCallback;
-png_progressive_frame_ptr frameEndRegisteredCallback;
-
-namespace mozilla {
-namespace image {
-
-static LazyLogModule sPNGLog("PNGDecoder");
-static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
-
-// limit image dimensions (bug #251381, #591822, #967656, and #1283961)
-#ifndef MOZ_PNG_MAX_WIDTH
-#  define MOZ_PNG_MAX_WIDTH 0x7fffffff // Unlimited
-#endif
-#ifndef MOZ_PNG_MAX_HEIGHT
-#  define MOZ_PNG_MAX_HEIGHT 0x7fffffff // Unlimited
-#endif
 
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   #include "pngstruct.h"
@@ -151,6 +130,32 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   } png_control;
   sandbox_nacl_load_library_api(pnglib)
 
+#endif
+
+png_error_ptr errRegisteredCallback;
+png_error_ptr warnRegisteredCallback;
+png_progressive_info_ptr infoRegisteredCallback;
+png_progressive_row_ptr rowRegisteredCallback;
+png_progressive_end_ptr endRegisteredCallback;
+png_progressive_frame_ptr frameInfoRegisteredCallback;
+png_progressive_frame_ptr frameEndRegisteredCallback;
+
+namespace mozilla {
+namespace image {
+
+static LazyLogModule sPNGLog("PNGDecoder");
+static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
+
+// limit image dimensions (bug #251381, #591822, #967656, and #1283961)
+#ifndef MOZ_PNG_MAX_WIDTH
+#  define MOZ_PNG_MAX_WIDTH 0x7fffffff // Unlimited
+#endif
+#ifndef MOZ_PNG_MAX_HEIGHT
+#  define MOZ_PNG_MAX_HEIGHT 0x7fffffff // Unlimited
+#endif
+
+#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+
   sandbox_callback_helper<void(unverified_data<png_structp>,unverified_data<png_const_charp>)>* cpp_cb_png_error_fn;
   sandbox_callback_helper<void(unverified_data<png_structp>,unverified_data<png_const_charp>)>* cpp_cb_png_warn_fn;
   sandbox_callback_helper<void(unverified_data<png_structp>,unverified_data<png_infop>)>* cpp_cb_png_progressive_info_fn;
@@ -159,8 +164,6 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   sandbox_callback_helper<void(unverified_data<png_structp>,unverified_data<png_uint_32>)>* cpp_cb_png_progressive_frame_info_fn;
   sandbox_callback_helper<void(unverified_data<jmp_buf>, unverified_data<int>)>* cpp_cb_longjmp_fn;
 
-  // #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoker_with_ptr<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, nullptr, ##__VA_ARGS__)
-  // #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoker_with_ptr_ret_unsandboxed_ptr<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, nullptr, ##__VA_ARGS__)
 #endif
 
 #if defined(NACL_SANDBOX_USE_CPP_API)
@@ -210,8 +213,8 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   }
 
 #elif defined(PROCESS_SANDBOX_USE_CPP_API)
-  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper(sandbox, fnName, ##__VA_ARGS__)
-  #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoke_custom_ret_unsandboxed_ptr_helper(sandbox, fnName, ##__VA_ARGS__)
+  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper(sandbox, &PROCESS_SANDBOX_CLASSNAME::inv_##fnName, ##__VA_ARGS__)
+  #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoke_custom_ret_unsandboxed_ptr_helper(sandbox, &PROCESS_SANDBOX_CLASSNAME::inv_##fnName, ##__VA_ARGS__)
 
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
@@ -407,15 +410,16 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
           nullptr
         );
       #else
-        errRegisteredCallback = nsPNGDecoder::error_callback;
-        warnRegisteredCallback = nsPNGDecoder::warning_callback;
-        infoRegisteredCallback = nsPNGDecoder::info_callback;
-        rowRegisteredCallback = nsPNGDecoder::row_callback;
-        endRegisteredCallback = nsPNGDecoder::end_callback;
-        #ifdef PNG_APNG_SUPPORTED
-          frameInfoRegisteredCallback = nsPNGDecoder::frame_info_callback;
-        #endif
-        initializeLibPngSandbox(nullptr,
+        initializeLibPngSandbox([](){
+            errRegisteredCallback = nsPNGDecoder::error_callback;
+            warnRegisteredCallback = nsPNGDecoder::warning_callback;
+            infoRegisteredCallback = nsPNGDecoder::info_callback;
+            rowRegisteredCallback = nsPNGDecoder::row_callback;
+            endRegisteredCallback = nsPNGDecoder::end_callback;
+            #ifdef PNG_APNG_SUPPORTED
+              frameInfoRegisteredCallback = nsPNGDecoder::frame_info_callback;
+            #endif
+          },
           nsPNGDecoder::error_callback,
           nsPNGDecoder::warning_callback,
           nsPNGDecoder::info_callback,
@@ -1910,7 +1914,7 @@ void nsPNGDecoder::WriteRow(uint8_t* aRow)
   #endif
 
   MOZ_ASSERT(pendingBytes < mLastChunkLength);
-  size_t consumedBytes = mLastChunkLength - min(pendingBytes, mLastChunkLength);
+  size_t consumedBytes = mLastChunkLength - std::min(pendingBytes, mLastChunkLength);
 
   mNextTransition =
     Transition::ContinueUnbufferedAfterYield(State::PNG_DATA, consumedBytes);

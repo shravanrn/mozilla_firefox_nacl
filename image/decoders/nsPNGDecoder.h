@@ -14,9 +14,6 @@
 #include "StreamingLexer.h"
 #include "SurfacePipe.h"
 
-namespace mozilla {
-namespace image {
-
 #ifdef NACL_SANDBOX_USE_CPP_API
   #define NACL_SANDBOX_API_NO_STL_DS
   #define NACL_SANDBOX_API_NO_OPTIONAL
@@ -34,6 +31,9 @@ namespace image {
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   #include "pnglib_structs_for_cpp_api.h"
 #endif
+
+namespace mozilla {
+namespace image {
 
 class RasterImage;
 
