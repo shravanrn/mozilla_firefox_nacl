@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <cmath>
-#include <set>
 #include <type_traits>
 #include "gfxColor.h"
 #include "gfxPlatform.h"
@@ -91,6 +90,9 @@ using std::min;
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   #include "pngstruct.h"
   #include "pnginfo.h"
+  #include <set>
+  #include <map>
+  std::map<typename std::decay<jmp_buf>::type, jmp_buf> jmpBufferList;
   std::set<void*> pngRendererList;
   typedef struct png_unknown_chunk_t
   {
@@ -336,29 +338,20 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
 #endif
 
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-void checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_data<int> unv_status)
+void nsPNGDecoder::checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_data<int> unv_status)
 {
-  // jmp_buf env;
-  // bool succeeded = unv_env.sandbox_copyAndVerify(env, size_t(env), [](typename std::remove_reference<decltype(*env)>::type* envC, size_t size){
-  //   ///////////////////TODO///////////////////
-  //   ///////////////////TODO///////////////////
-  //   ///////////////////TODO///////////////////
-  //   ///////////////////TODO///////////////////
-  //   ///////////////////TODO///////////////////
-  //   ///////////////////TODO///////////////////
-  //   return true;
-  // });
+  auto envRef = unv_env.sandbox_onlyVerifyAddress();
+  auto iter = jmpBufferList.find(envRef);
+  if(iter == jmpBufferList.end())
+  {
+    printf("nsPNGDecoder::nsPNGDecoder: Critical Error in finding the right jmp_buf\n");
+    exit(1);
+  }
 
-  // if(!succeeded)
-  // {
-  //   MOZ_LOG(sPNGDecoderAccountingLog, LogLevel::Error, ("nsJPEGDecoder::nsJPEGDecoder: Critical Error in finding the right jmp_buf"));
-  //   exit(1);
-  // }
-  auto p_env = (jmp_buf*)(&unv_env);
-  jmp_buf& env = *p_env;
+  jmpBufferList.erase(iter);
 
   int status = unv_status.sandbox_copyAndVerify([](int val){ return val; });
-  longjmp(env, status);
+  longjmp(iter->second, status);
 }
 #endif
 
@@ -399,7 +392,7 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
           #ifdef PNG_APNG_SUPPORTED
             cpp_cb_png_progressive_frame_info_fn = sandbox_callback(pngSandbox, nsPNGDecoder::frame_info_callback);
           #endif
-          cpp_cb_longjmp_fn = sandbox_callback(pngSandbox, checked_longjmp);
+          cpp_cb_longjmp_fn = sandbox_callback(pngSandbox, nsPNGDecoder::checked_longjmp);
         },
           nullptr,
           nullptr,
@@ -840,7 +833,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
   // libpng uses setjmp/longjmp for error handling.
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     auto setLongJumpRet = *(sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress());
-    if (setLongJumpRet != 0 && setjmp(setLongJumpRet)) {
+    if (setLongJumpRet != 0 && setjmp(jmpBufferList[setLongJumpRet])) {
       return Transition::TerminateFailure();
     }
   #else
@@ -2161,7 +2154,7 @@ nsPNGDecoder::IsValidICOResource() const
   // proper callstack.
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     auto setLongJumpRet = *(sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress());
-    if (setLongJumpRet != 0 && setjmp(setLongJumpRet)) {
+    if (setLongJumpRet != 0 && setjmp(jmpBufferList[setLongJumpRet])) {
       // We got here from a longjmp call indirectly from png_get_IHDR
       return false;
     }

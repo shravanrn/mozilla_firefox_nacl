@@ -181,6 +181,7 @@ public:
     static void PNGAPI end_callback(unverified_data<png_structp> png_ptr, unverified_data<png_infop> info_ptr);
     static void PNGAPI error_callback(unverified_data<png_structp> png_ptr, unverified_data<png_const_charp> error_msg);
     static void PNGAPI warning_callback(unverified_data<png_structp> png_ptr, unverified_data<png_const_charp> warning_msg);
+    static void PNGAPI checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_data<int> unv_status);
   #else
     static void PNGAPI info_callback(png_structp png_ptr, png_infop info_ptr);
     static void PNGAPI row_callback(png_structp png_ptr, png_bytep new_row, png_uint_32 row_num, int pass);
