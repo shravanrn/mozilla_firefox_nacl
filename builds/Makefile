@@ -17,7 +17,7 @@ inithasrun:
 	echo hi > "inithasrun"
 
 .NOTPARALLEL: build32 build64 static32 static64 dynamic32 dynamic64 nacl32 nacl64 ps32 ps64 \
-							dynamic64_dbg nacl64_dbg ps64_dbg
+							dynamic64_dbg nacl64_dbg ps64_dbg ps64_asan
 
 build32: static32 dynamic32 nacl32 ps32 nacl32_nosimd
 
@@ -155,6 +155,13 @@ ps64_dbg: inithasrun
 	cp ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
 	cd .. && ./mach build
 
+ps64_asan: inithasrun
+	cp ../image/decoders/moz_copy.build ../image/decoders/moz.build
+	cp ../mozconfig64_asan_ps ../mozconfig
+	cp ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
+	cp ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
+	cd .. && ./mach build
+
 run64_static:
 	cp ../mozconfig64_static ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
@@ -230,6 +237,10 @@ run64_psdebug:
 run64_pscppdebug:
 	cp ../mozconfig64_process_cpp_debug ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html
+
+run64_psasan:
+	cp ../mozconfig64_asan_ps ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 clean:
 	-rm -rf ../firefox_32bit_optdebug
