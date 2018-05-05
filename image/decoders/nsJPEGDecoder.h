@@ -35,7 +35,11 @@ extern "C" {
 
 #ifdef PROCESS_SANDBOX_USE_CPP_API
   #define PROCESS_SANDBOX_API_NO_OPTIONAL
-    #include "process_sandbox_cpp.h"
+  #undef USE_LIBPNG
+  #define USE_LIBJPEG
+  #include "ProcessSandbox.h"
+  #include "process_sandbox_cpp.h"
+  #undef USE_LIBJPEG
   #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 

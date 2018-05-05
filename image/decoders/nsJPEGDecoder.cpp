@@ -17,6 +17,7 @@
 #include "nsIInputStream.h"
 
 #include "nspr.h"
+#include "jpeglib_naclport.h"
 #include "nsCRT.h"
 #include "gfxColor.h"
 
@@ -27,7 +28,6 @@
 #include "mozilla/Telemetry.h"
 
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-  #include "jpeglib_naclport.h"
 #else
   extern "C" {
   #include "iccjpeg.h"
@@ -136,15 +136,15 @@ extern "C" {
 #endif
 
 #ifdef PROCESS_SANDBOX_USE_CPP_API
-  extern PROCESS_SANDBOX_CLASSNAME* jpegSandbox;
+  extern JPEGProcessSandbox* jpegSandbox;
 
-  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_jpeg(sandbox, &PROCESS_SANDBOX_CLASSNAME::inv_##fnName, ##__VA_ARGS__)
-  #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoke_custom_ret_unsandboxed_ptr_helper_jpeg(sandbox, &PROCESS_SANDBOX_CLASSNAME::inv_##fnName, ##__VA_ARGS__)
+  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_jpeg(sandbox, &JPEGProcessSandbox::inv_##fnName, ##__VA_ARGS__)
+  #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoke_custom_ret_unsandboxed_ptr_helper_jpeg(sandbox, &JPEGProcessSandbox::inv_##fnName, ##__VA_ARGS__)
 
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
   unverified_data<return_argument<TFunc>>
-  >::type sandbox_invoke_custom_helper_jpeg(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_helper_jpeg(JPEGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
     jpegStartTimer();
     auto ret = sandbox_invoker_with_ptr(sandbox, fnPtr, nullptr, params...);
@@ -155,7 +155,7 @@ extern "C" {
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
   void
-  >::type sandbox_invoke_custom_helper_jpeg(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_helper_jpeg(JPEGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
     jpegStartTimer();
     sandbox_invoker_with_ptr(sandbox, fnPtr, nullptr, params...);
@@ -165,7 +165,7 @@ extern "C" {
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
   unverified_data<return_argument<TFunc>>
-  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_jpeg(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_jpeg(JPEGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
     jpegStartTimer();
     auto ret = sandbox_invoker_with_ptr_ret_unsandboxed_ptr(sandbox, fnPtr, nullptr, params...);
@@ -176,7 +176,7 @@ extern "C" {
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
   void
-  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_jpeg(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_jpeg(JPEGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
     jpegStartTimer();
     sandbox_invoker_with_ptr_ret_unsandboxed_ptr(sandbox, fnPtr, nullptr, params...);

@@ -24,7 +24,11 @@
 
 #ifdef PROCESS_SANDBOX_USE_CPP_API
   #define PROCESS_SANDBOX_API_NO_OPTIONAL
-    #include "process_sandbox_cpp.h"
+  #undef USE_LIBJPEG
+  #define USE_LIBPNG
+  #include "ProcessSandbox.h"
+  #include "process_sandbox_cpp.h"
+  #undef USE_LIBPNG
   #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 

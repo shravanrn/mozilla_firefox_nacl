@@ -35,9 +35,12 @@ int getPngSandboxingOption() { return USE_SANDBOXING; }
   NaClSandbox* pngSandbox;
 
 #elif(USE_SANDBOXING == 3)
+  #undef USE_LIBJPEG
+  #define USE_LIBPNG
   #include "ProcessSandbox.h"
+  #undef USE_LIBPNG
 
-  PROCESS_SANDBOX_CLASSNAME* pngSandbox;
+  PNGProcessSandbox* pngSandbox;
 
 #endif
 
@@ -298,7 +301,7 @@ void initializeLibPngSandbox(void(*additionalSetup)(),
       strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
 
       printf("Creating PNG process sandbox\n");
-      pngSandbox = new PROCESS_SANDBOX_CLASSNAME(full_PS_OTHERSIDE_PATH, 0, 2);
+      pngSandbox = new PNGProcessSandbox(full_PS_OTHERSIDE_PATH, 0, 2);
     }
     #endif
 

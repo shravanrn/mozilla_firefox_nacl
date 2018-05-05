@@ -36,9 +36,12 @@
   NaClSandbox* jpegSandbox;
 
 #elif(USE_SANDBOXING == 3)
+  #undef USE_LIBPNG
+  #define USE_LIBJPEG
   #include "ProcessSandbox.h"
+  #undef USE_LIBJPEG
 
-  static PROCESS_SANDBOX_CLASSNAME* sandbox;
+  JPEGProcessSandbox* jpegSandbox;
 
 #endif
 
@@ -276,7 +279,7 @@ void initializeLibJpegSandbox(void(*additionalSetup)())
       strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
 
       printf("Creating JPEG process sandbox %s\n", full_PS_OTHERSIDE_PATH);
-      sandbox = new PROCESS_SANDBOX_CLASSNAME(full_PS_OTHERSIDE_PATH, 0, 2);
+      jpegSandbox = new JPEGProcessSandbox(full_PS_OTHERSIDE_PATH, 0, 2);
     }
     #endif
 
@@ -331,30 +334,30 @@ void initializeLibJpegSandbox(void(*additionalSetup)())
 
   #else  // USE_SANDBOXING == 3
 
-    #define ptr_jpeg_std_error              (sandbox->inv_jpeg_std_error)
-    #define ptr_jpeg_CreateCompress         (sandbox->inv_jpeg_CreateCompress)
-    #define ptr_jpeg_stdio_dest             (sandbox->inv_jpeg_stdio_dest)
-    #define ptr_jpeg_set_defaults           (sandbox->inv_jpeg_set_defaults)
-    #define ptr_jpeg_set_quality            (sandbox->inv_jpeg_set_quality)
-    #define ptr_jpeg_start_compress         (sandbox->inv_jpeg_start_compress)
-    #define ptr_jpeg_write_scanlines        (sandbox->inv_jpeg_write_scanlines)
-    #define ptr_jpeg_finish_compress        (sandbox->inv_jpeg_finish_compress)
-    #define ptr_jpeg_destroy_compress       (sandbox->inv_jpeg_destroy_compress)
-    #define ptr_jpeg_CreateDecompress       (sandbox->inv_jpeg_CreateDecompress)
-    #define ptr_jpeg_stdio_src              (sandbox->inv_jpeg_stdio_src)
-    #define ptr_jpeg_read_header            (sandbox->inv_jpeg_read_header)
-    #define ptr_jpeg_start_decompress       (sandbox->inv_jpeg_start_decompress)
-    #define ptr_jpeg_read_scanlines         (sandbox->inv_jpeg_read_scanlines)
-    #define ptr_jpeg_finish_decompress      (sandbox->inv_jpeg_finish_decompress)
-    #define ptr_jpeg_destroy_decompress     (sandbox->inv_jpeg_destroy_decompress)
-    #define ptr_jpeg_save_markers           (sandbox->inv_jpeg_save_markers)
-    #define ptr_jpeg_has_multiple_scans     (sandbox->inv_jpeg_has_multiple_scans)
-    #define ptr_jpeg_calc_output_dimensions (sandbox->inv_jpeg_calc_output_dimensions)
-    #define ptr_jpeg_start_output           (sandbox->inv_jpeg_start_output)
-    #define ptr_jpeg_finish_output          (sandbox->inv_jpeg_finish_output)
-    #define ptr_jpeg_input_complete         (sandbox->inv_jpeg_input_complete)
-    #define ptr_jpeg_consume_input          (sandbox->inv_jpeg_consume_input)
-    #define ptr_alloc_sarray                (sandbox->inv_alloc_sarray_ps)
+    #define ptr_jpeg_std_error              (jpegSandbox->inv_jpeg_std_error)
+    #define ptr_jpeg_CreateCompress         (jpegSandbox->inv_jpeg_CreateCompress)
+    #define ptr_jpeg_stdio_dest             (jpegSandbox->inv_jpeg_stdio_dest)
+    #define ptr_jpeg_set_defaults           (jpegSandbox->inv_jpeg_set_defaults)
+    #define ptr_jpeg_set_quality            (jpegSandbox->inv_jpeg_set_quality)
+    #define ptr_jpeg_start_compress         (jpegSandbox->inv_jpeg_start_compress)
+    #define ptr_jpeg_write_scanlines        (jpegSandbox->inv_jpeg_write_scanlines)
+    #define ptr_jpeg_finish_compress        (jpegSandbox->inv_jpeg_finish_compress)
+    #define ptr_jpeg_destroy_compress       (jpegSandbox->inv_jpeg_destroy_compress)
+    #define ptr_jpeg_CreateDecompress       (jpegSandbox->inv_jpeg_CreateDecompress)
+    #define ptr_jpeg_stdio_src              (jpegSandbox->inv_jpeg_stdio_src)
+    #define ptr_jpeg_read_header            (jpegSandbox->inv_jpeg_read_header)
+    #define ptr_jpeg_start_decompress       (jpegSandbox->inv_jpeg_start_decompress)
+    #define ptr_jpeg_read_scanlines         (jpegSandbox->inv_jpeg_read_scanlines)
+    #define ptr_jpeg_finish_decompress      (jpegSandbox->inv_jpeg_finish_decompress)
+    #define ptr_jpeg_destroy_decompress     (jpegSandbox->inv_jpeg_destroy_decompress)
+    #define ptr_jpeg_save_markers           (jpegSandbox->inv_jpeg_save_markers)
+    #define ptr_jpeg_has_multiple_scans     (jpegSandbox->inv_jpeg_has_multiple_scans)
+    #define ptr_jpeg_calc_output_dimensions (jpegSandbox->inv_jpeg_calc_output_dimensions)
+    #define ptr_jpeg_start_output           (jpegSandbox->inv_jpeg_start_output)
+    #define ptr_jpeg_finish_output          (jpegSandbox->inv_jpeg_finish_output)
+    #define ptr_jpeg_input_complete         (jpegSandbox->inv_jpeg_input_complete)
+    #define ptr_jpeg_consume_input          (jpegSandbox->inv_jpeg_consume_input)
+    #define ptr_alloc_sarray                (jpegSandbox->inv_alloc_sarray_ps)
 
   #endif
 
@@ -406,7 +409,7 @@ void* mallocInJpegSandbox(size_t size)
   #if(USE_SANDBOXING == 2)
     return mallocInSandbox(jpegSandbox, size);
   #elif(USE_SANDBOXING == 3)
-    return sandbox->mallocInSandbox(size);
+    return jpegSandbox->mallocInSandbox(size);
   #else
     return malloc(size);
   #endif
@@ -416,7 +419,7 @@ void freeInJpegSandbox(void* ptr)
   #if(USE_SANDBOXING == 2)
     freeInSandbox(jpegSandbox, ptr);
   #elif(USE_SANDBOXING == 3)
-    sandbox->freeInSandbox(ptr);
+    jpegSandbox->freeInSandbox(ptr);
   #else
     free(ptr);
   #endif
@@ -1230,7 +1233,7 @@ void freeInJpegSandbox(void* ptr)
     return my_error_exit_stub;
 #elif(USE_SANDBOXING == 3)
     if(my_error_exit_stub_reg == nullptr)
-      my_error_exit_stub_reg = sandbox->registerCallback(my_error_exit_stub, (void*) nullptr);
+      my_error_exit_stub_reg = jpegSandbox->registerCallback(my_error_exit_stub, (void*) nullptr);
     return my_error_exit_stub_reg;
 #else
 #error Missed case of USE_SANDBOXING
@@ -1255,7 +1258,7 @@ void freeInJpegSandbox(void* ptr)
     return init_source_stub;
 #elif(USE_SANDBOXING == 3)
     if(init_source_stub_reg == nullptr)
-      init_source_stub_reg = sandbox->registerCallback(init_source_stub, (void*) nullptr);
+      init_source_stub_reg = jpegSandbox->registerCallback(init_source_stub, (void*) nullptr);
     return init_source_stub_reg;
 #else
 #error Missed case of USE_SANDBOXING
@@ -1280,7 +1283,7 @@ void freeInJpegSandbox(void* ptr)
     return skip_input_data_stub;
 #elif(USE_SANDBOXING == 3)
     if(skip_input_data_stub_reg == nullptr)
-      skip_input_data_stub_reg = sandbox->registerCallback(skip_input_data_stub, (void*) nullptr);
+      skip_input_data_stub_reg = jpegSandbox->registerCallback(skip_input_data_stub, (void*) nullptr);
     return skip_input_data_stub_reg;
 #else
 #error Missed case of USE_SANDBOXING
@@ -1305,7 +1308,7 @@ void freeInJpegSandbox(void* ptr)
     return fill_input_buffer_stub;
 #elif(USE_SANDBOXING == 3)
     if(fill_input_buffer_stub_reg == nullptr)
-      fill_input_buffer_stub_reg = sandbox->registerCallback(fill_input_buffer_stub, (void*) nullptr);
+      fill_input_buffer_stub_reg = jpegSandbox->registerCallback(fill_input_buffer_stub, (void*) nullptr);
     return fill_input_buffer_stub_reg;
 #else
 #error Missed case of USE_SANDBOXING
@@ -1330,7 +1333,7 @@ void freeInJpegSandbox(void* ptr)
     return term_source_stub;
 #elif(USE_SANDBOXING == 3)
     if(term_source_stub_reg == nullptr)
-      term_source_stub_reg = sandbox->registerCallback(term_source_stub, (void*) nullptr);
+      term_source_stub_reg = jpegSandbox->registerCallback(term_source_stub, (void*) nullptr);
     return term_source_stub_reg;
 #else
 #error Missed case of USE_SANDBOXING
@@ -1355,7 +1358,7 @@ void freeInJpegSandbox(void* ptr)
     return jpeg_resync_to_restart_stub;
 #elif(USE_SANDBOXING == 3)
     if(jpeg_resync_to_restart_stub_reg == nullptr)
-      jpeg_resync_to_restart_stub_reg = sandbox->registerCallback(jpeg_resync_to_restart_stub, (void*) nullptr);
+      jpeg_resync_to_restart_stub_reg = jpegSandbox->registerCallback(jpeg_resync_to_restart_stub, (void*) nullptr);
     return jpeg_resync_to_restart_stub_reg;
 #else
 #error Missed case of USE_SANDBOXING

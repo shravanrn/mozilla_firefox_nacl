@@ -83,7 +83,7 @@ using std::min;
 // #include "ProcessSandbox.h"
 // #undef USE_LIBPNG
 #ifdef PROCESS_SANDBOX_USE_CPP_API
-  extern PROCESS_SANDBOX_CLASSNAME* pngSandbox;
+  extern PNGProcessSandbox* pngSandbox;
 #endif
 
 
@@ -215,13 +215,13 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   }
 
 #elif defined(PROCESS_SANDBOX_USE_CPP_API)
-  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_png(sandbox, &PROCESS_SANDBOX_CLASSNAME::inv_##fnName, ##__VA_ARGS__)
-  #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(sandbox, &PROCESS_SANDBOX_CLASSNAME::inv_##fnName, ##__VA_ARGS__)
+  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_png(sandbox, &PNGProcessSandbox::inv_##fnName, ##__VA_ARGS__)
+  #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(sandbox, &PNGProcessSandbox::inv_##fnName, ##__VA_ARGS__)
 
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
   unverified_data<return_argument<TFunc>>
-  >::type sandbox_invoke_custom_helper_png(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_helper_png(PNGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
     pngStartTimer();
     auto ret = sandbox_invoker_with_ptr(sandbox, fnPtr, nullptr, params...);
@@ -232,7 +232,7 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
   void
-  >::type sandbox_invoke_custom_helper_png(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_helper_png(PNGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
     pngStartTimer();
     sandbox_invoker_with_ptr(sandbox, fnPtr, nullptr, params...);
@@ -242,7 +242,7 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
   unverified_data<return_argument<TFunc>>
-  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(PNGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
     pngStartTimer();
     auto ret = sandbox_invoker_with_ptr_ret_unsandboxed_ptr(sandbox, fnPtr, nullptr, params...);
@@ -253,7 +253,7 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
   void
-  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(PNGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
     pngStartTimer();
     sandbox_invoker_with_ptr_ret_unsandboxed_ptr(sandbox, fnPtr, nullptr, params...);
