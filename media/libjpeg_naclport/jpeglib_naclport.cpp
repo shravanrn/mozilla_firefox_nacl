@@ -77,30 +77,6 @@
   #define END_TIMER_CORE(NAME) do {} while(0)
 #endif
 
-typedef struct jpeg_error_mgr * (*t_jpeg_std_error) (struct jpeg_error_mgr * err);
-typedef void (*t_jpeg_CreateCompress) (j_compress_ptr cinfo, int version, size_t structsize);
-typedef void (*t_jpeg_stdio_dest) (j_compress_ptr cinfo, FILE * outfile);
-typedef void (*t_jpeg_set_defaults) (j_compress_ptr cinfo);
-typedef void (*t_jpeg_set_quality) (j_compress_ptr cinfo, int quality, boolean force_baseline);
-typedef void (*t_jpeg_start_compress) (j_compress_ptr cinfo, boolean write_all_tables);
-typedef JDIMENSION (*t_jpeg_write_scanlines) (j_compress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION num_lines);
-typedef void (*t_jpeg_finish_compress) (j_compress_ptr cinfo);
-typedef void (*t_jpeg_destroy_compress) (j_compress_ptr cinfo);
-typedef void (*t_jpeg_CreateDecompress) (j_decompress_ptr cinfo, int version, size_t structsize);
-typedef void (*t_jpeg_stdio_src) (j_decompress_ptr cinfo, FILE * infile);
-typedef int (*t_jpeg_read_header) (j_decompress_ptr cinfo, boolean require_image);
-typedef boolean (*t_jpeg_start_decompress) (j_decompress_ptr cinfo);
-typedef JDIMENSION (*t_jpeg_read_scanlines) (j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines);
-typedef boolean (*t_jpeg_finish_decompress) (j_decompress_ptr cinfo);
-typedef void (*t_jpeg_destroy_decompress) (j_decompress_ptr cinfo);
-typedef void (*t_jpeg_save_markers) (j_decompress_ptr cinfo, int marker_code, unsigned int length_limit);
-typedef boolean (*t_jpeg_has_multiple_scans) (j_decompress_ptr cinfo);
-typedef void (*t_jpeg_calc_output_dimensions) (j_decompress_ptr cinfo);
-typedef boolean (*t_jpeg_start_output) (j_decompress_ptr cinfo, int scan_number);
-typedef boolean (*t_jpeg_finish_output) (j_decompress_ptr cinfo);
-typedef boolean (*t_jpeg_input_complete) (j_decompress_ptr cinfo);
-typedef int (*t_jpeg_consume_input) (j_decompress_ptr cinfo);
-
 #if(USE_SANDBOXING != 3)
 t_jpeg_std_error              ptr_jpeg_std_error;
 t_jpeg_CreateCompress         ptr_jpeg_CreateCompress;
@@ -177,6 +153,27 @@ unsigned long long getInvocationsInJpegCore()
   #endif
 }
 
+
+void jpegStartTimer()
+{
+  START_TIMER("");
+}
+
+void jpegStartTimerCore()
+{
+  START_TIMER_CORE("");
+}
+
+void jpegEndTimer()
+{
+  END_TIMER("");
+}
+
+void jpegEndTimerCore()
+{
+  END_TIMER_CORE("");
+}
+
 #if(USE_SANDBOXING == 2)
 
   std::mutex naclInitMutex;
@@ -202,9 +199,9 @@ unsigned long long getInvocationsInJpegCore()
 void* jpegDlPtr;
 std::once_flag jpegFinishedInit;
 
-void initializeLibJpegSandbox()
+void initializeLibJpegSandbox(void(*additionalSetup)())
 {
-  std::call_once(jpegFinishedInit, [](){
+  std::call_once(jpegFinishedInit, [](void(*additionalSetup)()){
     //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_NON_NACL_DL_PATH, PS_OTHERSIDE_PATH are defined as macros in the moz.build of this folder
 
     char SandboxingCodeRootFolder[1024];
@@ -228,6 +225,10 @@ void initializeLibJpegSandbox()
     #if(USE_SANDBOXING == 0)
     {
       printf("Using static libjpeg\n");
+      if(additionalSetup != nullptr)
+      {
+        additionalSetup();
+      }
       return;
     }
     #elif(USE_SANDBOXING == 1)
@@ -360,7 +361,12 @@ void initializeLibJpegSandbox()
     if(failed) { exit(1); }
 
     printf("Loaded symbols\n");
-  });
+
+    if(additionalSetup != nullptr)
+    {
+      additionalSetup();
+    }
+  }, additionalSetup);
 }
 
 uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr)

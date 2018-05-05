@@ -8,12 +8,42 @@ extern "C" {
 #include <stdio.h>
 #include "jpeglib.h"
 
+
+typedef struct jpeg_error_mgr * (*t_jpeg_std_error) (struct jpeg_error_mgr * err);
+typedef void (*t_jpeg_CreateCompress) (j_compress_ptr cinfo, int version, size_t structsize);
+typedef void (*t_jpeg_stdio_dest) (j_compress_ptr cinfo, FILE * outfile);
+typedef void (*t_jpeg_set_defaults) (j_compress_ptr cinfo);
+typedef void (*t_jpeg_set_quality) (j_compress_ptr cinfo, int quality, boolean force_baseline);
+typedef void (*t_jpeg_start_compress) (j_compress_ptr cinfo, boolean write_all_tables);
+typedef JDIMENSION (*t_jpeg_write_scanlines) (j_compress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION num_lines);
+typedef void (*t_jpeg_finish_compress) (j_compress_ptr cinfo);
+typedef void (*t_jpeg_destroy_compress) (j_compress_ptr cinfo);
+typedef void (*t_jpeg_CreateDecompress) (j_decompress_ptr cinfo, int version, size_t structsize);
+typedef void (*t_jpeg_stdio_src) (j_decompress_ptr cinfo, FILE * infile);
+typedef int (*t_jpeg_read_header) (j_decompress_ptr cinfo, boolean require_image);
+typedef boolean (*t_jpeg_start_decompress) (j_decompress_ptr cinfo);
+typedef JDIMENSION (*t_jpeg_read_scanlines) (j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines);
+typedef boolean (*t_jpeg_finish_decompress) (j_decompress_ptr cinfo);
+typedef void (*t_jpeg_destroy_decompress) (j_decompress_ptr cinfo);
+typedef void (*t_jpeg_save_markers) (j_decompress_ptr cinfo, int marker_code, unsigned int length_limit);
+typedef boolean (*t_jpeg_has_multiple_scans) (j_decompress_ptr cinfo);
+typedef void (*t_jpeg_calc_output_dimensions) (j_decompress_ptr cinfo);
+typedef boolean (*t_jpeg_start_output) (j_decompress_ptr cinfo, int scan_number);
+typedef boolean (*t_jpeg_finish_output) (j_decompress_ptr cinfo);
+typedef boolean (*t_jpeg_input_complete) (j_decompress_ptr cinfo);
+typedef int (*t_jpeg_consume_input) (j_decompress_ptr cinfo);
+
 unsigned long long getTimeSpentInJpeg();
 unsigned long long getInvocationsInJpeg();
 unsigned long long getTimeSpentInJpegCore();
 unsigned long long getInvocationsInJpegCore();
 
-void initializeLibJpegSandbox();
+void jpegStartTimer();
+void jpegStartTimerCore();
+void jpegEndTimer();
+void jpegEndTimerCore();
+
+void initializeLibJpegSandbox(void(*additionalSetup)());
 uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr);
 uintptr_t getSandboxedJpegPtr(uintptr_t uaddr);
 int isAddressInJpegSandboxMemoryOrNull(uintptr_t uaddr);

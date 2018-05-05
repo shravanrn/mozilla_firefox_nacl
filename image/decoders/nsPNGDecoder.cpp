@@ -92,7 +92,7 @@ using std::min;
   #include "pnginfo.h"
   #include <set>
   #include <map>
-  std::map<typename std::decay<jmp_buf>::type, jmp_buf> jmpBufferList;
+  std::map<typename std::decay<jmp_buf>::type, jmp_buf> pngJmpBufferList;
   std::set<void*> pngRendererList;
   typedef struct png_unknown_chunk_t
   {
@@ -169,13 +169,13 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
 #endif
 
 #if defined(NACL_SANDBOX_USE_CPP_API)
-  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, ##__VA_ARGS__)
-  #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoke_custom_ret_unsandboxed_ptr_helper<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, ##__VA_ARGS__)
+  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_png<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, ##__VA_ARGS__)
+  #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, ##__VA_ARGS__)
 
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
   unverified_data<return_argument<TFunc>>
-  >::type sandbox_invoke_custom_helper(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_helper_png(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
   {
     pngStartTimer();
     auto ret = sandbox_invoker_with_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
@@ -186,7 +186,7 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
   void
-  >::type sandbox_invoke_custom_helper(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_helper_png(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
   {
     pngStartTimer();
     sandbox_invoker_with_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
@@ -196,7 +196,7 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
   unverified_data<return_argument<TFunc>>
-  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
   {
     pngStartTimer();
     auto ret = sandbox_invoker_with_ptr_ret_unsandboxed_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
@@ -207,7 +207,7 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
   void
-  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
   {
     pngStartTimer();
     sandbox_invoker_with_ptr_ret_unsandboxed_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
@@ -215,13 +215,13 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   }
 
 #elif defined(PROCESS_SANDBOX_USE_CPP_API)
-  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper(sandbox, &PROCESS_SANDBOX_CLASSNAME::inv_##fnName, ##__VA_ARGS__)
-  #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoke_custom_ret_unsandboxed_ptr_helper(sandbox, &PROCESS_SANDBOX_CLASSNAME::inv_##fnName, ##__VA_ARGS__)
+  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_png(sandbox, &PROCESS_SANDBOX_CLASSNAME::inv_##fnName, ##__VA_ARGS__)
+  #define sandbox_invoke_custom_ret_unsandboxed_ptr(sandbox, fnName, ...) sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(sandbox, &PROCESS_SANDBOX_CLASSNAME::inv_##fnName, ##__VA_ARGS__)
 
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
   unverified_data<return_argument<TFunc>>
-  >::type sandbox_invoke_custom_helper(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_helper_png(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
   {
     pngStartTimer();
     auto ret = sandbox_invoker_with_ptr(sandbox, fnPtr, nullptr, params...);
@@ -232,7 +232,7 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
   void
-  >::type sandbox_invoke_custom_helper(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_helper_png(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
   {
     pngStartTimer();
     sandbox_invoker_with_ptr(sandbox, fnPtr, nullptr, params...);
@@ -242,7 +242,7 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
   unverified_data<return_argument<TFunc>>
-  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
   {
     pngStartTimer();
     auto ret = sandbox_invoker_with_ptr_ret_unsandboxed_ptr(sandbox, fnPtr, nullptr, params...);
@@ -253,7 +253,7 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
   void
-  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
+  >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(PROCESS_SANDBOX_CLASSNAME* sandbox, TFunc fnPtr, TArgs... params)
   {
     pngStartTimer();
     sandbox_invoker_with_ptr_ret_unsandboxed_ptr(sandbox, fnPtr, nullptr, params...);
@@ -341,14 +341,14 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
 void nsPNGDecoder::checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_data<int> unv_status)
 {
   auto envRef = unv_env.sandbox_onlyVerifyAddress();
-  auto iter = jmpBufferList.find(envRef);
-  if(iter == jmpBufferList.end())
+  auto iter = pngJmpBufferList.find(envRef);
+  if(iter == pngJmpBufferList.end())
   {
     printf("nsPNGDecoder::nsPNGDecoder: Critical Error in finding the right jmp_buf\n");
     exit(1);
   }
 
-  jmpBufferList.erase(iter);
+  pngJmpBufferList.erase(iter);
 
   int status = unv_status.sandbox_copyAndVerify([](int val){ return val; });
   longjmp(iter->second, status);
@@ -833,7 +833,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
   // libpng uses setjmp/longjmp for error handling.
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     auto setLongJumpRet = *(sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress());
-    if (setLongJumpRet != 0 && setjmp(jmpBufferList[setLongJumpRet])) {
+    if (setLongJumpRet != 0 && setjmp(pngJmpBufferList[setLongJumpRet])) {
       return Transition::TerminateFailure();
     }
   #else
@@ -2154,7 +2154,7 @@ nsPNGDecoder::IsValidICOResource() const
   // proper callstack.
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     auto setLongJumpRet = *(sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress());
-    if (setLongJumpRet != 0 && setjmp(jmpBufferList[setLongJumpRet])) {
+    if (setLongJumpRet != 0 && setjmp(pngJmpBufferList[setLongJumpRet])) {
       // We got here from a longjmp call indirectly from png_get_IHDR
       return false;
     }
@@ -2221,3 +2221,8 @@ nsPNGDecoder::IsValidICOResource() const
 
 } // namespace image
 } // namespace mozilla
+
+#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+  #undef sandbox_invoke_custom
+  #undef sandbox_invoke_custom_ret_unsandboxed_ptr
+#endif

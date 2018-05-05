@@ -25,6 +25,24 @@ extern "C" {
 
 #include <setjmp.h>
 
+#ifdef NACL_SANDBOX_USE_CPP_API
+  #define NACL_SANDBOX_API_NO_STL_DS
+  #define NACL_SANDBOX_API_NO_OPTIONAL
+    #include "nacl_sandbox.h"
+  #undef NACL_SANDBOX_API_NO_OPTIONAL
+  #undef NACL_SANDBOX_API_NO_STL_DS
+#endif
+
+#ifdef PROCESS_SANDBOX_USE_CPP_API
+  #define PROCESS_SANDBOX_API_NO_OPTIONAL
+    #include "process_sandbox_cpp.h"
+  #undef PROCESS_SANDBOX_API_NO_OPTIONAL
+#endif
+
+#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+  #include "jpeglib_structs_for_cpp_api.h"
+#endif
+
 namespace mozilla {
 namespace image {
 
@@ -84,12 +102,24 @@ private:
   StreamingLexer<State> mLexer;
 
 public:
-  // struct jpeg_decompress_struct mInfo;
-  struct jpeg_decompress_struct* p_mInfo;
-  // struct jpeg_source_mgr mSourceMgr;
-  struct jpeg_source_mgr* p_mSourceMgr;
-  // decoder_error_mgr mErr;
-  decoder_error_mgr* p_mErr;
+
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+    unverified_data<struct jpeg_decompress_struct*> p_mInfo;
+    unverified_data<struct jpeg_source_mgr*> p_mSourceMgr;
+    unverified_data<decoder_error_mgr*> p_mErr;
+    boolean m_buffered_image_shadow;
+    J_COLOR_SPACE m_out_color_space;
+    jmp_buf m_jmpBuff;
+    bool m_jmpBuffValid = FALSE; 
+  #else
+    // struct jpeg_decompress_struct mInfo;
+    struct jpeg_decompress_struct* p_mInfo;
+    // struct jpeg_source_mgr mSourceMgr;
+    struct jpeg_source_mgr* p_mSourceMgr;
+    // decoder_error_mgr mErr;
+    decoder_error_mgr* p_mErr;
+  #endif
+  JDIMENSION m_output_height_shadow;
   jstate mState;
 
   uint32_t mBytesToSkip;
@@ -98,9 +128,14 @@ public:
   uint32_t mSegmentLen;     // amount of data in mSegment
 
   #if(USE_SANDBOXING_BUFFERS != 0)
-    JOCTET* s_mSegment;
+    #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+      unverified_data<JOCTET*> s_mSegment;
+      unverified_data<JOCTET*> s_mBackBuffer;
+    #else
+      JOCTET* s_mSegment;
+      JOCTET* s_mBackBuffer;
+    #endif
     uint32_t s_mSegmentLen;
-    JOCTET* s_mBackBuffer;
     uint32_t s_mBackBufferLen;
   #endif
 

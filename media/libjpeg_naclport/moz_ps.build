@@ -9,6 +9,7 @@ with Files("**"):
 
 EXPORTS += [
     'jpeglib_naclport.h',
+    'jpeglib_structs_for_cpp_api.h',
 ]
 
 SOURCES += [
