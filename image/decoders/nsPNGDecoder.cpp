@@ -156,8 +156,7 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
 #  define MOZ_PNG_MAX_HEIGHT 0x7fffffff // Unlimited
 #endif
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-
+#if defined(NACL_SANDBOX_USE_CPP_API)
   sandbox_callback_helper<void(unverified_data<png_structp>,unverified_data<png_const_charp>)>* cpp_cb_png_error_fn;
   sandbox_callback_helper<void(unverified_data<png_structp>,unverified_data<png_const_charp>)>* cpp_cb_png_warn_fn;
   sandbox_callback_helper<void(unverified_data<png_structp>,unverified_data<png_infop>)>* cpp_cb_png_progressive_info_fn;
@@ -165,6 +164,14 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   sandbox_callback_helper<void(unverified_data<png_structp>,unverified_data<png_infop>)>* cpp_cb_png_progressive_end_fn;
   sandbox_callback_helper<void(unverified_data<png_structp>,unverified_data<png_uint_32>)>* cpp_cb_png_progressive_frame_info_fn;
   sandbox_callback_helper<void(unverified_data<jmp_buf>, unverified_data<int>)>* cpp_cb_longjmp_fn;
+#elif defined(PROCESS_SANDBOX_USE_CPP_API)
+  sandbox_callback_helper<PNGProcessSandbox, void(unverified_data<png_structp>,unverified_data<png_const_charp>)>* cpp_cb_png_error_fn;
+  sandbox_callback_helper<PNGProcessSandbox, void(unverified_data<png_structp>,unverified_data<png_const_charp>)>* cpp_cb_png_warn_fn;
+  sandbox_callback_helper<PNGProcessSandbox, void(unverified_data<png_structp>,unverified_data<png_infop>)>* cpp_cb_png_progressive_info_fn;
+  sandbox_callback_helper<PNGProcessSandbox, void(unverified_data<png_structp>,unverified_data<png_bytep>,unverified_data<png_uint_32>,unverified_data<int>)>* cpp_cb_png_progressive_row_fn;
+  sandbox_callback_helper<PNGProcessSandbox, void(unverified_data<png_structp>,unverified_data<png_infop>)>* cpp_cb_png_progressive_end_fn;
+  sandbox_callback_helper<PNGProcessSandbox, void(unverified_data<png_structp>,unverified_data<png_uint_32>)>* cpp_cb_png_progressive_frame_info_fn;
+  sandbox_callback_helper<PNGProcessSandbox, void(unverified_data<jmp_buf>, unverified_data<int>)>* cpp_cb_longjmp_fn;
 
 #endif
 
@@ -2225,4 +2232,5 @@ nsPNGDecoder::IsValidICOResource() const
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   #undef sandbox_invoke_custom
   #undef sandbox_invoke_custom_ret_unsandboxed_ptr
+  #undef sandbox_invoke_custom_with_ptr
 #endif

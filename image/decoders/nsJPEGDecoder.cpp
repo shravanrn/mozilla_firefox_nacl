@@ -368,15 +368,23 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
     return profile;
 }
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-
+#if defined(NACL_SANDBOX_USE_CPP_API)
   sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_init_source;
   sandbox_callback_helper<boolean(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_fill_input_buffer;
   sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd, unverified_data<long> num_bytes)>* cpp_cb_jpeg_skip_input_data;
   sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_term_source;
-  sandbox_function_helper<boolean(j_decompress_ptr, int)> cpp_resync_to_restart;
   sandbox_callback_helper<void(unverified_data<j_common_ptr> cinfo)>* cpp_cb_jpeg_my_error_exit;
+  sandbox_function_helper<boolean(j_decompress_ptr, int)> cpp_resync_to_restart;
+#elif defined(PROCESS_SANDBOX_USE_CPP_API)
+  sandbox_callback_helper<JPEGProcessSandbox, void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_init_source;
+  sandbox_callback_helper<JPEGProcessSandbox, boolean(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_fill_input_buffer;
+  sandbox_callback_helper<JPEGProcessSandbox, void(unverified_data<j_decompress_ptr> jd, unverified_data<long> num_bytes)>* cpp_cb_jpeg_skip_input_data;
+  sandbox_callback_helper<JPEGProcessSandbox, void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_term_source;
+  sandbox_callback_helper<JPEGProcessSandbox, void(unverified_data<j_common_ptr> cinfo)>* cpp_cb_jpeg_my_error_exit;
+  sandbox_function_helper<boolean(j_decompress_ptr, int)> cpp_resync_to_restart;
+#endif
 
+#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   METHODDEF(void) init_source (unverified_data<j_decompress_ptr> jd);
   METHODDEF(boolean) fill_input_buffer (unverified_data<j_decompress_ptr> jd);
   METHODDEF(void) skip_input_data (unverified_data<j_decompress_ptr> jd, unverified_data<long> num_bytes);
@@ -410,7 +418,12 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
       cpp_cb_jpeg_fill_input_buffer = sandbox_callback(jpegSandbox, fill_input_buffer);
       cpp_cb_jpeg_skip_input_data = sandbox_callback(jpegSandbox, skip_input_data);
       cpp_cb_jpeg_term_source = sandbox_callback(jpegSandbox, term_source);
-      cpp_resync_to_restart = sandbox_function(jpegSandbox, jpeg_resync_to_restart);
+      #if defined(NACL_SANDBOX_USE_CPP_API)
+        cpp_resync_to_restart = sandbox_function(jpegSandbox, jpeg_resync_to_restart);
+      #else
+        //hack process sandbox does not support sandbox_functions yet
+        //cpp_resync_to_restart = sandbox_function(jpegSandbox, jpeg_resync_to_restart);
+      #endif
       cpp_cb_jpeg_my_error_exit = sandbox_callback(jpegSandbox, my_error_exit);
     });
     p_mInfo = newInSandbox<jpeg_decompress_struct>(jpegSandbox);
@@ -671,7 +684,6 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
   //printf("FF Flag ReadJPEGData\n");
   mSegment = reinterpret_cast<const JOCTET*>(aData);
   mSegmentLen = aLength;
-  auto& mErr = *p_mErr;
 
   // Return here if there is a fatal error within libjpeg.
   nsresult error_code;
@@ -680,6 +692,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     if ((error_code = static_cast<nsresult>(setjmp(m_jmpBuff))) != NS_OK) {
   #else
+    auto& mErr = *p_mErr;
     if ((error_code = static_cast<nsresult>(setjmp(mErr.setjmp_buffer))) != NS_OK) {
   #endif
       if (error_code == NS_ERROR_FAILURE) {
@@ -1408,11 +1421,16 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       //Jpeg provides an api to allocate a buffer for a particular image, that will be destroyed automatically
       //we use this instead of malloc
       #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-        unverified_data<jpeg_memory_mgr *> mem_mgr = mInfo.mem;
-        auto p_alloc_sarray = mem_mgr->alloc_sarray.sandbox_onlyVerifyAddress();
-        //CPP_TODO - really need a cast
         unverified_data<j_common_ptr> common_ptr = (j_common_ptr) ((&mInfo).sandbox_onlyVerifyAddress());
-        pBufferSys = sandbox_invoke_custom_with_ptr(jpegSandbox, p_alloc_sarray, common_ptr, JPOOL_IMAGE, row_stride, 1);
+        #if defined(NACL_SANDBOX_USE_CPP_API)
+          unverified_data<jpeg_memory_mgr *> mem_mgr = mInfo.mem;
+          auto p_alloc_sarray = mem_mgr->alloc_sarray.sandbox_onlyVerifyAddress();
+          //CPP_TODO - really need a cast
+          pBufferSys = sandbox_invoke_custom_with_ptr(jpegSandbox, p_alloc_sarray, common_ptr, JPOOL_IMAGE, row_stride, 1);
+        #else
+          //Process Sandbox hack - no real way of invoking function pointers directly for now
+          pBufferSys = sandbox_invoke_custom(jpegSandbox, alloc_sarray_ps, common_ptr, JPOOL_IMAGE, row_stride, 1);
+        #endif
       #else
         struct jpeg_memory_mgr * mem_mgr = (struct jpeg_memory_mgr *) getUnsandboxedJpegPtr((uintptr_t) mInfo.mem);
         void* p_alloc_sarray = (void*) getUnsandboxedJpegPtr((uintptr_t) mem_mgr->alloc_sarray);
@@ -2115,4 +2133,5 @@ static void cmyk_convert_rgb(JSAMPROW row, JDIMENSION width)
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   #undef sandbox_invoke_custom
   #undef sandbox_invoke_custom_ret_unsandboxed_ptr
+  #undef sandbox_invoke_custom_with_ptr
 #endif
