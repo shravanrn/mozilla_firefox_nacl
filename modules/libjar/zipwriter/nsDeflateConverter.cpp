@@ -27,28 +27,23 @@ Sandbox* getZlibSandbox() {
   if(!sbox) {
     mutex.lock();
 #if SANDBOX_CPP == 1
-    sbox = createNaclSandbox();
+    sbox = createDlSandbox("/home/shr/Code/LibrarySandboxing/Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe",
+      "/home/shr/Code/LibrarySandboxing/zlib_nacl/builds/x64/nacl_build_debug/libz.nexe");
 #elif SANDBOX_CPP == 2
     sbox = createDlSandbox(PS_OTHERSIDE_PATH);
 #endif
+    initCPPApi(sbox);
     mutex.unlock();
   }
   return sbox;
 }
 
-void* nsDeflateConverter::mallocInSandbox(size_t size) {
-#if SANDBOX_CPP == 1
-  return mallocInSandbox(getZlibSandbox(), size);
-#elif SANDBOX_CPP == 2
-  return getZlibSandbox()->mallocInSandbox(size);
-#endif
-}
-
 z_stream* nsDeflateConverter::createmZstream() {
-  void* mem = mallocInSandbox(sizeof(z_stream)+65);
-  void* alignedMem = (void*)((uintptr_t)mem & (uintptr_t)0xFFFFFFFFFFFFFFC0);
-  return new (alignedMem) z_stream;
-  // TODO_UNSAFE: use newInSandbox
+  //TODO_UNSAFE
+  z_stream* mem = newInSandbox<z_stream>(getZlibSandbox(), 3).sandbox_onlyVerifyAddress();
+
+  void* alignedMem = (void*)((uintptr_t)(&(mem[1])) & (uintptr_t)0xFFFFFFFFFFFFFFC0);
+  return (z_stream*) alignedMem;
 }
 
 #endif

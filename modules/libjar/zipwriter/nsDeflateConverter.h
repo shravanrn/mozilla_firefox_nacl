@@ -8,11 +8,11 @@
 
 #ifdef SANDBOX_CPP
 #if SANDBOX_CPP == 1
-  #define NACL_SANDBOX_API_NO_STL_DS
+  // #define NACL_SANDBOX_API_NO_STL_DS
   #define NACL_SANDBOX_API_NO_OPTIONAL
   #include "nacl_sandbox.h"
   #undef NACL_SANDBOX_API_NO_OPTIONAL
-  #undef NACL_SANDBOX_API_NO_STL_DS
+  // #undef NACL_SANDBOX_API_NO_STL_DS
 #elif SANDBOX_CPP == 2
   #define PROCESS_SANDBOX_API_NO_OPTIONAL
   #define USE_ZLIB
@@ -30,8 +30,12 @@
 #include "zlib.h"
 
 #ifdef SANDBOX_CPP
+  #include "zlib_structs_for_cpp_api.h"
+#endif
+
+#ifdef SANDBOX_CPP
 #if SANDBOX_CPP == 1
-#define Sandbox NaclSandbox
+#define Sandbox NaClSandbox
 #elif SANDBOX_CPP == 2
 #define Sandbox ZProcessSandbox
 #endif
@@ -79,7 +83,6 @@ private:
 
 #ifdef SANDBOX_CPP
     static z_stream* createmZstream();
-    static void* mallocInSandbox(size_t size);
 #endif
 
     enum WrapMode {
