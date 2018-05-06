@@ -53,7 +53,7 @@ nsHTTPCompressConv::nsHTTPCompressConv()
   , mDecodedDataLength(0)
   , mMutex("nsHTTPCompressConv")
 {
-  LOG(("nsHttpCompresssConv %p ctor\n", this));
+  LOG(("nsHttpCompressConv %p ctor\n", this));
   if (NS_IsMainThread()) {
     mFailUncleanStops =
       Preferences::GetBool("network.http.enforce-framing.http", false);

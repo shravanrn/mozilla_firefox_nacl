@@ -11,12 +11,47 @@
 #include "nsMemory.h"
 #include "plstr.h"
 #include "mozilla/UniquePtr.h"
+#include <mutex>
 
 #define ZLIB_TYPE "deflate"
 #define GZIP_TYPE "gzip"
 #define X_GZIP_TYPE "x-gzip"
 
 using namespace mozilla;
+
+#ifdef SANDBOX_CPP
+
+Sandbox* getZlibSandbox() {
+  static Sandbox* sbox = NULL;
+  static std::mutex mutex;
+  if(!sbox) {
+    mutex.lock();
+#if SANDBOX_CPP == 1
+    sbox = createNaclSandbox();
+#elif SANDBOX_CPP == 2
+    sbox = createDlSandbox(PS_OTHERSIDE_PATH);
+#endif
+    mutex.unlock();
+  }
+  return sbox;
+}
+
+void* nsDeflateConverter::mallocInSandbox(size_t size) {
+#if SANDBOX_CPP == 1
+  return mallocInSandbox(getZlibSandbox(), size);
+#elif SANDBOX_CPP == 2
+  return getZlibSandbox()->mallocInSandbox(size);
+#endif
+}
+
+z_stream* nsDeflateConverter::createmZstream() {
+  void* mem = mallocInSandbox(sizeof(z_stream)+65);
+  void* alignedMem = (void*)((uintptr_t)mem & (uintptr_t)0xFFFFFFFFFFFFFFC0);
+  return new (alignedMem) z_stream;
+  // TODO_UNSAFE: use newInSandbox
+}
+
+#endif
 
 /**
  * nsDeflateConverter is a stream converter applies the deflate compression
@@ -48,8 +83,12 @@ nsresult nsDeflateConverter::Init()
             break;
     }
 
-    zerr = deflateInit2(&mZstream, mLevel, Z_DEFLATED, window, 8,
-                        Z_DEFAULT_STRATEGY);
+    zerr = sandbox_invoke(getZlibSandbox(), deflateInit2_, &mZstream,
+                        mLevel, Z_DEFLATED, window, 8, Z_DEFAULT_STRATEGY, sandbox_stackarr(ZLIB_VERSION), (int)sizeof(z_stream)).
+                        sandbox_copyAndVerify([](int i){
+                            // we only care about ==Z_OK or not, so any value is fine
+                            return i;
+                          });
     if (zerr != Z_OK) return NS_ERROR_OUT_OF_MEMORY;
 
     mZstream.next_out = mWriteBuffer;
@@ -119,13 +158,21 @@ NS_IMETHODIMP nsDeflateConverter::OnDataAvailable(nsIRequest *aRequest,
     int zerr = Z_OK;
     // deflate loop
     while (mZstream.avail_in > 0 && zerr == Z_OK) {
-        zerr = deflate(&mZstream, Z_NO_FLUSH);
+        zerr = sandbox_invoke(getZlibSandbox(), deflate, &mZstream, Z_NO_FLUSH).
+                sandbox_copyAndVerify([](int i){
+                    // we only care about ==Z_OK or not, so any value is safe
+                    return i;
+                  });
 
         while (mZstream.avail_out == 0) {
             // buffer is full, push the data out to the listener
             rv = PushAvailableData(aRequest, aContext);
             NS_ENSURE_SUCCESS(rv, rv);
-            zerr = deflate(&mZstream, Z_NO_FLUSH);
+            zerr = sandbox_invoke(getZlibSandbox(), deflate, &mZstream, Z_NO_FLUSH).
+                    sandbox_copyAndVerify([](int i){
+                        // we only care about ==Z_OK or not, so any value is safe
+                        return i;
+                      });
         }
     }
 
@@ -152,12 +199,23 @@ NS_IMETHODIMP nsDeflateConverter::OnStopRequest(nsIRequest *aRequest,
 
     int zerr;
     do {
+#ifdef SANDBOX_CPP
+        zerr = sandbox_invoke(getZlibSandbox(), deflate, &mZstream, Z_FINISH).sandbox_copyAndVerify([] (int i) {
+            // seems that any value of i is fine here; all that matters is ==Z_OK or not
+            return i;
+        });
+#else
         zerr = deflate(&mZstream, Z_FINISH);
+#endif
         rv = PushAvailableData(aRequest, aContext);
         NS_ENSURE_SUCCESS(rv, rv);
     } while (zerr == Z_OK);
 
+#ifdef SANDBOX_CPP
+    sandbox_invoke(getZlibSandbox(), deflateEnd, &mZstream);
+#else
     deflateEnd(&mZstream);
+#endif
 
     return mListener->OnStopRequest(aRequest, mContext, aStatusCode);
 }

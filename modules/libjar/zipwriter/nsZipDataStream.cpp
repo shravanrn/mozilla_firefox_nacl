@@ -35,7 +35,10 @@ nsresult nsZipDataStream::Init(nsZipWriter *aWriter,
     mWriter = aWriter;
     mHeader = aHeader;
     mStream = aStream;
-    mHeader->mCRC = crc32(0L, Z_NULL, 0);
+    mHeader->mCRC = sandbox_invoke(getZlibSandbox(), crc32, 0L, nullptr, 0).sandbox_copyAndVerify([](uLong i){
+                      // TODO_UNSAFE is this safe?
+                      return i;
+                    });
 
     nsresult rv = NS_NewSimpleStreamListener(getter_AddRefs(mOutput), aStream,
                                              nullptr);
@@ -70,13 +73,15 @@ NS_IMETHODIMP nsZipDataStream::OnDataAvailable(nsIRequest *aRequest,
     if (!mOutput)
         return NS_ERROR_NOT_INITIALIZED;
 
-    auto buffer = MakeUnique<char[]>(aCount);
+    auto buffer = newInSandbox<char>(getZlibSandbox(), aCount).sandbox_onlyVerifyAddress();
     NS_ENSURE_TRUE(buffer, NS_ERROR_OUT_OF_MEMORY);
 
-    nsresult rv = ZW_ReadData(aInputStream, buffer.get(), aCount);
+    nsresult rv = ZW_ReadData(aInputStream, buffer, aCount);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    return ProcessData(aRequest, aContext, buffer.get(), aOffset, aCount);
+    auto retval = ProcessData(aRequest, aContext, buffer, aOffset, aCount);
+    freeInSandbox(getZlibSandbox(), buffer);
+    return retval;
 }
 
 NS_IMETHODIMP nsZipDataStream::OnStartRequest(nsIRequest *aRequest,
@@ -130,9 +135,12 @@ nsresult nsZipDataStream::ProcessData(nsIRequest *aRequest,
                                       nsISupports *aContext, char *aBuffer,
                                       uint64_t aOffset, uint32_t aCount)
 {
-    mHeader->mCRC = crc32(mHeader->mCRC,
+    mHeader->mCRC = sandbox_invoke(getZlibSandbox(), crc32, mHeader->mCRC,
                           reinterpret_cast<const unsigned char*>(aBuffer),
-                          aCount);
+                          aCount).sandbox_copyAndVerify([](uLong i){
+                            // TODO_UNSAFE is this safe?
+                            return i;
+                          });
 
     MOZ_ASSERT(aCount <= INT32_MAX);
     nsCOMPtr<nsIInputStream> stream;
@@ -154,21 +162,21 @@ nsresult nsZipDataStream::ReadStream(nsIInputStream *aStream)
     nsresult rv = OnStartRequest(nullptr, nullptr);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    auto buffer = MakeUnique<char[]>(4096);
+    auto buffer = newInSandbox<char>(getZlibSandbox(), 4096).sandbox_onlyVerifyAddress();
     NS_ENSURE_TRUE(buffer, NS_ERROR_OUT_OF_MEMORY);
 
     uint32_t read = 0;
     uint32_t offset = 0;
     do
     {
-        rv = aStream->Read(buffer.get(), 4096, &read);
+        rv = aStream->Read(buffer, 4096, &read);
         if (NS_FAILED(rv)) {
             OnStopRequest(nullptr, nullptr, rv);
             return rv;
         }
 
         if (read > 0) {
-            rv = ProcessData(nullptr, nullptr, buffer.get(), offset, read);
+            rv = ProcessData(nullptr, nullptr, buffer, offset, read);
             if (NS_FAILED(rv)) {
                 OnStopRequest(nullptr, nullptr, rv);
                 return rv;
@@ -177,5 +185,6 @@ nsresult nsZipDataStream::ReadStream(nsIInputStream *aStream)
         }
     } while (read > 0);
 
+    freeInSandbox(getZlibSandbox(), buffer);
     return OnStopRequest(nullptr, nullptr, NS_OK);
 }

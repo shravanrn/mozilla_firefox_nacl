@@ -21,4 +21,16 @@ UNIFIED_SOURCES += [
     'ZipWriterModule.cpp',
 ]
 
+# Enable sandboxing for zlib
+# Choose 1 for NaCl, 2 for process, or simply undefined (no sandboxing)
+DEFINES["SANDBOX_CPP"] = 2
+DEFINES["PS_OTHERSIDE_PATH"] = "\"/home/craig/code/LibrarySandboxing/ProcessSandbox/ProcessSandbox_otherside_zlib64\""
+
+LOCAL_INCLUDES += [
+    '/../ProcessSandbox',
+    '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
+]
+
+OS_LIBS += ['-L../../../../ProcessSandbox', '-lProcessSandbox_zlib64']
+
 FINAL_LIBRARY = 'xul'
