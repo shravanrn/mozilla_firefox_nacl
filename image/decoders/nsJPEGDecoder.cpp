@@ -554,7 +554,7 @@ nsJPEGDecoder::InitInternal()
     m_jmpBuffValid = TRUE;
   #else
     // Establish the setjmp return context for my_error_exit to use.
-    if (setjmp(mErr.setjmp_buffer) {
+    if (setjmp(mErr.setjmp_buffer)) {
       // If we get here, the JPEG code has signaled an error, and initialization
       // has failed.
       return NS_ERROR_FAILURE;
