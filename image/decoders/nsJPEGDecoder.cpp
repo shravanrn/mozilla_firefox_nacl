@@ -554,7 +554,7 @@ nsJPEGDecoder::InitInternal()
     m_jmpBuffValid = TRUE;
   #else
     // Establish the setjmp return context for my_error_exit to use.
-    if (setjmp(mErr.setjmp_buffer.sandbox_onlyVerifyAddress()/* TODO_NEW */)) {
+    if (setjmp(mErr.setjmp_buffer) {
       // If we get here, the JPEG code has signaled an error, and initialization
       // has failed.
       return NS_ERROR_FAILURE;
@@ -680,7 +680,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     if ((error_code = static_cast<nsresult>(setjmp(m_jmpBuff))) != NS_OK) {
   #else
-    if ((error_code = static_cast<nsresult>(setjmp(mErr.setjmp_buffer.sandbox_onlyVerifyAddress()/*TODO_NEW*/))) != NS_OK) {
+    if ((error_code = static_cast<nsresult>(setjmp(mErr.setjmp_buffer))) != NS_OK) {
   #endif
       if (error_code == NS_ERROR_FAILURE) {
         // Error due to corrupt data. Make sure that we don't feed any more data
@@ -1697,7 +1697,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       longjmp(decoder->m_jmpBuff, static_cast<int>(error_code));
     }
   #else
-    longjmp(err->setjmp_buffer.sandbox_onlyVerifyAddress()/* TODO_NEW */, static_cast<int>(error_code));
+    longjmp(err->setjmp_buffer, static_cast<int>(error_code));
   #endif
 }
 
