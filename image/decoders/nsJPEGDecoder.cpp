@@ -1439,6 +1439,22 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     }
   #endif
 
+    #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+      auto output_height_non_rounded = mInfo.output_height.sandbox_copyAndVerify([this](JDIMENSION val){
+        if(m_output_height_shadow == val || 
+          m_output_height_shadow == (val + 1))
+        {
+          return val;
+        }
+
+        printf("Could not validate image height\n");
+        exit(1);
+      });
+    #else
+      auto output_height_non_rounded = mInfo.output_height;
+    #endif
+
+
     JDIMENSION output_scanline_forLoop;
     while(true)
     {
@@ -1448,7 +1464,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
         output_scanline_forLoop = mInfo.output_scanline;
       #endif
 
-      if(output_scanline_forLoop >= m_output_height_shadow)
+      if(output_scanline_forLoop >= output_height_non_rounded)
       {
         break;
       }
@@ -1676,7 +1692,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
 
 #ifdef DEBUG
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_CPP_API)
     auto buffer = newInSandbox<char>(jpegSandbox, sizeof(char[JMSG_LENGTH_MAX]));
     auto formatMessagePtr = err->pub.format_message.sandbox_onlyVerifyAddress();
     sandbox_invoke_custom_with_ptr(jpegSandbox, formatMessagePtr, cinfo, buffer);
@@ -1687,6 +1703,10 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
     fprintf(stderr, "JPEG decoding error:\n%s\n", verifBuffer);
     delete[] verifBuffer;
+  #elif defined(PROCESS_SANDBOX_USE_CPP_API)
+    //function pointer calls not supported yet
+    auto buffer = newInSandbox<char>(jpegSandbox, sizeof(char[JMSG_LENGTH_MAX]));
+    fprintf(stderr, "JPEG decoding error:\nUnknown\n");
   #else
     //char buffer[JMSG_LENGTH_MAX];
     char* buffer = (char *) mallocInJpegSandbox(sizeof(char[JMSG_LENGTH_MAX]));
@@ -1960,7 +1980,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       if ((const JOCTET*) getUnsandboxedJpegPtr((uintptr_t) next_input_byte) != decoder->s_mSegment) {
     #endif
   #else
-    if (src->next_input_byte != decoder->mSegment) {
+    if (next_input_byte != decoder->mSegment) {
   #endif
       // Backtrack data has been permanently consumed.
       decoder->mBackBufferUnreadLen = 0;

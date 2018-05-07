@@ -146,7 +146,7 @@ nsBaseAppShell::DoProcessNextNativeEvent(bool mayWait)
 
 //-------------------------------------------------------------------------
 // nsIAppShell methods:
-
+void SandboxOnFirefoxExiting();
 NS_IMETHODIMP
 nsBaseAppShell::Run(void)
 {
@@ -158,6 +158,8 @@ nsBaseAppShell::Run(void)
   MessageLoop::current()->Run();
 
   NS_ProcessPendingEvents(thread);
+
+  SandboxOnFirefoxExiting();
 
   mRunning = false;
   return NS_OK;

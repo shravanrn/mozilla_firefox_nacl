@@ -41,7 +41,7 @@
   #include "ProcessSandbox.h"
   #undef USE_LIBJPEG
 
-  JPEGProcessSandbox* jpegSandbox;
+  JPEGProcessSandbox* jpegSandbox = 0;
 
 #endif
 
@@ -175,6 +175,26 @@ void jpegEndTimer()
 void jpegEndTimerCore()
 {
   END_TIMER_CORE("");
+}
+
+#if(USE_SANDBOXING == 3)
+  std::mutex processExitMutex;
+#endif
+void SandboxOnFirefoxExitingPNG();
+void SandboxOnFirefoxExiting()
+{
+  {
+    #if(USE_SANDBOXING == 3)
+      std::lock_guard<std::mutex> guard(processExitMutex);
+
+      if(jpegSandbox != nullptr)
+      {
+        jpegSandbox->destroySandbox();
+        jpegSandbox = nullptr;
+      }
+    #endif
+    SandboxOnFirefoxExitingPNG();
+  }
 }
 
 #if(USE_SANDBOXING == 2)

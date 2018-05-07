@@ -40,7 +40,7 @@ int getPngSandboxingOption() { return USE_SANDBOXING; }
   #include "ProcessSandbox.h"
   #undef USE_LIBPNG
 
-  PNGProcessSandbox* pngSandbox;
+  PNGProcessSandbox* pngSandbox = 0;
 
 #endif
 
@@ -195,6 +195,17 @@ void pngEndTimer()
 void pngEndTimerCore()
 {
   END_TIMER_CORE("");
+}
+
+void SandboxOnFirefoxExitingPNG()
+{
+  #if(USE_SANDBOXING == 3)
+    if(pngSandbox != nullptr)
+    {
+      pngSandbox->destroySandbox();
+      pngSandbox = nullptr;
+    }
+  #endif
 }
 
 #if(USE_SANDBOXING == 2)
