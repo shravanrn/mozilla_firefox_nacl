@@ -190,7 +190,16 @@ NS_IMETHODIMP nsDeflateConverter::OnDataAvailable(nsIRequest *aRequest,
 
     int zerr = Z_OK;
     // deflate loop
-    while (mZstream.avail_in > 0 && zerr == Z_OK) {
+    while (
+#ifdef SANDBOX_CPP
+    mZstream_p->avail_in.sandbox_copyAndVerify([](uInt i){
+                          // TODO_UNSAFE
+                          return i;
+                        }) > 0
+#else
+    mZstream.avail_in > 0
+#endif
+      && zerr == Z_OK) {
 #ifdef CURRENTLY_DISABLED
         zerr = sandbox_invoke(getZlibSandbox(), deflate, mZstream_p, Z_NO_FLUSH).
                 sandbox_copyAndVerify([](int i){
@@ -202,18 +211,28 @@ NS_IMETHODIMP nsDeflateConverter::OnDataAvailable(nsIRequest *aRequest,
 #endif
         printf("Past sandbox_invoke near line 189\n");
 
-        while (mZstream.avail_out == 0) {
+        while (
+#ifdef SANDBOX_CPP
+            mZstream_p->avail_out.sandbox_copyAndVerify([](uInt i){
+                                    // TODO_UNSAFE
+                                    return i;
+                                  }) == 0
+#else
+            mZstream.avail_out == 0
+#endif
+        ) {
             // buffer is full, push the data out to the listener
             rv = PushAvailableData(aRequest, aContext);
             NS_ENSURE_SUCCESS(rv, rv);
-            /*
+#ifdef CURRENTLY_DISABLED
             zerr = sandbox_invoke(getZlibSandbox(), deflate, mZstream_p, Z_NO_FLUSH).
                     sandbox_copyAndVerify([](int i){
                         // we only care about ==Z_OK or not, so any value is safe
                         return i;
                       });
-            */
+#else
             zerr = deflate(&mZstream, Z_NO_FLUSH);
+#endif
         }
     }
 
