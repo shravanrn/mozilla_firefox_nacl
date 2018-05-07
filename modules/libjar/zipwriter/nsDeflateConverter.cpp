@@ -17,7 +17,7 @@
 #define GZIP_TYPE "gzip"
 #define X_GZIP_TYPE "x-gzip"
 
-//sandbox_nacl_load_library_api(zlib)
+sandbox_nacl_load_library_api(zlib)
 
 using namespace mozilla;
 
@@ -81,13 +81,13 @@ nsresult nsDeflateConverter::Init()
 
     mOffset = 0;
 
+    mZstream_p->zalloc = nullptr;
+    mZstream_p->zfree = nullptr;
+    mZstream_p->opaque = nullptr;
+
 #ifdef SANDBOX_CPP
     z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
 #endif
-
-    mZstream.zalloc = Z_NULL;
-    mZstream.zfree = Z_NULL;
-    mZstream.opaque = Z_NULL;
 
     int32_t window = MAX_WBITS;
     switch (mWrapMode) {
@@ -174,18 +174,18 @@ NS_IMETHODIMP nsDeflateConverter::OnDataAvailable(nsIRequest *aRequest,
     nsresult rv = ZW_ReadData(aInputStream, buffer.get(), aCount);
     NS_ENSURE_SUCCESS(rv, rv);
 
+    // make sure we aren't reading too much
+    mZstream_p->avail_in = aCount;
+    mZstream_p->next_in = (unsigned char*)buffer.get();
+
 #ifdef SANDBOX_CPP
     z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
 #endif
 
-    // make sure we aren't reading too much
-    mZstream.avail_in = aCount;
-    mZstream.next_in = (unsigned char*)buffer.get();
-
     int zerr = Z_OK;
     // deflate loop
     while (mZstream.avail_in > 0 && zerr == Z_OK) {
-#ifdef SANDBOX_CPP
+#ifdef CURRENTLY_DISABLED
         zerr = sandbox_invoke(getZlibSandbox(), deflate, mZstream_p, Z_NO_FLUSH).
                 sandbox_copyAndVerify([](int i){
                     // we only care about ==Z_OK or not, so any value is safe
@@ -194,7 +194,7 @@ NS_IMETHODIMP nsDeflateConverter::OnDataAvailable(nsIRequest *aRequest,
 #else
         zerr = deflate(&mZstream, Z_NO_FLUSH);
 #endif
-        printf("Past sandbox_invoke near line 189 \n");
+        printf("Past sandbox_invoke near line 189\n");
 
         while (mZstream.avail_out == 0) {
             // buffer is full, push the data out to the listener
