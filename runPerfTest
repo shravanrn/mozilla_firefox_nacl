@@ -12,28 +12,26 @@ if [[ -f "$1" ]]; then
 	exit 1; 
 fi
 
-PlatformToUse="64"
+Pl="64"
 
 if [[ ! -z "$2" ]]; then
 	if [[ "$2" == "32" ]]; then
-		PlatformToUse="32"
+		Pl="32"
 	else
 		echo "Unknown platform: $2"
 		exit 1
 	fi
 fi
-
-FFVersions=("firefox_${PlatformToUse}bit_optdebug_nacl" "firefox_${PlatformToUse}bit_optdebug_nonnacl" "firefox_${PlatformToUse}bit_optdebug_static"  "firefox_${PlatformToUse}bit_optdebug_nacl_cpp")
+FFVersions=("static" "static_buffcopy" "nonnacl" "nacl" "ps" "nacl_cpp" "process_cpp")
 
 for i in ${FFVersions[@]}; do
-	if [[ ! -d "${i}" ]]; then
-		echo "Not all firefox versions found: ${i}";
+	if [[ ! -d "firefox_${Pl}bit_optdebug_${i}" ]]; then
+		echo "Not all firefox versions found: firefox_${Pl}bit_optdebug_${i}";
 		exit 1;
 	fi
 done
 
-#Get root
-# sudo echo "Starting. Make sure to disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
+echo "Starting. Make sure to disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
 
 #param: outputfile
 #param: logfile
@@ -102,7 +100,9 @@ function runTest(){
 	rm -f ./talos_output.txt
 	#sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 	sleep 5
-	taskset -c 3 ./mach talos-test --activeTests $2 2>&1 | tee ./talos_output.txt
+	#we aren't pinning to a core as these are macro benchmarks
+	#taskset -c 3
+	./mach talos-test --activeTests $2 2>&1 | tee ./talos_output.txt
 	cat ./testing/mozharness/build/local.json >> "$1"
 	echo -e "\n" >> "$1"
 	writeTimingLinesToOutput "$1" "./talos_output.txt"
@@ -112,55 +112,22 @@ function runTest(){
 	rm ./talos_output.txt
 }
 
-function loadSandboxedFirefox(){
-	sleep 2
-	cp "./mozconfig${PlatformToUse}_nacl" ./mozconfig
-	sleep 2
-}
-function loadUnsandboxedFirefox(){
-	sleep 2
-	cp "./mozconfig${PlatformToUse}_nonnacl" ./mozconfig
-	sleep 2	
-}
-function loadStaticFirefox(){
-	sleep 2
-	cp "./mozconfig${PlatformToUse}_static" ./mozconfig
-	sleep 2	
-}
-function loadPsFirefox(){
-    sleep 2
-    cp "./mozconfig${PlatformToUse}_ps" ./mozconfig
-    sleep 2
-}
-function loadSandboxedCppFirefox(){
-	sleep 2
-	cp "./mozconfig${PlatformToUse}_nacl_cpp" ./mozconfig
-	sleep 2
-}
-
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50
+for i in `seq 1 500`
 do
 
-	loadStaticFirefox
-	echo -e "FFBuild-Stock\n" >> "$1"
-	runTest "$1" "jpeg_page_render"
-	echo -e "\n---------------------\n" >> "$1"
+	echo "Round ${i}" >> "$1"
+	echo "=========" >> "$1"
 
-	loadUnsandboxedFirefox
-	echo -e "FFBuild-DynLib\n" >> "$1"
-	runTest "$1" "jpeg_page_render"
-	echo -e "\n---------------------\n" >> "$1"
+	for j in ${FFVersions[@]}; do
+		sleep 2
+		cp "./mozconfig${Pl}_${j}" ./mozconfig
+		sleep 2
+	
+		echo -e "FFBuild-${j}\n" >> "$1"
+		runTest "$1" "jpeg_page_render"
+		echo -e "\n---------------------\n" >> "$1"
 
-	loadSandboxedFirefox
-	echo -e "FFBuild-NaCl\n" >> "$1"
-	runTest "$1" "jpeg_page_render"
-	echo -e "\n---------------------\n" >> "$1"
-
-	loadSandboxedCppFirefox
-	echo -e "FFBuild-NaClC++\n" >> "$1"
-	runTest "$1" "jpeg_page_render"
-	echo -e "\n---------------------\n" >> "$1"
-
+	done
 done
 
 echo "Output results to $1"
