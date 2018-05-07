@@ -30,7 +30,7 @@ Sandbox* getZlibSandbox() {
     sbox = createDlSandbox("/home/shr/Code/LibrarySandboxing/Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe",
       "/home/shr/Code/LibrarySandboxing/zlib_nacl/builds/x64/nacl_build_debug/libz.nexe");
 #elif SANDBOX_CPP == 2
-    sbox = createDlSandbox(PS_OTHERSIDE_PATH);
+    sbox = createDlSandbox<ZProcessSandbox>(PS_OTHERSIDE_PATH);
 #endif
     initCPPApi(sbox);
     mutex.unlock();
@@ -39,11 +39,16 @@ Sandbox* getZlibSandbox() {
 }
 
 z_stream* nsDeflateConverter::createmZstream() {
-  //TODO_UNSAFE
-  z_stream* mem = newInSandbox<z_stream>(getZlibSandbox(), 3).sandbox_onlyVerifyAddress();
-
-  void* alignedMem = (void*)((uintptr_t)(&(mem[1])) & (uintptr_t)0xFFFFFFFFFFFFFFC0);
-  return (z_stream*) alignedMem;
+//unverified_data<z_stream*> nsDeflateConverter::createmZstream() {
+  //unverified_data<z_stream*> mem = newInSandbox<z_stream>(getZlibSandbox(), 3);
+  //void* alignedMem = (void*)((uintptr_t)(&(mem[1])) & (uintptr_t)0xFFFFFFFFFFFFFFC0);
+  //return *((unverified_data<z_stream*>*) &alignedMem);
+  void* mem = getZlibSandbox()->mallocInSandbox(sizeof(z_stream));
+  if(mem == NULL) ERROR("malloc failed with errno %s\n", strerror(errno))
+  //z_stream* zmem = new (mem) z_stream;
+  z_stream* zmem = (z_stream*)mem;
+  //return *((unverified_data<z_stream*>*) &zmem);
+  return zmem;
 }
 
 #endif
@@ -62,6 +67,9 @@ nsresult nsDeflateConverter::Init()
 
     mOffset = 0;
 
+    //z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
+    z_stream &mZstream = *mZstream_p;
+
     mZstream.zalloc = Z_NULL;
     mZstream.zfree = Z_NULL;
     mZstream.opaque = Z_NULL;
@@ -78,12 +86,15 @@ nsresult nsDeflateConverter::Init()
             break;
     }
 
-    zerr = sandbox_invoke(getZlibSandbox(), deflateInit2_, &mZstream,
+    /*
+    zerr = sandbox_invoke(getZlibSandbox(), deflateInit2_, mZstream_p,
                         mLevel, Z_DEFLATED, window, 8, Z_DEFAULT_STRATEGY, sandbox_stackarr(ZLIB_VERSION), (int)sizeof(z_stream)).
                         sandbox_copyAndVerify([](int i){
                             // we only care about ==Z_OK or not, so any value is fine
                             return i;
                           });
+    */
+    zerr = deflateInit2(&mZstream, mLevel, Z_DEFLATED, window, 8, Z_DEFAULT_STRATEGY);
     if (zerr != Z_OK) return NS_ERROR_OUT_OF_MEMORY;
 
     mZstream.next_out = mWriteBuffer;
@@ -146,6 +157,9 @@ NS_IMETHODIMP nsDeflateConverter::OnDataAvailable(nsIRequest *aRequest,
     nsresult rv = ZW_ReadData(aInputStream, buffer.get(), aCount);
     NS_ENSURE_SUCCESS(rv, rv);
 
+    //z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
+    z_stream &mZstream = *mZstream_p;
+
     // make sure we aren't reading too much
     mZstream.avail_in = aCount;
     mZstream.next_in = (unsigned char*)buffer.get();
@@ -153,21 +167,27 @@ NS_IMETHODIMP nsDeflateConverter::OnDataAvailable(nsIRequest *aRequest,
     int zerr = Z_OK;
     // deflate loop
     while (mZstream.avail_in > 0 && zerr == Z_OK) {
-        zerr = sandbox_invoke(getZlibSandbox(), deflate, &mZstream, Z_NO_FLUSH).
+        /*
+        zerr = sandbox_invoke(getZlibSandbox(), deflate, mZstream_p, Z_NO_FLUSH).
                 sandbox_copyAndVerify([](int i){
                     // we only care about ==Z_OK or not, so any value is safe
                     return i;
                   });
+        */
+        zerr = deflate(&mZstream, Z_NO_FLUSH);
 
         while (mZstream.avail_out == 0) {
             // buffer is full, push the data out to the listener
             rv = PushAvailableData(aRequest, aContext);
             NS_ENSURE_SUCCESS(rv, rv);
-            zerr = sandbox_invoke(getZlibSandbox(), deflate, &mZstream, Z_NO_FLUSH).
+            /*
+            zerr = sandbox_invoke(getZlibSandbox(), deflate, mZstream_p, Z_NO_FLUSH).
                     sandbox_copyAndVerify([](int i){
                         // we only care about ==Z_OK or not, so any value is safe
                         return i;
                       });
+            */
+            zerr = deflate(&mZstream, Z_NO_FLUSH);
         }
     }
 
@@ -192,13 +212,19 @@ NS_IMETHODIMP nsDeflateConverter::OnStopRequest(nsIRequest *aRequest,
 
     nsresult rv;
 
+    //z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
+    z_stream &mZstream = *mZstream_p;
+
     int zerr;
     do {
 #ifdef SANDBOX_CPP
-        zerr = sandbox_invoke(getZlibSandbox(), deflate, &mZstream, Z_FINISH).sandbox_copyAndVerify([] (int i) {
+        /*
+        zerr = sandbox_invoke(getZlibSandbox(), deflate, mZstream_p, Z_FINISH).sandbox_copyAndVerify([] (int i) {
             // seems that any value of i is fine here; all that matters is ==Z_OK or not
             return i;
         });
+        */
+        zerr = deflate(&mZstream, Z_FINISH);
 #else
         zerr = deflate(&mZstream, Z_FINISH);
 #endif
@@ -207,7 +233,10 @@ NS_IMETHODIMP nsDeflateConverter::OnStopRequest(nsIRequest *aRequest,
     } while (zerr == Z_OK);
 
 #ifdef SANDBOX_CPP
-    sandbox_invoke(getZlibSandbox(), deflateEnd, &mZstream);
+    /*
+    sandbox_invoke(getZlibSandbox(), deflateEnd, mZstream_p);
+    */
+    deflateEnd(&mZstream);
 #else
     deflateEnd(&mZstream);
 #endif
@@ -218,6 +247,8 @@ NS_IMETHODIMP nsDeflateConverter::OnStopRequest(nsIRequest *aRequest,
 nsresult nsDeflateConverter::PushAvailableData(nsIRequest *aRequest,
                                                nsISupports *aContext)
 {
+    //z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
+    z_stream &mZstream = *mZstream_p;
     uint32_t bytesToWrite = sizeof(mWriteBuffer) - mZstream.avail_out;
     // We don't need to do anything if there isn't any data
     if (bytesToWrite == 0)

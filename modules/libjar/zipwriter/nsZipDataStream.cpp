@@ -35,10 +35,13 @@ nsresult nsZipDataStream::Init(nsZipWriter *aWriter,
     mWriter = aWriter;
     mHeader = aHeader;
     mStream = aStream;
+    /*
     mHeader->mCRC = sandbox_invoke(getZlibSandbox(), crc32, 0L, nullptr, 0).sandbox_copyAndVerify([](uLong i){
                       // TODO_UNSAFE is this safe?
                       return i;
                     });
+    */
+    mHeader->mCRC = crc32(0L, nullptr, 0);
 
     nsresult rv = NS_NewSimpleStreamListener(getter_AddRefs(mOutput), aStream,
                                              nullptr);
@@ -135,12 +138,15 @@ nsresult nsZipDataStream::ProcessData(nsIRequest *aRequest,
                                       nsISupports *aContext, char *aBuffer,
                                       uint64_t aOffset, uint32_t aCount)
 {
+    /*
     mHeader->mCRC = sandbox_invoke(getZlibSandbox(), crc32, mHeader->mCRC,
                           reinterpret_cast<const unsigned char*>(aBuffer),
                           aCount).sandbox_copyAndVerify([](uLong i){
                             // TODO_UNSAFE is this safe?
                             return i;
                           });
+    */
+    mHeader->mCRC = crc32(mHeader->mCRC, reinterpret_cast<const unsigned char*>(aBuffer), aCount);
 
     MOZ_ASSERT(aCount <= INT32_MAX);
     nsCOMPtr<nsIInputStream> stream;

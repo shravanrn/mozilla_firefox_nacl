@@ -57,7 +57,7 @@ public:
 
     nsDeflateConverter()
 #ifdef SANDBOX_CPP
-      : mZstream (*(createmZstream()))
+      : mZstream_p (createmZstream())
 #endif
     {
         // 6 is Z_DEFAULT_COMPRESSION but we need the actual value
@@ -66,7 +66,7 @@ public:
 
     explicit nsDeflateConverter(int32_t level)
 #ifdef SANDBOX_CPP
-      : mZstream (*(createmZstream()))
+      : mZstream_p (createmZstream())
 #endif
     {
         mLevel = level;
@@ -77,11 +77,12 @@ private:
     ~nsDeflateConverter()
     {
 #ifdef SANDBOX_CPP
-      freeInSandbox(getZlibSandbox(), &mZstream);
+      freeInSandbox(getZlibSandbox(), mZstream_p);
 #endif
     }
 
 #ifdef SANDBOX_CPP
+    //static unverified_data<z_stream*> createmZstream();
     static z_stream* createmZstream();
 #endif
 
@@ -97,7 +98,8 @@ private:
     nsCOMPtr<nsIStreamListener> mListener;
     nsCOMPtr<nsISupports> mContext;
 #ifdef SANDBOX_CPP
-    z_stream &mZstream;
+    //unverified_data<z_stream*> mZstream_p;
+    z_stream* mZstream_p;
 #else
     z_stream mZstream;
 #endif
