@@ -85,10 +85,6 @@ nsresult nsDeflateConverter::Init()
     mZstream_p->zfree = nullptr;
     mZstream_p->opaque = nullptr;
 
-#ifdef SANDBOX_CPP
-    z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
-#endif
-
     int32_t window = MAX_WBITS;
     switch (mWrapMode) {
         case WRAP_NONE:
@@ -114,12 +110,22 @@ nsresult nsDeflateConverter::Init()
     if (zerr != Z_OK) return NS_ERROR_OUT_OF_MEMORY;
     printf("Past sandbox_invoke near line 105\n");
 
+#ifdef SANDBOX_CPP
+    mZstream_p->next_out = (unsigned char*)mWriteBuffer;
+    mZstream_p->avail_out = sizeof(mWriteBuffer);
+#else
     mZstream.next_out = mWriteBuffer;
     mZstream.avail_out = sizeof(mWriteBuffer);
+#endif
 
     // mark the input buffer as empty.
+#ifdef SANDBOX_CPP
+    mZstream_p->avail_in = 0;
+    mZstream_p->next_in = Z_NULL;
+#else
     mZstream.avail_in = 0;
     mZstream.next_in = Z_NULL;
+#endif
 
     return NS_OK;
 }
@@ -269,9 +275,14 @@ nsresult nsDeflateConverter::PushAvailableData(nsIRequest *aRequest,
                                                nsISupports *aContext)
 {
 #ifdef SANDBOX_CPP
-    z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
-#endif
+    uInt avail_out = mZstream_p->avail_out.sandbox_copyAndVerify([](uInt i){
+                          // TODO_UNSAFE
+                          return i;
+                        });
+    uint32_t bytesToWrite = sizeof(mWriteBuffer) - avail_out;
+#else
     uint32_t bytesToWrite = sizeof(mWriteBuffer) - mZstream.avail_out;
+#endif
     // We don't need to do anything if there isn't any data
     if (bytesToWrite == 0)
         return NS_OK;
@@ -286,8 +297,13 @@ nsresult nsDeflateConverter::PushAvailableData(nsIRequest *aRequest,
                                     bytesToWrite);
 
     // now set the state for 'deflate'
+#ifdef SANDBOX_CPP
+    mZstream_p->next_out = (unsigned char*)mWriteBuffer;
+    mZstream_p->avail_out = sizeof(mWriteBuffer);
+#else
     mZstream.next_out = mWriteBuffer;
     mZstream.avail_out = sizeof(mWriteBuffer);
+#endif
 
     mOffset += bytesToWrite;
     return rv;
