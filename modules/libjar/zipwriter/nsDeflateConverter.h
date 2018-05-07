@@ -82,8 +82,7 @@ private:
     }
 
 #ifdef SANDBOX_CPP
-    //static unverified_data<z_stream*> createmZstream();
-    static z_stream* createmZstream();
+    static unverified_data<z_stream*> createmZstream();
 #endif
 
     enum WrapMode {
@@ -98,8 +97,7 @@ private:
     nsCOMPtr<nsIStreamListener> mListener;
     nsCOMPtr<nsISupports> mContext;
 #ifdef SANDBOX_CPP
-    //unverified_data<z_stream*> mZstream_p;
-    z_stream* mZstream_p;
+    unverified_data<z_stream*> mZstream_p;
 #else
     z_stream mZstream;
 #endif

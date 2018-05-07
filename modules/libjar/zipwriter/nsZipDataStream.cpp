@@ -36,6 +36,17 @@ nsresult nsZipDataStream::Init(nsZipWriter *aWriter,
     mHeader = aHeader;
     mStream = aStream;
     /*
+    {
+      printf("  Attach gdb with command --- sudo gdb -p %d\n", getpid());
+      fflush(stdout);
+      volatile int gdb = 0;
+      while (gdb == 0) {  // to continue, use gdb to set 'gdb' to something nonzero
+        usleep(100000);  // sleep for 0.1 seconds
+        fflush(stderr);
+      }
+    }
+    */
+    /*
     mHeader->mCRC = sandbox_invoke(getZlibSandbox(), crc32, 0L, nullptr, 0).sandbox_copyAndVerify([](uLong i){
                       // TODO_UNSAFE is this safe?
                       return i;

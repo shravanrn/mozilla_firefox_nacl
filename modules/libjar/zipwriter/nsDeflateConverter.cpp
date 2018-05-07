@@ -38,17 +38,17 @@ Sandbox* getZlibSandbox() {
   return sbox;
 }
 
-z_stream* nsDeflateConverter::createmZstream() {
-//unverified_data<z_stream*> nsDeflateConverter::createmZstream() {
+unverified_data<z_stream*> nsDeflateConverter::createmZstream() {
   //unverified_data<z_stream*> mem = newInSandbox<z_stream>(getZlibSandbox(), 3);
   //void* alignedMem = (void*)((uintptr_t)(&(mem[1])) & (uintptr_t)0xFFFFFFFFFFFFFFC0);
   //return *((unverified_data<z_stream*>*) &alignedMem);
-  void* mem = getZlibSandbox()->mallocInSandbox(sizeof(z_stream));
-  if(mem == NULL) ERROR("malloc failed with errno %s\n", strerror(errno))
+
+  //void* mem = getZlibSandbox()->mallocInSandbox(sizeof(z_stream));
+  //if(mem == NULL) ERROR("malloc failed with errno %s\n", strerror(errno))
   //z_stream* zmem = new (mem) z_stream;
-  z_stream* zmem = (z_stream*)mem;
-  //return *((unverified_data<z_stream*>*) &zmem);
-  return zmem;
+  //return zmem;
+
+  return newInSandbox<z_stream>(getZlibSandbox());
 }
 
 #endif
@@ -63,12 +63,25 @@ NS_IMPL_ISUPPORTS(nsDeflateConverter, nsIStreamConverter,
 
 nsresult nsDeflateConverter::Init()
 {
+    /*
+    {
+      printf("  Attach gdb with command --- sudo gdb -p %d\n", getpid());
+      fflush(stdout);
+      volatile int gdb = 0;
+      while (gdb == 0) {  // to continue, use gdb to set 'gdb' to something nonzero
+        usleep(100000);  // sleep for 0.1 seconds
+        fflush(stderr);
+      }
+    }
+    */
+
     int zerr;
 
     mOffset = 0;
 
-    //z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
-    z_stream &mZstream = *mZstream_p;
+#ifdef SANDBOX_CPP
+    z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
+#endif
 
     mZstream.zalloc = Z_NULL;
     mZstream.zfree = Z_NULL;
@@ -157,8 +170,9 @@ NS_IMETHODIMP nsDeflateConverter::OnDataAvailable(nsIRequest *aRequest,
     nsresult rv = ZW_ReadData(aInputStream, buffer.get(), aCount);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    //z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
-    z_stream &mZstream = *mZstream_p;
+#ifdef SANDBOX_CPP
+    z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
+#endif
 
     // make sure we aren't reading too much
     mZstream.avail_in = aCount;
@@ -212,8 +226,9 @@ NS_IMETHODIMP nsDeflateConverter::OnStopRequest(nsIRequest *aRequest,
 
     nsresult rv;
 
-    //z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
-    z_stream &mZstream = *mZstream_p;
+#ifdef SANDBOX_CPP
+    z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
+#endif
 
     int zerr;
     do {
@@ -247,8 +262,9 @@ NS_IMETHODIMP nsDeflateConverter::OnStopRequest(nsIRequest *aRequest,
 nsresult nsDeflateConverter::PushAvailableData(nsIRequest *aRequest,
                                                nsISupports *aContext)
 {
-    //z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
-    z_stream &mZstream = *mZstream_p;
+#ifdef SANDBOX_CPP
+    z_stream &mZstream = *(mZstream_p.sandbox_onlyVerifyAddress());
+#endif
     uint32_t bytesToWrite = sizeof(mWriteBuffer) - mZstream.avail_out;
     // We don't need to do anything if there isn't any data
     if (bytesToWrite == 0)
