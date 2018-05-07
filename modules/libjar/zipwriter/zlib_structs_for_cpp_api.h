@@ -1,4 +1,4 @@
-#define sandbox_fields_reflection_zlib_class_z_stream(f, g) \
+#define sandbox_fields_reflection_zlib_class_z_stream_s(f, g) \
     f(z_const Bytef *,next_in) \
     g() \
     f(uInt           ,avail_in) \
@@ -37,17 +37,17 @@
     g() \
     f(int,     os) \
     g() \
-    f(Bytef,   *extra) \
+    f(Bytef*,  extra) \
     g() \
     f(uInt,    extra_len) \
     g() \
     f(uInt,    extra_max) \
     g() \
-    f(Bytef,   *name) \
+    f(Bytef*,  name) \
     g() \
     f(uInt,    name_max) \
     g() \
-    f(Bytef,   *comment) \
+    f(Bytef*,  comment) \
     g() \
     f(uInt,    comm_max) \
     g() \
@@ -58,5 +58,5 @@
 
 
 #define sandbox_fields_reflection_zlib_allClasses(f) \
-    f(z_stream, zlib) \
+    f(z_stream_s, zlib) \
     f(gz_header, zlib)
