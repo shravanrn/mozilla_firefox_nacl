@@ -209,7 +209,7 @@ NS_IMETHODIMP nsDeflateConverter::OnDataAvailable(nsIRequest *aRequest,
 #else
         zerr = deflate(&mZstream, Z_NO_FLUSH);
 #endif
-        printf("Past sandbox_invoke near line 189\n");
+        printf("Past sandbox_invoke near line 200\n");
 
         while (
 #ifdef SANDBOX_CPP
@@ -263,14 +263,11 @@ NS_IMETHODIMP nsDeflateConverter::OnStopRequest(nsIRequest *aRequest,
 
     int zerr;
     do {
-#ifdef SANDBOX_CPP
-        /*
+#ifdef CURRENTLY_DISABLED
         zerr = sandbox_invoke(getZlibSandbox(), deflate, mZstream_p, Z_FINISH).sandbox_copyAndVerify([] (int i) {
             // seems that any value of i is fine here; all that matters is ==Z_OK or not
             return i;
         });
-        */
-        zerr = deflate(&mZstream, Z_FINISH);
 #else
         zerr = deflate(&mZstream, Z_FINISH);
 #endif
@@ -278,11 +275,8 @@ NS_IMETHODIMP nsDeflateConverter::OnStopRequest(nsIRequest *aRequest,
         NS_ENSURE_SUCCESS(rv, rv);
     } while (zerr == Z_OK);
 
-#ifdef SANDBOX_CPP
-    /*
+#ifdef CURRENTLY_DISABLED
     sandbox_invoke(getZlibSandbox(), deflateEnd, mZstream_p);
-    */
-    deflateEnd(&mZstream);
 #else
     deflateEnd(&mZstream);
 #endif
