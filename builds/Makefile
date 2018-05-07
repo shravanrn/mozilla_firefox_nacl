@@ -21,7 +21,7 @@ inithasrun:
 
 build32: static32 dynamic32 nacl32 ps32 nacl32_nosimd
 
-build64: static64 dynamic64 nacl64 ps64 nacl64_cpp nacl64_nosimd
+build64: static64 static64_buffcopy dynamic64 nacl64 ps64 nacl64_cpp ps64_cpp
 
 CP=./cpIfDifferent.sh
 
@@ -72,6 +72,15 @@ nacl32_nosimd: inithasrun
 static64: inithasrun
 	$(CP) ../mozconfig64_static ../mozconfig
 	$(CP) ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
+	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
+	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
+	cd .. && ./mach build
+
+static64_buffcopy: inithasrun
+	if [ ! -d ../firefox_64bit_optdebug_static_buffcopy ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_static_buffcopy; fi
+	$(CP) ../mozconfig64_static_buffcopy ../mozconfig
+	$(CP) ../image/decoders/moz_copy_stock.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
@@ -184,6 +193,10 @@ ps64_asan: inithasrun
 
 run64_static:
 	$(CP) ../mozconfig64_static ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+
+run64_static_buffcopy:
+	$(CP) ../mozconfig64_static_buffcopy ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 run64_dynamic:
