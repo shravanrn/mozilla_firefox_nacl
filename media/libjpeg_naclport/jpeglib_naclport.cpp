@@ -178,20 +178,22 @@ void jpegEndTimerCore()
 }
 
 #if(USE_SANDBOXING == 3)
-  std::mutex processExitMutex;
+  std::mutex jpegProcessExitMutex;
 #endif
 void SandboxOnFirefoxExitingPNG();
 void SandboxOnFirefoxExiting()
 {
   {
     #if(USE_SANDBOXING == 3)
-      std::lock_guard<std::mutex> guard(processExitMutex);
+    {
+      std::lock_guard<std::mutex> guard(jpegProcessExitMutex);
 
       if(jpegSandbox != nullptr)
       {
         jpegSandbox->destroySandbox();
         jpegSandbox = nullptr;
       }
+    }
     #endif
     SandboxOnFirefoxExitingPNG();
   }

@@ -197,16 +197,22 @@ void pngEndTimerCore()
   END_TIMER_CORE("");
 }
 
+#if(USE_SANDBOXING == 3)
+  std::mutex pngProcessExitMutex;
+#endif
 void SandboxOnFirefoxExitingZLIB();
-
 void SandboxOnFirefoxExitingPNG()
 {
   #if(USE_SANDBOXING == 3)
+  {
+    std::lock_guard<std::mutex> guard(pngProcessExitMutex);
+
     if(pngSandbox != nullptr)
     {
       pngSandbox->destroySandbox();
       pngSandbox = nullptr;
     }
+  }
   #endif
   SandboxOnFirefoxExitingZLIB();
 }

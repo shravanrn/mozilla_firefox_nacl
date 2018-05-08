@@ -30,20 +30,25 @@ NaClSandbox* sbox = NULL;
 static ZProcessSandbox* sbox = NULL;
 #endif
 
-void SandboxOnFirefoxExitingZLIB()
-{
-  #if SANDBOX_CPP == 2
-    sbox->destroySandbox();
-    sbox = NULL;
-  #endif
-}
-
 #ifdef SANDBOX_CPP
 #include <mutex>
 
 sandbox_nacl_load_library_api(zlib)
 
 static std::mutex mtx;
+#endif
+
+void SandboxOnFirefoxExitingZLIB()
+{
+  #if SANDBOX_CPP == 2
+    std::lock_guard<std::mutex> guard(mtx);
+
+    sbox->destroySandbox();
+    sbox = NULL;
+  #endif
+}
+
+#ifdef SANDBOX_CPP
 
 static void constructZlibSandboxIfNecessary() {
   mtx.lock();
