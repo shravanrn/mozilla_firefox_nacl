@@ -790,7 +790,7 @@ class zlib_page_render(PageloaderTest):
     tpmanifest = '${talos}/tests/zlib_page_render/zlib_page_render.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 25
+    tppagecycles = 10
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
