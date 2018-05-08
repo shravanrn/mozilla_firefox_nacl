@@ -27,19 +27,18 @@
 
 sandbox_nacl_load_library_api(zlib)
 
+static std::mutex mutex;
+static ZProcessSandbox* sbox = NULL;
+
 static ZProcessSandbox* getZlibSandbox() {
-  static ZProcessSandbox* sbox = NULL;
-  static std::mutex mutex;
-  if(!sbox) {
-    mutex.lock();
-      if(!sbox) {
-        //sbox = createDlSandbox("/home/shr/Code/LibrarySandboxing/Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe",
-      //"/home/shr/Code/LibrarySandboxing/zlib_nacl/builds/x64/nacl_build_debug/libz.nexe");
-        sbox = createDlSandbox<ZProcessSandbox>("/home/craig/code/LibrarySandboxing/ProcessSandbox/ProcessSandbox_otherside_zlib64");
-        initCPPApi(sbox);
-      }
-    mutex.unlock();
-  }
+  mutex.lock();
+    if(!sbox) {
+      //sbox = createDlSandbox("/home/shr/Code/LibrarySandboxing/Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe",
+    //"/home/shr/Code/LibrarySandboxing/zlib_nacl/builds/x64/nacl_build_debug/libz.nexe");
+      sbox = createDlSandbox<ZProcessSandbox>("/home/shr/Code/LibrarySandboxing/ProcessSandbox/ProcessSandbox_otherside_zlib64");
+      initCPPApi(sbox);
+    }
+  mutex.unlock();
   return sbox;
 }
 #endif
