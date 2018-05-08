@@ -116,12 +116,13 @@ private:
     Atomic<CompressMode, Relaxed> mMode;
 
 #ifdef SANDBOX_CPP
-    unverified_data<unsigned char*> mOutBuffer;
     unverified_data<unsigned char*> mInpBuffer;
+    unverified_data<unsigned char*> sbOutBuffer;
 #else
-    unsigned char *mOutBuffer;
     unsigned char *mInpBuffer;
 #endif
+
+    unsigned char *mOutBuffer;
 
     uint32_t	mOutBufferLen;
     uint32_t	mInpBufferLen;

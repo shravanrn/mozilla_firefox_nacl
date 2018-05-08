@@ -93,8 +93,9 @@ NS_IMPL_ISUPPORTS(nsHTTPCompressConv,
 // nsFTPDirListingConv methods
 nsHTTPCompressConv::nsHTTPCompressConv()
   : mMode(HTTP_COMPRESS_IDENTITY)
-  , mOutBuffer(nullptr)
   , mInpBuffer(nullptr)
+  , sbOutBuffer(nullptr)
+  , mOutBuffer(nullptr)
   , mOutBufferLen(0)
   , mInpBufferLen(0)
   , mCheckHeaderDone(false)
@@ -135,12 +136,14 @@ nsHTTPCompressConv::~nsHTTPCompressConv()
 #endif
   }
 
-  if (mOutBuffer) {
 #ifdef SANDBOX_CPP
-    freeInSandbox(sbox, mOutBuffer);
-#else
-    free(mOutBuffer);
+  if (sbOutBuffer) {
+    freeInSandbox(sbox, sbOutBuffer);
+  }
 #endif
+
+  if(mOutBuffer) {
+    free(mOutBuffer);
   }
 
   // For some reason we are not getting Z_STREAM_END.  But this was also seen
@@ -380,15 +383,19 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
 #endif
 
       if (mOutBufferLen < streamLen * 2) {
+        mOutBufferLen = streamLen * 3;
+        mOutBuffer = (unsigned char *) realloc(mOutBuffer, mOutBufferLen);
 #ifdef SANDBOX_CPP
-        freeInSandbox(sbox, mOutBuffer);
-        mOutBuffer = newInSandbox<unsigned char>(sbox, mOutBufferLen = streamLen * 3);
-#else
-        mOutBuffer = (unsigned char *) realloc(mOutBuffer, mOutBufferLen = streamLen * 3);
+        freeInSandbox(sbox, sbOutBuffer);
+        sbOutBuffer = newInSandbox<unsigned char>(sbox, mOutBufferLen);
 #endif
       }
 
-      if (mInpBuffer == nullptr || mOutBuffer == nullptr) {
+      if (mInpBuffer == nullptr || mOutBuffer == nullptr
+#ifdef SANDBOX_CPP
+          || sbOutBuffer == nullptr
+#endif
+         ) {
         return NS_ERROR_OUT_OF_MEMORY;
       }
     }
@@ -402,14 +409,18 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
     }
 
     if (mOutBuffer == nullptr) {
+      mOutBufferLen = streamLen * 3;
+      mOutBuffer = (unsigned char *) malloc(mOutBufferLen);
 #ifdef SANDBOX_CPP
-      mOutBuffer = newInSandbox<unsigned char>(sbox, mOutBufferLen = streamLen * 3);
-#else
-      mOutBuffer = (unsigned char *) malloc(mOutBufferLen = streamLen * 3);
+      sbOutBuffer = newInSandbox<unsigned char>(sbox, mOutBufferLen);
 #endif
     }
 
-    if (mInpBuffer == nullptr || mOutBuffer == nullptr) {
+    if (mInpBuffer == nullptr || mOutBuffer == nullptr
+#ifdef SANDBOX_CPP
+          || sbOutBuffer == nullptr
+#endif
+        ) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
 
@@ -450,7 +461,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
       mDummyStreamInitialised = false;
       for (;;) {
 #ifdef SANDBOX_CPP
-        p_d_stream->next_out  = mOutBuffer;
+        p_d_stream->next_out  = sbOutBuffer;
         p_d_stream->avail_out = (uInt)mOutBufferLen;
 
         int code = sandbox_invoke(sbox, inflate, p_d_stream, Z_NO_FLUSH).sandbox_copyAndVerify([](int i){
@@ -474,10 +485,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         if (code == Z_STREAM_END) {
           if (bytesWritten) {
 #ifdef SANDBOX_CPP
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)(mOutBuffer.sandbox_onlyVerifyAddress()), bytesWritten);
-#else
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+            mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char c){
+                            // no validation needed, we simply copy the array to prevent
+                            // double-fetch / TOCTOU i.e. capture a persistent snapshot of
+                            // its contents
+                            return true;
+                          }, mOutBufferLen);
 #endif
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
             if (NS_FAILED (rv)) {
               return rv;
             }
@@ -493,10 +508,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         } else if (code == Z_OK) {
           if (bytesWritten) {
 #ifdef SANDBOX_CPP
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)(mOutBuffer.sandbox_onlyVerifyAddress()), bytesWritten);
-#else
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+            mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char c){
+                            // no validation needed, we simply copy the array to prevent
+                            // double-fetch / TOCTOU i.e. capture a persistent snapshot of
+                            // its contents
+                            return true;
+                          }, mOutBufferLen);
 #endif
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
             if (NS_FAILED (rv)) {
               return rv;
             }
@@ -504,10 +523,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         } else if (code == Z_BUF_ERROR) {
           if (bytesWritten) {
 #ifdef SANDBOX_CPP
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)(mOutBuffer.sandbox_onlyVerifyAddress()), bytesWritten);
-#else
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+            mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char c){
+                            // no validation needed, we simply copy the array to prevent
+                            // double-fetch / TOCTOU i.e. capture a persistent snapshot of
+                            // its contents
+                            return true;
+                          }, mOutBufferLen);
 #endif
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
             if (NS_FAILED (rv)) {
               return rv;
             }
@@ -592,7 +615,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
 
       for (;;) {
 #ifdef SANDBOX_CPP
-        p_d_stream->next_out  = mOutBuffer;
+        p_d_stream->next_out  = sbOutBuffer;
         p_d_stream->avail_out = (uInt)mOutBufferLen;
 
         int code = sandbox_invoke(sbox, inflate, p_d_stream, Z_NO_FLUSH).sandbox_copyAndVerify([](int i){
@@ -617,10 +640,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         if (code == Z_STREAM_END) {
           if (bytesWritten) {
 #ifdef SANDBOX_CPP
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)(mOutBuffer.sandbox_onlyVerifyAddress()), bytesWritten);
-#else
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+            mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char c){
+                            // no validation needed, we simply copy the array to prevent
+                            // double-fetch / TOCTOU i.e. capture a persistent snapshot of
+                            // its contents
+                            return true;
+                          }, mOutBufferLen);
 #endif
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
             if (NS_FAILED (rv)) {
               return rv;
             }
@@ -636,10 +663,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         } else if (code == Z_OK) {
           if (bytesWritten) {
 #ifdef SANDBOX_CPP
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)(mOutBuffer.sandbox_onlyVerifyAddress()), bytesWritten);
-#else
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+            mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char c){
+                            // no validation needed, we simply copy the array to prevent
+                            // double-fetch / TOCTOU i.e. capture a persistent snapshot of
+                            // its contents
+                            return true;
+                          }, mOutBufferLen);
 #endif
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
             if (NS_FAILED (rv)) {
               return rv;
             }
@@ -647,10 +678,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         } else if (code == Z_BUF_ERROR) {
           if (bytesWritten) {
 #ifdef SANDBOX_CPP
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)(mOutBuffer.sandbox_onlyVerifyAddress()), bytesWritten);
-#else
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+            mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char c){
+                            // no validation needed, we simply copy the array to prevent
+                            // double-fetch / TOCTOU i.e. capture a persistent snapshot of
+                            // its contents
+                            return true;
+                          }, mOutBufferLen);
 #endif
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
             if (NS_FAILED (rv)) {
               return rv;
             }
