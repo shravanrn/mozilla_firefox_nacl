@@ -22,6 +22,11 @@
 #include "state.h"
 #include "brotli/decode.h"
 
+#include <dirent.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <signal.h>
 
 #if SANDBOX_CPP == 1
 void ensureNaClSandboxInit();
@@ -41,10 +46,42 @@ static std::mutex mtx;
 void SandboxOnFirefoxExitingZLIB()
 {
   #if SANDBOX_CPP == 2
+  {
     std::lock_guard<std::mutex> guard(mtx);
-
     sbox->destroySandbox();
     sbox = NULL;
+  }
+  //killProcessSandboxOthersides
+  {
+    DIR *dir = opendir("/proc/");
+    struct dirent *entry = readdir(dir);
+
+    printf("Force killing all otherside processes\n");
+    while (entry != NULL)
+    {
+      if (entry->d_type == DT_DIR)
+      {
+        long int pid = strtol(entry->d_name,NULL,0);
+        if(pid != 0)
+        {
+          char buffer[4096];
+          char filename[512];
+          snprintf(filename, 512, "/proc/%s/cmdline", entry->d_name);
+
+          FILE *fp = fopen(filename, "r");                 // do not use "rb"
+          if (fgets(buffer, sizeof(buffer), fp)) {
+            if(strstr(buffer, "andbox_otherside") != NULL) {
+              kill(pid, SIGKILL);
+            }
+          }
+          fclose(fp);
+        }
+      }
+
+      entry = readdir(dir);
+    }
+    closedir(dir);
+  }
   #endif
 }
 
