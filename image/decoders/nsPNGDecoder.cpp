@@ -888,7 +888,9 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
   MOZ_ASSERT_IF(GetDecodeDone(), mNextTransition.NextStateIsTerminal());
   MOZ_ASSERT_IF(HasError(), mNextTransition.NextStateIsTerminal());
 
-  pngJmpBufferKey = nullptr;
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+    pngJmpBufferKey = nullptr;
+  #endif
   // Continue with whatever transition the callback code requested. We
   // initialized this to Transition::ContinueUnbuffered(State::PNG_DATA) above,
   // so by default we just continue the unbuffered read.

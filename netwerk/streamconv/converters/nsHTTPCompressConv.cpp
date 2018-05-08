@@ -22,12 +22,7 @@
 #include "state.h"
 #include "brotli/decode.h"
 
-#ifdef SANDBOX_CPP
-#include <mutex>
 
-sandbox_nacl_load_library_api(zlib)
-
-static std::mutex mtx;
 #if SANDBOX_CPP == 1
 void ensureNaClSandboxInit();
 NaClSandbox* sbox = NULL;
@@ -42,6 +37,13 @@ void SandboxOnFirefoxExitingZLIB()
     sbox = NULL;
   #endif
 }
+
+#ifdef SANDBOX_CPP
+#include <mutex>
+
+sandbox_nacl_load_library_api(zlib)
+
+static std::mutex mtx;
 
 static void constructZlibSandboxIfNecessary() {
   mtx.lock();

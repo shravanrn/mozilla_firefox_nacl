@@ -1362,25 +1362,24 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
   //width and height shouldn't change, so we read them out make a copy and use that
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     auto output_width = mInfo.output_width.UNSAFE_noVerify();
+    auto output_components = mInfo.output_components.sandbox_copyAndVerify([](int val) {
+      if(val < 1)
+      {
+        printf("nsJPEGDecoder::nsJPEGDecoder: output_components < 1. Unexpected value\n");
+        exit(1);
+      }
+      return val;
+    });
   #else
     auto output_width = mInfo.output_width;
+    auto output_components = mInfo.output_components;
   #endif
 
   #if(USE_SANDBOXING_BUFFERS != 0)
     #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-      auto output_components = mInfo.output_components.sandbox_copyAndVerify([](int val) {
-        if(val < 1)
-        {
-          printf("nsJPEGDecoder::nsJPEGDecoder: output_components < 1. Unexpected value\n");
-          exit(1);
-        }
-        return val;
-      });
-
       unsigned int row_stride = output_width * output_components;
       unverified_data<JSAMPARRAY> pBufferSys;
     #else
-      auto output_components = mInfo.output_components;
       unsigned int row_stride = output_width * output_components;
       JSAMPARRAY pBufferSys;
     #endif
