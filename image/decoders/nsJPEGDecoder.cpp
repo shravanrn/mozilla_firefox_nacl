@@ -1041,7 +1041,11 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
     if (mState == JPEG_DECOMPRESS_SEQUENTIAL) {
       LOG_SCOPE((mozilla::LogModule*)sJPEGLog, "nsJPEGDecoder::Write -- "
                               "JPEG_DECOMPRESS_SEQUENTIAL case");
-      m_output_height_shadow = mInfo.output_height.UNSAFE_noVerify();
+      #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+        m_output_height_shadow = mInfo.output_height.UNSAFE_noVerify();
+      #else
+        m_output_height_shadow = mInfo.output_height;
+      #endif
       bool suspend;
       OutputScanlines(&suspend);
 
