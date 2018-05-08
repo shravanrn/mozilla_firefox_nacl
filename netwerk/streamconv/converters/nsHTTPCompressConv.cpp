@@ -27,19 +27,18 @@
 
 sandbox_nacl_load_library_api(zlib)
 
-static std::mutex mutex;
+static std::mutex mtx;
 static ZProcessSandbox* sbox = NULL;
 
-static ZProcessSandbox* getZlibSandbox() {
-  mutex.lock();
+static void constructZlibSandboxIfNecessary() {
+  mtx.lock();
     if(!sbox) {
       //sbox = createDlSandbox("/home/shr/Code/LibrarySandboxing/Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe",
     //"/home/shr/Code/LibrarySandboxing/zlib_nacl/builds/x64/nacl_build_debug/libz.nexe");
       sbox = createDlSandbox<ZProcessSandbox>("/home/shr/Code/LibrarySandboxing/ProcessSandbox/ProcessSandbox_otherside_zlib64");
       initCPPApi(sbox);
     }
-  mutex.unlock();
-  return sbox;
+  mtx.unlock();
 }
 #endif
 
@@ -75,7 +74,8 @@ nsHTTPCompressConv::nsHTTPCompressConv()
   , mMutex("nsHTTPCompressConv")
 {
 #ifdef SANDBOX_CPP
-  p_d_stream = newInSandbox<z_stream>(getZlibSandbox());
+  constructZlibSandboxIfNecessary();
+  p_d_stream = newInSandbox<z_stream>(sbox);
   if(p_d_stream == nullptr) {
     printf("Error in malloc for p_d_stream\n");
     exit(1);
@@ -95,7 +95,7 @@ nsHTTPCompressConv::~nsHTTPCompressConv()
   LOG(("nsHttpCompresssConv %p dtor\n", this));
   if (mInpBuffer) {
 #ifdef SANDBOX_CPP
-    freeInSandbox(getZlibSandbox(), mInpBuffer);
+    freeInSandbox(sbox, mInpBuffer);
 #else
     free(mInpBuffer);
 #endif
@@ -103,7 +103,7 @@ nsHTTPCompressConv::~nsHTTPCompressConv()
 
   if (mOutBuffer) {
 #ifdef SANDBOX_CPP
-    freeInSandbox(getZlibSandbox(), mOutBuffer);
+    freeInSandbox(sbox, mOutBuffer);
 #else
     free(mOutBuffer);
 #endif
@@ -113,14 +113,14 @@ nsHTTPCompressConv::~nsHTTPCompressConv()
   //    for mozilla bug 198133.  Need to handle this case.
   if (mStreamInitialized && !mStreamEnded) {
 #ifdef SANDBOX_CPP
-    sandbox_invoke(getZlibSandbox(), inflateEnd, p_d_stream);
+    sandbox_invoke(sbox, inflateEnd, p_d_stream);
 #else
     inflateEnd(&d_stream);
 #endif
   }
 
 #ifdef SANDBOX_CPP
-  getZlibSandbox()->freeInSandbox(p_d_stream);
+  freeInSandbox(sbox, p_d_stream);
 #endif
 }
 
@@ -339,16 +339,16 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
 
     if (mInpBuffer != nullptr && streamLen > mInpBufferLen) {
 #ifdef SANDBOX_CPP
-      freeInSandbox(getZlibSandbox(), mInpBuffer);
-      mInpBuffer = newInSandbox<unsigned char>(getZlibSandbox(), mInpBufferLen = streamLen);
+      freeInSandbox(sbox, mInpBuffer);
+      mInpBuffer = newInSandbox<unsigned char>(sbox, mInpBufferLen = streamLen);
 #else
       mInpBuffer = (unsigned char *) realloc(mInpBuffer, mInpBufferLen = streamLen);
 #endif
 
       if (mOutBufferLen < streamLen * 2) {
 #ifdef SANDBOX_CPP
-        freeInSandbox(getZlibSandbox(), mOutBuffer);
-        mOutBuffer = newInSandbox<unsigned char>(getZlibSandbox(), mOutBufferLen = streamLen * 3);
+        freeInSandbox(sbox, mOutBuffer);
+        mOutBuffer = newInSandbox<unsigned char>(sbox, mOutBufferLen = streamLen * 3);
 #else
         mOutBuffer = (unsigned char *) realloc(mOutBuffer, mOutBufferLen = streamLen * 3);
 #endif
@@ -361,7 +361,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
 
     if (mInpBuffer == nullptr) {
 #ifdef SANDBOX_CPP
-      mInpBuffer = newInSandbox<unsigned char>(getZlibSandbox(), mInpBufferLen = streamLen);
+      mInpBuffer = newInSandbox<unsigned char>(sbox, mInpBufferLen = streamLen);
 #else
       mInpBuffer = (unsigned char *) malloc(mInpBufferLen = streamLen);
 #endif
@@ -369,7 +369,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
 
     if (mOutBuffer == nullptr) {
 #ifdef SANDBOX_CPP
-      mOutBuffer = newInSandbox<unsigned char>(getZlibSandbox(), mOutBufferLen = streamLen * 3);
+      mOutBuffer = newInSandbox<unsigned char>(sbox, mOutBufferLen = streamLen * 3);
 #else
       mOutBuffer = (unsigned char *) malloc(mOutBufferLen = streamLen * 3);
 #endif
@@ -390,7 +390,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
       if (!mStreamInitialized) {
 #ifdef SANDBOX_CPP
         memset(p_d_stream, 0, sizeof (*p_d_stream));
-        auto rv = sandbox_invoke(getZlibSandbox(), inflateInit_, p_d_stream, sandbox_stackarr(ZLIB_VERSION), sizeof(z_stream)).sandbox_copyAndVerify([](int i){
+        auto rv = sandbox_invoke(sbox, inflateInit_, p_d_stream, sandbox_stackarr(ZLIB_VERSION), sizeof(z_stream)).sandbox_copyAndVerify([](int i){
                 // safe in all cases - we only care about ==Z_OK or not
                 return i;
               });
@@ -419,7 +419,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         p_d_stream->next_out  = mOutBuffer;
         p_d_stream->avail_out = (uInt)mOutBufferLen;
 
-        int code = sandbox_invoke(getZlibSandbox(), inflate, p_d_stream, Z_NO_FLUSH).sandbox_copyAndVerify([](int i){
+        int code = sandbox_invoke(sbox, inflate, p_d_stream, Z_NO_FLUSH).sandbox_copyAndVerify([](int i){
                         // all values are safe - we handle all values of 'code'
                         return i;
                       });
@@ -450,7 +450,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
           }
 
 #ifdef SANDBOX_CPP
-          sandbox_invoke(getZlibSandbox(), inflateEnd, p_d_stream);
+          sandbox_invoke(sbox, inflateEnd, p_d_stream);
 #else
           inflateEnd(&d_stream);
 #endif
@@ -488,13 +488,13 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
               (((0x8 + 0x7 * 0x10) * 0x100 + 30) / 31 * 31) & 0xFF,
             };
 #ifdef SANDBOX_CPP
-          auto sb_dummy_head = newInSandbox<unsigned char>(getZlibSandbox(), 2);
+          auto sb_dummy_head = newInSandbox<unsigned char>(sbox, 2);
           memcpy(sb_dummy_head, dummy_head, 2);
-          sandbox_invoke(getZlibSandbox(), inflateReset, p_d_stream);
+          sandbox_invoke(sbox, inflateReset, p_d_stream);
           p_d_stream->next_in  = sb_dummy_head;
           p_d_stream->avail_in = sizeof(dummy_head);
 
-          code = sandbox_invoke(getZlibSandbox(), inflate, p_d_stream, Z_NO_FLUSH).sandbox_copyAndVerify([](int i){
+          code = sandbox_invoke(sbox, inflate, p_d_stream, Z_NO_FLUSH).sandbox_copyAndVerify([](int i){
                       // all values of code are safe, we only care about ==Z_OK or not
                       return i;
                     });
@@ -520,7 +520,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
 #ifdef SANDBOX_CPP
           p_d_stream->next_in  = mInpBuffer;
           p_d_stream->avail_in = (uInt)streamLen;
-          freeInSandbox(getZlibSandbox(), sb_dummy_head);
+          freeInSandbox(sbox, sb_dummy_head);
 #else
           d_stream.next_in  = mInpBuffer;
           d_stream.avail_in = (uInt)streamLen;
@@ -533,7 +533,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
       if (!mStreamInitialized) {
 #ifdef SANDBOX_CPP
         memset(p_d_stream, 0, sizeof (*p_d_stream));
-        auto rv = sandbox_invoke(getZlibSandbox(), inflateInit2_, p_d_stream, -MAX_WBITS, sandbox_stackarr(ZLIB_VERSION), sizeof(z_stream)).sandbox_copyAndVerify([](int i){
+        auto rv = sandbox_invoke(sbox, inflateInit2_, p_d_stream, -MAX_WBITS, sandbox_stackarr(ZLIB_VERSION), sizeof(z_stream)).sandbox_copyAndVerify([](int i){
               // safe in all cases - we only care about ==Z_OK or not
               return i;
               });
@@ -561,7 +561,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         p_d_stream->next_out  = mOutBuffer;
         p_d_stream->avail_out = (uInt)mOutBufferLen;
 
-        int code = sandbox_invoke(getZlibSandbox(), inflate, p_d_stream, Z_NO_FLUSH).sandbox_copyAndVerify([](int i){
+        int code = sandbox_invoke(sbox, inflate, p_d_stream, Z_NO_FLUSH).sandbox_copyAndVerify([](int i){
             // safe in all cases - we handle all possible values of code
             return i;
             });
@@ -593,7 +593,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
           }
 
 #ifdef SANDBOX_CPP
-          sandbox_invoke(getZlibSandbox(), inflateEnd, p_d_stream);
+          sandbox_invoke(sbox, inflateEnd, p_d_stream);
 #else
           inflateEnd(&d_stream);
 #endif

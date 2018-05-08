@@ -43,4 +43,4 @@ LOCAL_INCLUDES += [
     '/netwerk/base',
 ]
 
-OS_LIBS += ['-L/home/craig/code/LibrarySandboxing/ProcessSandbox', '-lProcessSandbox_zlib64']
+OS_LIBS += ['-L../../../../ProcessSandbox', '-lProcessSandbox_zlib64']
