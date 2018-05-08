@@ -31,6 +31,9 @@ for i in ${FFVersions[@]}; do
 	fi
 done
 
+echo -n "Enter number of iterations:"
+read iterationsToRun
+
 echo "Starting. Make sure to "
 echo "1. Disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
 echo "2. Run the zlib testing server with node server.js"
@@ -41,12 +44,12 @@ echo "2. Run the zlib testing server with node server.js"
 function writeTimingLinesToOutput() {
 	# Logs are in the format as given below
 	#
-	# stuff | 1,JPEG_Time,0xf7150598,10,0,0,30
-	# stuff | 2,JPEG_Time,0xf7150598,33,1,10,35
-	# stuff | 1,JPEG_Time,0xaaa,31,0,0,40
-	# stuff | 2,JPEG_Time,0xaaa,40,1,11,50
+	# stuff | 1,JPEG_Time,0xf7150598,10,0,0,30,1
+	# stuff | 2,JPEG_Time,0xf7150598,33,1,10,35,1
+	# stuff | 1,JPEG_Time,0xaaa,31,0,0,40,1
+	# stuff | 2,JPEG_Time,0xaaa,40,1,11,50,1
 	#
-	# where the 5 comma separated columns are 
+	# where the 6 comma separated columns are 
 	# - invocation count for this thread
 	# - const string "JPEG_Time"
 	# - a unique string for each thread
@@ -54,11 +57,11 @@ function writeTimingLinesToOutput() {
 	# - invocation count for scanlines in this thread
 	# - cumulative time spent in "timed" scanlines code
 	# - cumulative time spent in rendering thread until jpeg destroy
-	#
+	# - invocation count for all apis in this thread
 	# We want the latest time for each thread i.e.
 	#
-	# stuff | 2,JPEG_Time,0xf7150598,33,1,10,35
-	# stuff | 2,JPEG_Time,0xaaa,40,1,11,50
+	# stuff | 2,JPEG_Time,0xf7150598,33,1,10,35,1
+	# stuff | 2,JPEG_Time,0xaaa,40,1,11,50,1
 
 	for testToRun in "JPEG_Time" "PNG_Time"
 	do
@@ -69,6 +72,7 @@ function writeTimingLinesToOutput() {
 
 		FNINVOCATIONS=0
 		FNTIMESPENT=0
+		FNALLINVOCATIONS=0
 		FNCOREINVOCATIONS=0
 		FNCORETIMESPENT=0
 		DESTROYTIMESPENT=0
@@ -83,13 +87,14 @@ function writeTimingLinesToOutput() {
 			FNCOREINVOCATIONS=$((FNCOREINVOCATIONS + PIECES[4]))
 			FNCORETIMESPENT=$((FNCORETIMESPENT + PIECES[5]))
 			DESTROYTIMESPENT=$((DESTROYTIMESPENT + PIECES[6]))
+			FNALLINVOCATIONS=$((FNALLINVOCATIONS + PIECES[7]))
 			DATATOFILTER=$(echo "$DATATOFILTER" | grep -v -E "${PIECES[2]}")
 		done
 
 		COMMASEPTIME=$(printf "%'.f\n" $((FNTIMESPENT / 25)))
 		COMMASEPCORETIME=$(printf "%'.f\n" $((FNCORETIMESPENT / 25)))
 		COMMASEPDESTROYTIME=$(printf "%'.f\n" $((DESTROYTIMESPENT / 25)))
-		echo "Final $testToRun (for 1 run): inv=$((FNINVOCATIONS / 25)) time=$COMMASEPTIME core_inv=$((FNCOREINVOCATIONS / 25)) core_time=$COMMASEPCORETIME destroy=$COMMASEPDESTROYTIME" >> "$1"
+		echo "Final $testToRun (for 1 run): inv=$((FNINVOCATIONS / 25)) time=$COMMASEPTIME core_inv=$((FNCOREINVOCATIONS / 25)) core_time=$COMMASEPCORETIME destroy=$COMMASEPDESTROYTIME all_inv=$FNALLINVOCATIONS" >> "$1"
 		echo -e "\n" >> "$1"
 
 		IFS=$OIFS
@@ -113,7 +118,7 @@ function runTest(){
 	rm ./talos_output.txt
 }
 
-for i in `seq 1 500`
+for i in `seq 1 $iterationsToRun`
 do
 
 	echo "Round ${i}" >> "$1"

@@ -1519,7 +1519,9 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       // if (jpeg_read_scanlines(&mInfo, &sampleRow, 1) != 1) {
 
       #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+          jpegStartTimerCore();
           JDIMENSION readScanLinesRet2 = sandbox_invoke_custom(jpegSandbox, jpeg_read_scanlines, &mInfo, pBufferSys, 1).sandbox_copyAndVerify(readScanLinesVerif);
+          jpegEndTimerCore();
           void* pBufferSysMemCpyTarget2 = (*pBufferSys).sandbox_onlyVerifyAddress();
           memcpy((void *)sampleRow, pBufferSysMemCpyTarget2, row_stride);
       #else
