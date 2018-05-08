@@ -122,9 +122,14 @@ private:
 
 #ifdef SANDBOX_CPP
     unverified_data<unsigned char*> mInpBuffer;
-    unverified_data<unsigned char*> sbOutBuffer;
+    #ifdef USE_COPYING_BUFFERS
+      unverified_data<unsigned char*> sbOutBuffer;
+    #endif
 #else
     unsigned char *mInpBuffer;
+    #ifdef USE_COPYING_BUFFERS
+      unsigned char* sbOutBuffer;
+    #endif
 #endif
 
     unsigned char *mOutBuffer;
