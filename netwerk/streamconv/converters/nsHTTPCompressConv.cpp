@@ -28,7 +28,12 @@
 sandbox_nacl_load_library_api(zlib)
 
 static std::mutex mtx;
+#if SANDBOX_CPP == 1
+NaClSandbox* sbox = NULL;
+#elif SANDBOX_CPP == 2
 static ZProcessSandbox* sbox = NULL;
+#endif
+
 
 static void constructZlibSandboxIfNecessary() {
   mtx.lock();

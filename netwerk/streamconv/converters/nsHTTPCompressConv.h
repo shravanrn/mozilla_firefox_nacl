@@ -16,15 +16,20 @@
 #include "mozilla/Mutex.h"
 
 #if SANDBOX_CPP == 1
-NACL: TODO
+#define NACL_SANDBOX_API_NO_OPTIONAL
+#include "nacl_sandbox.h"
+#undef NACL_SANDBOX_API_NO_OPTIONAL
 #elif SANDBOX_CPP == 2
 #define PROCESS_SANDBOX_API_NO_OPTIONAL
 #define USE_ZLIB
 #include "ProcessSandbox.h"
 #include "process_sandbox_cpp.h"
-#include "zlib_structs_for_cpp_api.h"
 #undef USE_ZLIB
 #undef PROCESS_SANDBOX_API_NO_OPTIONAL
+#endif
+
+#ifdef SANDBOX_CPP
+#include "zlib_structs_for_cpp_api.h"
 #endif
 
 #include "zlib.h"
