@@ -783,6 +783,21 @@ class jpeg_page_render(PageloaderTest):
     unit = 'ms'
 
 @register_test()
+class zlib_page_render(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/zlib_page_render/zlib_page_render.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 25
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+
+@register_test()
 class jpeg_page_render_25(PageloaderTest):
     """
     Test the time taken to render 25 jpeg image
