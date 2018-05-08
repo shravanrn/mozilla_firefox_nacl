@@ -1041,7 +1041,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
     if (mState == JPEG_DECOMPRESS_SEQUENTIAL) {
       LOG_SCOPE((mozilla::LogModule*)sJPEGLog, "nsJPEGDecoder::Write -- "
                               "JPEG_DECOMPRESS_SEQUENTIAL case");
-
+      m_output_height_shadow = mInfo.output_height.UNSAFE_noVerify();
       bool suspend;
       OutputScanlines(&suspend);
 
@@ -1447,7 +1447,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
           return val;
         }
 
-        printf("Could not validate image height\n");
+        printf("Could not validate image height: %u %u\n", m_output_height_shadow, val);
         exit(1);
       });
     #else
