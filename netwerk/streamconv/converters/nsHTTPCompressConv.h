@@ -15,6 +15,18 @@
 #include "mozilla/Atomics.h"
 #include "mozilla/Mutex.h"
 
+#if SANDBOX_CPP == 1
+NACL: TODO
+#elif SANDBOX_CPP == 2
+#define PROCESS_SANDBOX_API_NO_OPTIONAL
+#define USE_ZLIB
+#include "ProcessSandbox.h"
+#include "process_sandbox_cpp.h"
+#include "zlib_structs_for_cpp_api.h"
+#undef USE_ZLIB
+#undef PROCESS_SANDBOX_API_NO_OPTIONAL
+#endif
+
 #include "zlib.h"
 
 // brotli includes
@@ -103,8 +115,13 @@ private:
     nsCOMPtr<nsIStreamListener> mListener; // this guy gets the converted data via his OnDataAvailable ()
     Atomic<CompressMode, Relaxed> mMode;
 
+#ifdef SANDBOX_CPP
+    unverified_data<unsigned char*> mOutBuffer;
+    unverified_data<unsigned char*> mInpBuffer;
+#else
     unsigned char *mOutBuffer;
     unsigned char *mInpBuffer;
+#endif
 
     uint32_t	mOutBufferLen;
     uint32_t	mInpBufferLen;
@@ -127,7 +144,12 @@ private:
     bool         mDummyStreamInitialised;
     bool         mFailUncleanStops;
 
+#ifdef SANDBOX_CPP
+    unverified_data<z_stream*> p_d_stream;
+#else
     z_stream d_stream;
+#endif
+
     unsigned mLen, hMode, mSkipCount, mFlags;
 
     uint32_t check_header (nsIInputStream *iStr, uint32_t streamLen, nsresult *rv);

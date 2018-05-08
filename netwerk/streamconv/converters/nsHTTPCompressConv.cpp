@@ -22,6 +22,28 @@
 #include "state.h"
 #include "brotli/decode.h"
 
+#ifdef SANDBOX_CPP
+#include <mutex>
+
+sandbox_nacl_load_library_api(zlib)
+
+static ZProcessSandbox* getZlibSandbox() {
+  static ZProcessSandbox* sbox = NULL;
+  static std::mutex mutex;
+  if(!sbox) {
+    mutex.lock();
+      if(!sbox) {
+        //sbox = createDlSandbox("/home/shr/Code/LibrarySandboxing/Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe",
+      //"/home/shr/Code/LibrarySandboxing/zlib_nacl/builds/x64/nacl_build_debug/libz.nexe");
+        sbox = createDlSandbox<ZProcessSandbox>("/home/craig/code/LibrarySandboxing/ProcessSandbox/ProcessSandbox_otherside_zlib64");
+        initCPPApi(sbox);
+      }
+    mutex.unlock();
+  }
+  return sbox;
+}
+#endif
+
 namespace mozilla {
 namespace net {
 
@@ -53,7 +75,14 @@ nsHTTPCompressConv::nsHTTPCompressConv()
   , mDecodedDataLength(0)
   , mMutex("nsHTTPCompressConv")
 {
-  LOG(("nsHttpCompresssConv %p ctor\n", this));
+#ifdef SANDBOX_CPP
+  p_d_stream = newInSandbox<z_stream>(getZlibSandbox());
+  if(p_d_stream == nullptr) {
+    printf("Error in malloc for p_d_stream\n");
+    exit(1);
+  }
+#endif
+  LOG(("nsHttpCompressConv %p ctor\n", this));
   if (NS_IsMainThread()) {
     mFailUncleanStops =
       Preferences::GetBool("network.http.enforce-framing.http", false);
@@ -66,18 +95,34 @@ nsHTTPCompressConv::~nsHTTPCompressConv()
 {
   LOG(("nsHttpCompresssConv %p dtor\n", this));
   if (mInpBuffer) {
+#ifdef SANDBOX_CPP
+    freeInSandbox(getZlibSandbox(), mInpBuffer);
+#else
     free(mInpBuffer);
+#endif
   }
 
   if (mOutBuffer) {
+#ifdef SANDBOX_CPP
+    freeInSandbox(getZlibSandbox(), mOutBuffer);
+#else
     free(mOutBuffer);
+#endif
   }
 
   // For some reason we are not getting Z_STREAM_END.  But this was also seen
   //    for mozilla bug 198133.  Need to handle this case.
   if (mStreamInitialized && !mStreamEnded) {
-    inflateEnd (&d_stream);
+#ifdef SANDBOX_CPP
+    sandbox_invoke(getZlibSandbox(), inflateEnd, p_d_stream);
+#else
+    inflateEnd(&d_stream);
+#endif
   }
+
+#ifdef SANDBOX_CPP
+  getZlibSandbox()->freeInSandbox(p_d_stream);
+#endif
 }
 
 NS_IMETHODIMP
@@ -294,10 +339,20 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
   case HTTP_COMPRESS_DEFLATE:
 
     if (mInpBuffer != nullptr && streamLen > mInpBufferLen) {
+#ifdef SANDBOX_CPP
+      freeInSandbox(getZlibSandbox(), mInpBuffer);
+      mInpBuffer = newInSandbox<unsigned char>(getZlibSandbox(), mInpBufferLen = streamLen);
+#else
       mInpBuffer = (unsigned char *) realloc(mInpBuffer, mInpBufferLen = streamLen);
+#endif
 
       if (mOutBufferLen < streamLen * 2) {
+#ifdef SANDBOX_CPP
+        freeInSandbox(getZlibSandbox(), mOutBuffer);
+        mOutBuffer = newInSandbox<unsigned char>(getZlibSandbox(), mOutBufferLen = streamLen * 3);
+#else
         mOutBuffer = (unsigned char *) realloc(mOutBuffer, mOutBufferLen = streamLen * 3);
+#endif
       }
 
       if (mInpBuffer == nullptr || mOutBuffer == nullptr) {
@@ -306,11 +361,19 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
     }
 
     if (mInpBuffer == nullptr) {
+#ifdef SANDBOX_CPP
+      mInpBuffer = newInSandbox<unsigned char>(getZlibSandbox(), mInpBufferLen = streamLen);
+#else
       mInpBuffer = (unsigned char *) malloc(mInpBufferLen = streamLen);
+#endif
     }
 
     if (mOutBuffer == nullptr) {
+#ifdef SANDBOX_CPP
+      mOutBuffer = newInSandbox<unsigned char>(getZlibSandbox(), mOutBufferLen = streamLen * 3);
+#else
       mOutBuffer = (unsigned char *) malloc(mOutBufferLen = streamLen * 3);
+#endif
     }
 
     if (mInpBuffer == nullptr || mOutBuffer == nullptr) {
@@ -318,50 +381,100 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
     }
 
     uint32_t unused;
+#ifdef SANDBOX_CPP
+    iStr->Read((char *)(mInpBuffer.sandbox_onlyVerifyAddress()), streamLen, &unused);
+#else
     iStr->Read((char *)mInpBuffer, streamLen, &unused);
+#endif
 
     if (mMode == HTTP_COMPRESS_DEFLATE) {
       if (!mStreamInitialized) {
-        memset(&d_stream, 0, sizeof (d_stream));
-
-        if (inflateInit(&d_stream) != Z_OK) {
+#ifdef SANDBOX_CPP
+        memset(p_d_stream, 0, sizeof (*p_d_stream));
+        auto rv = sandbox_invoke(getZlibSandbox(), inflateInit_, p_d_stream, sandbox_stackarr(ZLIB_VERSION), sizeof(z_stream)).sandbox_copyAndVerify([](int i){
+                // safe in all cases - we only care about ==Z_OK or not
+                return i;
+              });
+#else
+        memset(&d_stream, 0, sizeof(d_stream));
+        auto rv = inflateInit(&d_stream);
+#endif
+        if (rv != Z_OK) {
           return NS_ERROR_FAILURE;
         }
 
         mStreamInitialized = true;
       }
-      d_stream.next_in = mInpBuffer;
+
+#ifdef SANDBOX_CPP
+      p_d_stream->next_in  = mInpBuffer;
+      p_d_stream->avail_in = (uInt)streamLen;
+#else
+      d_stream.next_in  = mInpBuffer;
       d_stream.avail_in = (uInt)streamLen;
+#endif
 
       mDummyStreamInitialised = false;
       for (;;) {
-        d_stream.next_out = mOutBuffer;
+#ifdef SANDBOX_CPP
+        p_d_stream->next_out  = mOutBuffer;
+        p_d_stream->avail_out = (uInt)mOutBufferLen;
+
+        int code = sandbox_invoke(getZlibSandbox(), inflate, p_d_stream, Z_NO_FLUSH).sandbox_copyAndVerify([](int i){
+                        // all values are safe - we handle all values of 'code'
+                        return i;
+                      });
+        uInt avail_out = p_d_stream->avail_out.sandbox_copyAndVerify([this](uInt i){
+                            if(i <= mOutBufferLen) return i;
+                            printf("Unexpected avail_out %u vs. mOutBufferLen %u\n", i, mOutBufferLen);
+                            exit(1);
+                          });
+#else
+        d_stream.next_out  = mOutBuffer;
         d_stream.avail_out = (uInt)mOutBufferLen;
 
         int code = inflate(&d_stream, Z_NO_FLUSH);
-        unsigned bytesWritten = (uInt)mOutBufferLen - d_stream.avail_out;
+        uInt avail_out = d_stream.avail_out;
+#endif
+        unsigned bytesWritten = (uInt)mOutBufferLen - avail_out;
 
         if (code == Z_STREAM_END) {
           if (bytesWritten) {
+#ifdef SANDBOX_CPP
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)(mOutBuffer.sandbox_onlyVerifyAddress()), bytesWritten);
+#else
             rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+#endif
             if (NS_FAILED (rv)) {
               return rv;
             }
           }
 
+#ifdef SANDBOX_CPP
+          sandbox_invoke(getZlibSandbox(), inflateEnd, p_d_stream);
+#else
           inflateEnd(&d_stream);
+#endif
           mStreamEnded = true;
           break;
         } else if (code == Z_OK) {
           if (bytesWritten) {
+#ifdef SANDBOX_CPP
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)(mOutBuffer.sandbox_onlyVerifyAddress()), bytesWritten);
+#else
             rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+#endif
             if (NS_FAILED (rv)) {
               return rv;
             }
           }
         } else if (code == Z_BUF_ERROR) {
           if (bytesWritten) {
+#ifdef SANDBOX_CPP
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)(mOutBuffer.sandbox_onlyVerifyAddress()), bytesWritten);
+#else
             rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+#endif
             if (NS_FAILED (rv)) {
               return rv;
             }
@@ -375,11 +488,24 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
               0x8 + 0x7 * 0x10,
               (((0x8 + 0x7 * 0x10) * 0x100 + 30) / 31 * 31) & 0xFF,
             };
+#ifdef SANDBOX_CPP
+          auto sb_dummy_head = newInSandbox<unsigned char>(getZlibSandbox(), 2);
+          memcpy(sb_dummy_head, dummy_head, 2);
+          sandbox_invoke(getZlibSandbox(), inflateReset, p_d_stream);
+          p_d_stream->next_in  = sb_dummy_head;
+          p_d_stream->avail_in = sizeof(dummy_head);
+
+          code = sandbox_invoke(getZlibSandbox(), inflate, p_d_stream, Z_NO_FLUSH).sandbox_copyAndVerify([](int i){
+                      // all values of code are safe, we only care about ==Z_OK or not
+                      return i;
+                    });
+#else
           inflateReset(&d_stream);
-          d_stream.next_in = (Bytef*) dummy_head;
+          d_stream.next_in  = (Bytef*) dummy_head;
           d_stream.avail_in = sizeof(dummy_head);
 
           code = inflate(&d_stream, Z_NO_FLUSH);
+#endif
           if (code != Z_OK) {
             return NS_ERROR_FAILURE;
           }
@@ -392,54 +518,106 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
           }
           mDummyStreamInitialised = true;
           // reset stream pointers to our original data
-          d_stream.next_in = mInpBuffer;
+#ifdef SANDBOX_CPP
+          p_d_stream->next_in  = mInpBuffer;
+          p_d_stream->avail_in = (uInt)streamLen;
+          freeInSandbox(getZlibSandbox(), sb_dummy_head);
+#else
+          d_stream.next_in  = mInpBuffer;
           d_stream.avail_in = (uInt)streamLen;
+#endif
         } else {
           return NS_ERROR_INVALID_CONTENT_ENCODING;
         }
       } /* for */
     } else {
       if (!mStreamInitialized) {
-        memset(&d_stream, 0, sizeof (d_stream));
-
-        if (inflateInit2(&d_stream, -MAX_WBITS) != Z_OK) {
+#ifdef SANDBOX_CPP
+        memset(p_d_stream, 0, sizeof (*p_d_stream));
+        auto rv = sandbox_invoke(getZlibSandbox(), inflateInit2_, p_d_stream, -MAX_WBITS, sandbox_stackarr(ZLIB_VERSION), sizeof(z_stream)).sandbox_copyAndVerify([](int i){
+              // safe in all cases - we only care about ==Z_OK or not
+              return i;
+              });
+#else
+        memset(&d_stream, 0, sizeof(d_stream));
+        auto rv = inflateInit2(&d_stream, -MAX_WBITS);
+#endif
+        if (rv != Z_OK) {
           return NS_ERROR_FAILURE;
         }
 
         mStreamInitialized = true;
       }
 
+#ifdef SANDBOX_CPP
+      p_d_stream->next_in  = mInpBuffer;
+      p_d_stream->avail_in = (uInt)streamLen;
+#else
       d_stream.next_in  = mInpBuffer;
       d_stream.avail_in = (uInt)streamLen;
+#endif
 
       for (;;) {
+#ifdef SANDBOX_CPP
+        p_d_stream->next_out  = mOutBuffer;
+        p_d_stream->avail_out = (uInt)mOutBufferLen;
+
+        int code = sandbox_invoke(getZlibSandbox(), inflate, p_d_stream, Z_NO_FLUSH).sandbox_copyAndVerify([](int i){
+            // safe in all cases - we handle all possible values of code
+            return i;
+            });
+        //int code = inflate (&d_stream, Z_NO_FLUSH);
+        uInt avail_out = p_d_stream->avail_out.sandbox_copyAndVerify([this](uInt i){
+                            if(i <= mOutBufferLen) return i;
+                            printf("Unexpected avail_out %u vs mOutBufferLen %u\n", i, mOutBufferLen);
+                            exit(1);
+                          });
+#else
         d_stream.next_out  = mOutBuffer;
         d_stream.avail_out = (uInt)mOutBufferLen;
 
-        int code = inflate (&d_stream, Z_NO_FLUSH);
-        unsigned bytesWritten = (uInt)mOutBufferLen - d_stream.avail_out;
+        int code = inflate(&d_stream, Z_NO_FLUSH);
+        uInt avail_out = d_stream.avail_out;
+#endif
+        unsigned bytesWritten = (uInt)mOutBufferLen - avail_out;
 
         if (code == Z_STREAM_END) {
           if (bytesWritten) {
+#ifdef SANDBOX_CPP
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)(mOutBuffer.sandbox_onlyVerifyAddress()), bytesWritten);
+#else
             rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+#endif
             if (NS_FAILED (rv)) {
               return rv;
             }
           }
 
+#ifdef SANDBOX_CPP
+          sandbox_invoke(getZlibSandbox(), inflateEnd, p_d_stream);
+#else
           inflateEnd(&d_stream);
+#endif
           mStreamEnded = true;
           break;
         } else if (code == Z_OK) {
           if (bytesWritten) {
+#ifdef SANDBOX_CPP
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)(mOutBuffer.sandbox_onlyVerifyAddress()), bytesWritten);
+#else
             rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+#endif
             if (NS_FAILED (rv)) {
               return rv;
             }
           }
         } else if (code == Z_BUF_ERROR) {
           if (bytesWritten) {
+#ifdef SANDBOX_CPP
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)(mOutBuffer.sandbox_onlyVerifyAddress()), bytesWritten);
+#else
             rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+#endif
             if (NS_FAILED (rv)) {
               return rv;
             }

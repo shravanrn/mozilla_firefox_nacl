@@ -10,10 +10,6 @@ XPIDL_SOURCES += [
 
 XPIDL_MODULE = 'necko_http'
 
-EXPORTS += [
-    'zlib_structs_for_cpp_api.h',
-]
-
 UNIFIED_SOURCES += [
     'mozTXTToHTMLConv.cpp',
     'nsDirIndex.cpp',
@@ -34,13 +30,7 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'cocoa':
 
 FINAL_LIBRARY = 'xul'
 
-# Choose 1 for NaCl sandbox, 2 for process sandbox, or comment this out for no sandbox
-DEFINES["SANDBOX_CPP"] = 2
-
 LOCAL_INCLUDES += [
-    '/../ProcessSandbox',
     '/modules/brotli/dec',
     '/netwerk/base',
 ]
-
-OS_LIBS += ['-L/home/craig/code/LibrarySandboxing/ProcessSandbox', '-lProcessSandbox_zlib64']

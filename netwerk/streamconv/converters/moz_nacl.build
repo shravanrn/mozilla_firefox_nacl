@@ -35,7 +35,7 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'cocoa':
 FINAL_LIBRARY = 'xul'
 
 # Choose 1 for NaCl sandbox, 2 for process sandbox, or comment this out for no sandbox
-DEFINES["SANDBOX_CPP"] = 2
+DEFINES["SANDBOX_CPP"] = 1
 
 LOCAL_INCLUDES += [
     '/../ProcessSandbox',
