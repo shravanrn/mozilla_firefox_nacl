@@ -197,6 +197,8 @@ void pngEndTimerCore()
   END_TIMER_CORE("");
 }
 
+void SandboxOnFirefoxExitingZLIB();
+
 void SandboxOnFirefoxExitingPNG()
 {
   #if(USE_SANDBOXING == 3)
@@ -206,6 +208,7 @@ void SandboxOnFirefoxExitingPNG()
       pngSandbox = nullptr;
     }
   #endif
+  SandboxOnFirefoxExitingZLIB();
 }
 
 #if(USE_SANDBOXING == 2)
