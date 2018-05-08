@@ -148,7 +148,7 @@ def main():
 	with open(sys.argv[1]) as f:
 		for line in f:
 			s = handle_line(line, s)
-	# print_final_results(s, sys.argv[2])
+	print_final_results(s, sys.argv[2])
 	print_final_results2(s, sys.argv[2])
 
 main()
