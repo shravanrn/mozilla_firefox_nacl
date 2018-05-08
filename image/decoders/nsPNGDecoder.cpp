@@ -2092,7 +2092,7 @@ nsPNGDecoder::FinishInternal()
 
 
   timeInPng += duration_cast<nanoseconds>(high_resolution_clock::now() - PngCreateTime).count();
-  printf("%10llu,PNG_Time,%d,%10llu,%10llu,%10llu,%10llu\n", invPng, getppid(), getTimeSpentInPng(), getInvocationsInPngCore(), getTimeSpentInPngCore(), timeInPng);
+  printf("%10llu,PNG_Time,%d,%10llu,%10llu,%10llu,%10llu,%10llu\n", invPng, getppid(), getTimeSpentInPng(), getInvocationsInPngCore(), getTimeSpentInPngCore(), timeInPng, getInvocationsInPng());
   invPng++;
 
   decoder->DoTerminate(png_ptr, TerminalState::SUCCESS);

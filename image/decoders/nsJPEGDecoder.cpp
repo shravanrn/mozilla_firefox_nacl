@@ -1227,7 +1227,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 
     // Step 7: Finish decompression
     timeInJpeg += duration_cast<nanoseconds>(high_resolution_clock::now() - JpegCreateTime).count();
-    printf("%10llu,JPEG_Time,%d,%10llu,%10llu,%10llu,%10llu\n", invJpeg, getppid(), getTimeSpentInJpeg(), getInvocationsInJpegCore(), getTimeSpentInJpegCore(), timeInJpeg);
+    printf("%10llu,JPEG_Time,%d,%10llu,%10llu,%10llu,%10llu,%10llu\n", invJpeg, getppid(), getTimeSpentInJpeg(), getInvocationsInJpegCore(), getTimeSpentInJpegCore(), timeInJpeg, getInvocationsInJpeg());
     invJpeg++;
 
     #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -1482,7 +1482,9 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
         JDIMENSION readScanLinesRet;
         #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+          jpegStartTimerCore();
           readScanLinesRet = sandbox_invoke_custom(jpegSandbox, jpeg_read_scanlines, &mInfo, pBufferSys, 1).sandbox_copyAndVerify(readScanLinesVerif);
+          jpegEndTimerCore();
           void* pBufferSysMemCpyTarget = (*pBufferSys).sandbox_onlyVerifyAddress();
           memcpy((void *)imageRow, pBufferSysMemCpyTarget, row_stride);
         #else
@@ -1745,11 +1747,16 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   METHODDEF(void) init_source (unverified_data<j_decompress_ptr> jd)
+  {
+    jpegEndTimer();
+    jpegStartTimer();
+  }
 #else
   METHODDEF(void) init_source (j_decompress_ptr jd)
+  {
+  }
 #endif
-{
-}
+
 
 /******************************************************************************/
 /* data source manager method
@@ -1764,10 +1771,12 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 */
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   METHODDEF(void) skip_input_data (unverified_data<j_decompress_ptr> jd, unverified_data<long> unv_num_bytes)
+  {
+    jpegEndTimer();
 #else
   METHODDEF(void) skip_input_data (j_decompress_ptr jd, long num_bytes)
+  {
 #endif
-{
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     unverified_data<jpeg_source_mgr*> src = jd->src;
     long num_bytes = unv_num_bytes.sandbox_copyAndVerify([](int val){
@@ -1812,6 +1821,9 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     src->bytes_in_buffer = bytes_in_buffer - (size_t)num_bytes;
     src->next_input_byte = next_input_byte + num_bytes;
   }
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+  jpegStartTimer();
+  #endif
 }
 
 /******************************************************************************/
@@ -1853,10 +1865,12 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   METHODDEF(boolean) fill_input_buffer (unverified_data<j_decompress_ptr> jd)
+  {
+    jpegEndTimer();
 #else
   METHODDEF(boolean) fill_input_buffer (j_decompress_ptr jd)
+  {
 #endif
-{
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     unverified_data<jpeg_source_mgr*> src = jd->src;
     nsJPEGDecoder* decoder = (nsJPEGDecoder*) jd->client_data.sandbox_copyAndVerifyUnsandboxedPointer([](void* val){
@@ -2021,6 +2035,9 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
   decoder->mBackBufferLen = (size_t)new_backtrack_buflen;
   decoder->mReading = true;
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+  jpegStartTimer();
+  #endif
   return false;
 }
 
@@ -2038,6 +2055,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 #endif
 {
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+    jpegEndTimer();
     nsJPEGDecoder* decoder = (nsJPEGDecoder*) jd->client_data.sandbox_copyAndVerifyUnsandboxedPointer([](void* val){
       if(val != jpegRendererSaved)
       {
@@ -2057,6 +2075,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
   // Notify using a helper method to get around protectedness issues.
   decoder->NotifyDone();
+  jpegStartTimer();
 }
 
 } // namespace image

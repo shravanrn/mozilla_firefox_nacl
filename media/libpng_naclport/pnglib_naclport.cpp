@@ -716,7 +716,7 @@ PNG_ALLOCATED png_structp d_png_create_read_struct(png_const_charp user_png_ver,
         unsigned len = strlen(user_png_ver) + 1;
         char* stringInSandbox = (char*) mallocInPngSandbox(len);
         strncpy(stringInSandbox, user_png_ver, len);
-        png_structp ret = ptr_png_create_read_struct((png_const_charp)stringInSandbox, error_ptr, error_fn, warn_fn);
+        png_structp ret = ptr_png_create_read_struct((png_const_charp)stringInSandbox, error_ptr, my_err_fn_stub, my_warn_fn_stub);
         freeInPngSandbox(stringInSandbox);
     #elif(USE_SANDBOXING == 1)
         png_structp ret = ptr_png_create_read_struct(user_png_ver, error_ptr, my_err_fn_stub, my_warn_fn_stub);
@@ -1025,7 +1025,7 @@ void d_png_set_progressive_read_fn(png_structrp png_ptr, png_voidp progressive_p
         PUSH_VAL_TO_STACK(threadData, png_progressive_end_ptr, endRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_set_progressive_read_fn);
     #elif(USE_SANDBOXING == 3)
-        ptr_png_set_progressive_read_fn(png_ptr, progressive_ptr, info_fn, row_fn, end_fn);
+        ptr_png_set_progressive_read_fn(png_ptr, progressive_ptr, my_info_fn_stub, my_row_fn_stub, my_end_fn_stub);
     #elif(USE_SANDBOXING == 1)
         ptr_png_set_progressive_read_fn(png_ptr, progressive_ptr, my_info_fn_stub, my_row_fn_stub, my_end_fn_stub);
     #elif(USE_SANDBOXING == 0)
@@ -1460,7 +1460,7 @@ void d_png_set_progressive_frame_fn(png_structp png_ptr, png_progressive_frame_p
         PUSH_VAL_TO_STACK(threadData, png_progressive_end_ptr, frameEndRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_set_progressive_frame_fn);
     #elif(USE_SANDBOXING == 3)
-        ptr_png_set_progressive_frame_fn(png_ptr, frame_info_fn, frame_end_fn);
+        ptr_png_set_progressive_frame_fn(png_ptr, my_frame_info_fn_stub, my_frame_end_fn_stub);
     #elif(USE_SANDBOXING == 1)
         ptr_png_set_progressive_frame_fn(png_ptr, my_frame_info_fn_stub, my_frame_end_fn_stub);
     #elif(USE_SANDBOXING == 0)
