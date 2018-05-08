@@ -312,7 +312,7 @@ void initializeLibPngSandbox(void(*additionalSetup)(),
       strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
 
       printf("Creating PNG process sandbox\n");
-      pngSandbox = new PNGProcessSandbox(full_PS_OTHERSIDE_PATH, 0, 2);
+      pngSandbox = new PNGProcessSandbox(full_PS_OTHERSIDE_PATH, 3, 3);
     }
     #endif
 
