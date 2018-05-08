@@ -92,8 +92,10 @@ using std::min;
   #include "pnginfo.h"
   #include <set>
   #include <map>
-  std::map<typename std::decay<jmp_buf>::type, jmp_buf> pngJmpBufferList;
-  std::set<void*> pngRendererList;
+
+  thread_local typename std::decay<jmp_buf>::type pngJmpBufferKey = nullptr;
+  thread_local jmp_buf pngJmpBufferValue;
+  thread_local void* pngRendererSaved = nullptr;
   typedef struct png_unknown_chunk_t
   {
      png_byte name[5]; /* Textual chunk name with '\0' terminator */
@@ -348,17 +350,17 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
 void nsPNGDecoder::checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_data<int> unv_status)
 {
   auto envRef = unv_env.sandbox_onlyVerifyAddress();
-  auto iter = pngJmpBufferList.find(envRef);
-  if(iter == pngJmpBufferList.end())
+
+  if(envRef != pngJmpBufferKey)
   {
     printf("nsPNGDecoder::nsPNGDecoder: Critical Error in finding the right jmp_buf\n");
     exit(1);
   }
 
-  pngJmpBufferList.erase(iter);
+  pngJmpBufferKey = nullptr;
 
   int status = unv_status.sandbox_copyAndVerify([](int val){ return val; });
-  longjmp(iter->second, status);
+  longjmp(pngJmpBufferValue, status);
 }
 #endif
 
@@ -616,10 +618,6 @@ nsPNGDecoder::EndImageFrame()
 nsresult
 nsPNGDecoder::InitInternal()
 {
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    pngRendererList.insert((void*) this);
-  #endif
-
   mCMSMode = gfxPlatform::GetCMSMode();
   if (GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
     mCMSMode = eCMSMode_Off;
@@ -807,6 +805,9 @@ nsPNGDecoder::InitInternal()
 LexerResult
 nsPNGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+    pngRendererSaved = this;
+  #endif
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
 
   PngCreateTime = high_resolution_clock::now();
@@ -839,10 +840,18 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
 
   // libpng uses setjmp/longjmp for error handling.
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+    if(pngJmpBufferKey != nullptr)
+    {
+      printf("nsPNGDecoder::nsPNGDecoder - jump buffer already in use\n");
+      exit(1);
+    }
+
     auto setLongJumpRet = *(sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress());
-    if (setLongJumpRet != 0 && setjmp(pngJmpBufferList[setLongJumpRet])) {
+    if (setLongJumpRet != 0 && setjmp(pngJmpBufferValue)) {
       return Transition::TerminateFailure();
     }
+
+    pngJmpBufferKey = setLongJumpRet;
   #else
     auto setLongJumpRet = *d_png_set_longjmp_fn((mPNG), longjmp, (sizeof (jmp_buf)));
     if (setLongJumpRet != 0 && setjmp(setLongJumpRet)) {
@@ -879,6 +888,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
   MOZ_ASSERT_IF(GetDecodeDone(), mNextTransition.NextStateIsTerminal());
   MOZ_ASSERT_IF(HasError(), mNextTransition.NextStateIsTerminal());
 
+  pngJmpBufferKey = nullptr;
   // Continue with whatever transition the callback code requested. We
   // initialized this to Transition::ContinueUnbuffered(State::PNG_DATA) above,
   // so by default we just continue the unbuffered read.
@@ -1216,9 +1226,8 @@ nsPNGDecoder::FinishedPNGData()
     *p_num_trans = 0;
 
     void* getProgPtrRet = sandbox_invoke_custom_ret_unsandboxed_ptr(pngSandbox, png_get_progressive_ptr, png_ptr);
-    auto iter = pngRendererList.find(getProgPtrRet);
 
-    if(iter == pngRendererList.end())
+    if(getProgPtrRet != pngRendererSaved)
     {
       sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - bad nsPNGDecoder pointer returned"));
     }
@@ -1738,9 +1747,8 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     pngEndTimerCore();
     void* getProgPtrRet = sandbox_invoke_custom_ret_unsandboxed_ptr(pngSandbox, png_get_progressive_ptr, png_ptr);
-    auto iter = pngRendererList.find(getProgPtrRet);
 
-    if(iter == pngRendererList.end())
+    if(getProgPtrRet != pngRendererSaved)
     {
       sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - bad nsPNGDecoder pointer returned"));
     }
@@ -1760,19 +1768,7 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     //data sanity checks already exist below
     png_uint_32 row_num = row_num_unv.sandbox_copyAndVerify([](png_uint_32 val){ return val; });
-
-    int lastKnownPassNumberCopy = decoder->lastKnownPassNumber;
-    int pass = pass_unv.sandbox_copyAndVerify([&png_ptr, lastKnownPassNumberCopy](int val){ 
-      //0 to 6 according to header, additionally we make sure it only increases
-      // if(val >= 0 && val <= 6 && val >= lastKnownPassNumberCopy){ 
-        return val; 
-      // }
-
-      // sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - pass value out of range"));
-      // return int(0);
-    });
-
-    decoder->lastKnownPassNumber = pass;
+    int pass = pass_unv.sandbox_copyAndVerify([](int val){ return val; });
   #endif
 
   while (pass > decoder->mPass) {
@@ -1956,7 +1952,7 @@ nsPNGDecoder::FinishInternal()
   PostDecodeDone(loop_count);
 
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    pngRendererList.erase((void *)this);
+    pngRendererSaved = nullptr;
   #endif
 
   return NS_OK;
@@ -1974,9 +1970,8 @@ nsPNGDecoder::FinishInternal()
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     pngEndTimer();
     void* getProgPtrRet = sandbox_invoke_custom_ret_unsandboxed_ptr(pngSandbox, png_get_progressive_ptr, png_ptr);
-    auto iter = pngRendererList.find(getProgPtrRet);
 
-    if(iter == pngRendererList.end())
+    if(getProgPtrRet != pngRendererSaved)
     {
       sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - bad nsPNGDecoder pointer returned"));
     }
@@ -2078,9 +2073,8 @@ nsPNGDecoder::FinishInternal()
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     pngEndTimer();
     void* getProgPtrRet = sandbox_invoke_custom_ret_unsandboxed_ptr(pngSandbox, png_get_progressive_ptr, png_ptr);
-    auto iter = pngRendererList.find(getProgPtrRet);
 
-    if(iter == pngRendererList.end())
+    if(getProgPtrRet != pngRendererSaved)
     {
       sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - bad nsPNGDecoder pointer returned"));
     }
@@ -2160,11 +2154,20 @@ nsPNGDecoder::IsValidICOResource() const
   // we need to save the jump buffer here. Otherwise we'll end up without a
   // proper callstack.
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+
+    if(pngJmpBufferKey != nullptr)
+    {
+      printf("nsPNGDecoder::nsPNGDecoder - jump buffer already in use\n");
+      exit(1);
+    }
+
     auto setLongJumpRet = *(sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress());
-    if (setLongJumpRet != 0 && setjmp(pngJmpBufferList[setLongJumpRet])) {
+    if (setLongJumpRet != 0 && setjmp(pngJmpBufferValue)) {
       // We got here from a longjmp call indirectly from png_get_IHDR
       return false;
     }
+
+    pngJmpBufferKey = setLongJumpRet;
 
     auto p_png_width  = newInSandbox<png_uint_32>(pngSandbox);
     auto p_png_height = newInSandbox<png_uint_32>(pngSandbox);
@@ -2195,6 +2198,15 @@ nsPNGDecoder::IsValidICOResource() const
         }
         return *val; 
       });
+
+      pngJmpBufferKey = nullptr;
+      return ((png_color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
+         png_color_type == PNG_COLOR_TYPE_RGB) &&
+        png_bit_depth == 8);
+    } else {
+      pngJmpBufferKey = nullptr;
+      return false;
+    }
   #else
     auto setLongJumpRet = *d_png_set_longjmp_fn((mPNG), longjmp, (sizeof (jmp_buf)));
     if (setLongJumpRet != 0 && setjmp(setLongJumpRet)) {
@@ -2216,14 +2228,13 @@ nsPNGDecoder::IsValidICOResource() const
 
     if (d_png_get_IHDR(mPNG, mInfo, &png_width, &png_height, &png_bit_depth,
                      &png_color_type, nullptr, nullptr, nullptr)) {
+      return ((png_color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
+               png_color_type == PNG_COLOR_TYPE_RGB) &&
+              png_bit_depth == 8);
+    } else {
+      return false;
+    }
   #endif
-
-    return ((png_color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
-             png_color_type == PNG_COLOR_TYPE_RGB) &&
-            png_bit_depth == 8);
-  } else {
-    return false;
-  }
 }
 
 } // namespace image

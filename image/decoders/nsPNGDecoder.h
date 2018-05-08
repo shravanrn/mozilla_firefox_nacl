@@ -176,7 +176,6 @@ public:
   // libpng callbacks
   // We put these in the class so that they can access protected members.
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    int lastKnownPassNumber = 0;
     static void PNGAPI info_callback(unverified_data<png_structp> png_ptr, unverified_data<png_infop> info_ptr);
     static void PNGAPI row_callback(unverified_data<png_structp> png_ptr, unverified_data<png_bytep> new_row, unverified_data<png_uint_32> row_num, unverified_data<int> pass);
     #ifdef PNG_APNG_SUPPORTED

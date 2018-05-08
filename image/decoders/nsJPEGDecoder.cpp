@@ -78,11 +78,8 @@ extern "C" {
   sandbox_nacl_load_library_api(jpeglib)
 
   #include <set>
-  #include <map>
-  #include <mutex>
 
-  std::mutex jpegRendererListMutex;
-  std::set<nsJPEGDecoder*> jpegRendererList;
+  thread_local void* jpegRendererSaved = nullptr;
 #endif
 
 #ifdef NACL_SANDBOX_USE_CPP_API
@@ -533,12 +530,6 @@ nsJPEGDecoder::SpeedHistogram() const
 nsresult
 nsJPEGDecoder::InitInternal()
 {
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-  {
-    std::lock_guard<std::mutex> lock(jpegRendererListMutex);
-    jpegRendererList.insert(this);
-  }
-  #endif
   //printf("FF Flag InitInternal\n");
   mCMSMode = gfxPlatform::GetCMSMode();
   if (GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
@@ -631,10 +622,7 @@ nsJPEGDecoder::FinishInternal()
   }
 
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-  {
-    std::lock_guard<std::mutex> lock(jpegRendererListMutex);
-    jpegRendererList.erase(this);
-  }
+  jpegRendererSaved = nullptr;
   #endif
 
   return NS_OK;
@@ -643,6 +631,9 @@ nsJPEGDecoder::FinishInternal()
 LexerResult
 nsJPEGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+  jpegRendererSaved = this;
+  #endif
   //printf("FF Flag DoDecode\n");
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
 
@@ -667,15 +658,6 @@ J_COLOR_SPACE jpegJColorSpaceVerifier(J_COLOR_SPACE val)
     return val <= JCS_RGB565? val : JCS_UNKNOWN;
 }
 
-int jpegOutputComponentsVerifier(int val)
-{
-  if(val < 1)
-  {
-    printf("nsJPEGDecoder::nsJPEGDecoder: output_components < 1. Unexpected value\n");
-    exit(1);
-  }
-  return val;
-}
 #endif
 
 LexerTransition<nsJPEGDecoder::State>
@@ -747,33 +729,31 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 
       #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
         auto image_width = mInfo.image_width
-        .UNSAFE_noVerify();//TODO_NEW
-        // .sandbox_copyAndVerify([this](JDIMENSION val){
-        //   if(HasSize())
-        //   {
-        //     auto s = Size();
-        //     if(s.width < 0 || ((unsigned) s.width) != val)
-        //     {
-        //       printf("nsJPEGDecoder::nsJPEGDecoder: unexpected image width\n");
-        //       exit(1);
-        //     }
-        //   }
-        //   return val; 
-        // });
+        .sandbox_copyAndVerify([this](JDIMENSION val){
+          if(HasSize())
+          {
+            auto s = Size();
+            if(s.width < 0 || ((unsigned) s.width) != val)
+            {
+              printf("nsJPEGDecoder::nsJPEGDecoder: unexpected image width\n");
+              exit(1);
+            }
+          }
+          return val; 
+        });
         auto image_height = mInfo.image_height
-        .UNSAFE_noVerify();//TODO_NEW
-        // .sandbox_copyAndVerify([this](JDIMENSION val){
-        //   if(HasSize())
-        //   {
-        //     auto s = Size();
-        //     if(s.height < 0 || ((unsigned) s.height) != val)
-        //     {
-        //       printf("nsJPEGDecoder::nsJPEGDecoder: unexpected image height\n");
-        //       exit(1);
-        //     }
-        //   }
-        //   return val; 
-        // });
+        .sandbox_copyAndVerify([this](JDIMENSION val){
+          if(HasSize())
+          {
+            auto s = Size();
+            if(s.height < 0 || ((unsigned) s.height) != val)
+            {
+              printf("nsJPEGDecoder::nsJPEGDecoder: unexpected image height\n");
+              exit(1);
+            }
+          }
+          return val; 
+        });
       #else
         auto image_width = mInfo.image_width;
         auto image_height = mInfo.image_height;
@@ -1122,19 +1102,8 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
             return val;
           });
           //invariant output_scanline <= output_height
-          m_output_height_shadow = mInfo.output_height.UNSAFE_noVerify();//TODO_NEW
-          // .sandbox_copyAndVerify([this](JDIMENSION val){
-          //   if(HasSize())
-          //   {
-          //     auto s = OutputSize();
-          //     if(s.height < 0 || ((unsigned) s.height) != val)
-          //     {
-          //       printf("nsJPEGDecoder::nsJPEGDecoder: unexpected output height\n");
-          //       exit(1);
-          //     }
-          //   }
-          //   return val; 
-          // });
+          m_output_height_shadow = mInfo.output_height.UNSAFE_noVerify();
+
           JDIMENSION output_scanline = mInfo.output_scanline.sandbox_copyAndVerify(output_scanline_verifier);
         #else
           int scan = mInfo.input_scan_number;
@@ -1392,28 +1361,27 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
   //width and height shouldn't change, so we read them out make a copy and use that
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    auto output_width = mInfo.output_width.sandbox_copyAndVerify([this](JDIMENSION val){
-      // if(HasSize())
-      // {
-      //   auto s = OutputSize();
-      //   if(s.width < 0 || ((unsigned) s.width) != val)
-      //   {
-      //     printf("nsJPEGDecoder::nsJPEGDecoder: unexpected output width: %u, %d\n", val, s.width);
-      //     exit(1);
-      //   }
-      // }
-      return val;
-    });
+    auto output_width = mInfo.output_width.UNSAFE_noVerify();
   #else
     auto output_width = mInfo.output_width;
   #endif
 
   #if(USE_SANDBOXING_BUFFERS != 0)
     #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-      unsigned int row_stride = output_width * mInfo.output_components.sandbox_copyAndVerify(jpegOutputComponentsVerifier);
+      auto output_components = mInfo.output_components.sandbox_copyAndVerify([](int val) {
+        if(val < 1)
+        {
+          printf("nsJPEGDecoder::nsJPEGDecoder: output_components < 1. Unexpected value\n");
+          exit(1);
+        }
+        return val;
+      });
+
+      unsigned int row_stride = output_width * output_components;
       unverified_data<JSAMPARRAY> pBufferSys;
     #else
-      unsigned int row_stride = output_width * mInfo.output_components;
+      auto output_components = mInfo.output_components;
+      unsigned int row_stride = output_width * output_components;
       JSAMPARRAY pBufferSys;
     #endif
     {
@@ -1540,13 +1508,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
 
       JSAMPROW sampleRow = (JSAMPROW)imageRow;
-      #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-        //doesn't appear to be much validation I can do here
-        auto output_components = mInfo.output_components.sandbox_copyAndVerify(jpegOutputComponentsVerifier);
-        if (output_components == 3) 
-      #else
-        if (mInfo.output_components == 3) 
-      #endif
+      if(output_components == 3) 
       {
         // Put the pixels at end of row to enable in-place expansion
         sampleRow += output_width;
@@ -1675,9 +1637,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
                         : NS_ERROR_FAILURE;
 
       nsJPEGDecoder* decoder = (nsJPEGDecoder*) cinfo->client_data.sandbox_copyAndVerifyUnsandboxedPointer([](void* val){
-        std::lock_guard<std::mutex> lock(jpegRendererListMutex);
-        auto iter = jpegRendererList.find((nsJPEGDecoder*) val);
-        if(iter == jpegRendererList.end())
+        if(val != jpegRendererSaved)
         {
           printf("Sbox - bad nsJPEGDecoder pointer returned\n");
           exit(1);
@@ -1819,9 +1779,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     });
 
     nsJPEGDecoder* decoder = (nsJPEGDecoder*) jd->client_data.sandbox_copyAndVerifyUnsandboxedPointer([](void* val){
-      std::lock_guard<std::mutex> lock(jpegRendererListMutex);
-      auto iter = jpegRendererList.find((nsJPEGDecoder*) val);
-      if(iter == jpegRendererList.end())
+      if(val != jpegRendererSaved)
       {
         printf("Sbox - bad nsJPEGDecoder pointer returned\n");
         exit(1);
@@ -1903,9 +1861,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     unverified_data<jpeg_source_mgr*> src = jd->src;
     nsJPEGDecoder* decoder = (nsJPEGDecoder*) jd->client_data.sandbox_copyAndVerifyUnsandboxedPointer([](void* val){
-      std::lock_guard<std::mutex> lock(jpegRendererListMutex);
-      auto iter = jpegRendererList.find((nsJPEGDecoder*) val);
-      if(iter == jpegRendererList.end())
+      if(val != jpegRendererSaved)
       {
         printf("Sbox - bad nsJPEGDecoder pointer returned\n");
         exit(1);
@@ -2084,9 +2040,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 {
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     nsJPEGDecoder* decoder = (nsJPEGDecoder*) jd->client_data.sandbox_copyAndVerifyUnsandboxedPointer([](void* val){
-      std::lock_guard<std::mutex> lock(jpegRendererListMutex);
-      auto iter = jpegRendererList.find((nsJPEGDecoder*) val);
-      if(iter == jpegRendererList.end())
+      if(val != jpegRendererSaved)
       {
         printf("Sbox - bad nsJPEGDecoder pointer returned\n");
         exit(1);
