@@ -36,6 +36,7 @@ FINAL_LIBRARY = 'xul'
 
 # Choose 1 for NaCl sandbox, 2 for process sandbox, or comment this out for no sandbox
 DEFINES["SANDBOX_CPP"] = 2
+DEFINES["PS_OTHERSIDE_PATH"] = '"ProcessSandbox/ProcessSandbox_otherside_zlib64"'
 
 LOCAL_INCLUDES += [
     '/../ProcessSandbox',

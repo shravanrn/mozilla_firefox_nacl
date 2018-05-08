@@ -83,6 +83,26 @@ static64: inithasrun
 	$(CP) ../netwerk/streamconv/converters/moz_static.build ../netwerk/streamconv/converters/moz.build
 	cd .. && ./mach build
 
+static64_zlibnacl: inithasrun
+	if [ ! -d ../firefox_64bit_optdebug_static_zlib_nacl ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_static_zlib_nacl; fi
+	$(CP) ../mozconfig64_staticzlibnacl ../mozconfig
+	$(CP) ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
+	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
+	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
+	$(CP) ../netwerk/streamconv/converters/moz_nacl.build ../netwerk/streamconv/converters/moz.build
+	cd .. && ./mach build
+
+static64_zlibps: inithasrun
+	if [ ! -d ../firefox_64bit_optdebug_static_zlib_ps ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_static_zlib_ps; fi
+	$(CP) ../mozconfig64_staticzlibps ../mozconfig
+	$(CP) ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
+	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
+	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
+	$(CP) ../netwerk/streamconv/converters/moz_ps.build ../netwerk/streamconv/converters/moz.build
+	cd .. && ./mach build
+
 static64_buffcopy: inithasrun
 	if [ ! -d ../firefox_64bit_optdebug_static_buffcopy ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_static_buffcopy; fi
 	$(CP) ../mozconfig64_static_buffcopy ../mozconfig

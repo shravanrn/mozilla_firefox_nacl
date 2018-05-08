@@ -33,9 +33,43 @@ static ZProcessSandbox* sbox = NULL;
 static void constructZlibSandboxIfNecessary() {
   mtx.lock();
     if(!sbox) {
-      //sbox = createDlSandbox("/home/shr/Code/LibrarySandboxing/Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe",
-    //"/home/shr/Code/LibrarySandboxing/zlib_nacl/builds/x64/nacl_build_debug/libz.nexe");
-      sbox = createDlSandbox<ZProcessSandbox>("/home/shr/Code/LibrarySandboxing/ProcessSandbox/ProcessSandbox_otherside_zlib64");
+      char SandboxingCodeRootFolder[1024];
+      int index;
+
+      if(!getcwd(SandboxingCodeRootFolder, 256)) abort();
+
+      char * found = strstr(SandboxingCodeRootFolder, "/mozilla-release");
+      if (found == NULL)
+      {
+        printf("Error initializing SandboxingCodeRootFolder\n");
+        exit(1);
+      }
+
+      index = found - SandboxingCodeRootFolder + 1;
+      SandboxingCodeRootFolder[index] = '\0';
+
+#if SANDBOX_CPP == 1
+      char full_STARTUP_LIBRARY_PATH[1024];
+      char full_SANDBOX_INIT_APP[1024];
+
+      strcpy(full_STARTUP_LIBRARY_PATH, SandboxingCodeRootFolder);
+      strcat(full_STARTUP_LIBRARY_PATH, STARTUP_LIBRARY_PATH);
+
+      strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
+      strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
+
+      printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+      ensureNaClSandboxInit();
+      sbox = createDlSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+#elif SANDBOX_CPP == 2
+      char full_PS_OTHERSIDE_PATH[1024];
+
+      strcpy(full_PS_OTHERSIDE_PATH, SandboxingCodeRootFolder);
+      strcat(full_PS_OTHERSIDE_PATH, PS_OTHERSIDE_PATH);
+
+      printf("Creating zlib process sandbox %s\n", full_PS_OTHERSIDE_PATH);
+      sbox = createDlSandbox<ZProcessSandbox>(full_PS_OTHERSIDE_PATH);
+#endif
       initCPPApi(sbox);
     }
   mtx.unlock();
