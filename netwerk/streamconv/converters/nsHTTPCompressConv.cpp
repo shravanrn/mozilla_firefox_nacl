@@ -504,7 +504,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
                             exit(1);
                           });
 #else
-        #if USE_COPYING_BUFFERS
+        #ifdef USE_COPYING_BUFFERS
           d_stream.next_out = sbOutBuffer;
         #else
           d_stream.next_out  = mOutBuffer;
@@ -519,7 +519,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         if (code == Z_STREAM_END) {
           if (bytesWritten) {
 
-            #if USE_COPYING_BUFFERS
+            #ifdef USE_COPYING_BUFFERS
               #ifdef SANDBOX_CPP
                 mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char* c){
                             // no validation needed, we simply copy the array to prevent
@@ -546,7 +546,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
           break;
         } else if (code == Z_OK) {
           if (bytesWritten) {
-            #if USE_COPYING_BUFFERS
+            #ifdef USE_COPYING_BUFFERS
               #ifdef SANDBOX_CPP
                 mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char* c){
                             // no validation needed, we simply copy the array to prevent
@@ -565,7 +565,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
           }
         } else if (code == Z_BUF_ERROR) {
           if (bytesWritten) {
-            #if USE_COPYING_BUFFERS
+            #ifdef USE_COPYING_BUFFERS
               #ifdef SANDBOX_CPP
                 mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char* c){
                             // no validation needed, we simply copy the array to prevent
@@ -686,7 +686,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
 
         if (code == Z_STREAM_END) {
           if (bytesWritten) {
-            #if USE_COPYING_BUFFERS
+            #ifdef USE_COPYING_BUFFERS
               #ifdef SANDBOX_CPP
                 mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char* c){
                             // no validation needed, we simply copy the array to prevent
@@ -713,7 +713,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
           break;
         } else if (code == Z_OK) {
           if (bytesWritten) {
-            #if USE_COPYING_BUFFERS
+            #ifdef USE_COPYING_BUFFERS
               #ifdef SANDBOX_CPP
                 mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char* c){
                             // no validation needed, we simply copy the array to prevent
@@ -732,7 +732,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
           }
         } else if (code == Z_BUF_ERROR) {
           if (bytesWritten) {
-            #if USE_COPYING_BUFFERS
+            #ifdef USE_COPYING_BUFFERS
               #ifdef SANDBOX_CPP
                 mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char* c){
                             // no validation needed, we simply copy the array to prevent
