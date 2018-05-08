@@ -681,7 +681,11 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
                             exit(1);
                           });
 #else
+#ifdef USE_COPYING_BUFFERS
+        d_stream.next_out  = sbOutBuffer;
+#else
         d_stream.next_out  = mOutBuffer;
+#endif
         d_stream.avail_out = (uInt)mOutBufferLen;
 
         int code = inflate(&d_stream, Z_NO_FLUSH);

@@ -110,7 +110,7 @@ static64_buffcopy: inithasrun
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
-	$(CP) ../netwerk/streamconv/converters/moz_static.build ../netwerk/streamconv/converters/moz.build
+	$(CP) ../netwerk/streamconv/converters/moz_static_buffcopy.build ../netwerk/streamconv/converters/moz.build
 	cd .. && ./mach build
 
 dynamic64: inithasrun
