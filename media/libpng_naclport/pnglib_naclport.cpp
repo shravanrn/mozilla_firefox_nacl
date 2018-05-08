@@ -123,6 +123,14 @@ t_png_longjmp                     ptr_png_longjmp;
 t_png_set_longjmp_fn              ptr_png_set_longjmp_fn;
 t_png_get_IHDR                    ptr_png_get_IHDR;
 t_png_set_scale_16                ptr_png_set_scale_16;
+#else
+void my_err_fn_stub(png_structp png_ptr, png_const_charp error_msg);
+void my_warn_fn_stub(png_structp png_ptr, png_const_charp warning_msg);
+void my_info_fn_stub(png_structp png_ptr, png_infop info_ptr);
+void my_row_fn_stub(png_structp png_ptr, png_bytep new_row, png_uint_32 row_num, int pass);
+void my_end_fn_stub(png_structp png_ptr, png_infop info_ptr);
+void my_frame_info_fn_stub(png_structp png_ptr, png_uint_32 frame_num);
+void my_frame_end_fn_stub(png_structp png_ptr, png_uint_32 frame_num);
 #endif
 
 //Callback stubs
@@ -459,14 +467,21 @@ void initializeLibPngSandbox(void(*additionalSetup)(),
       extern png_progressive_end_ptr endRegisteredCallback;
       extern png_progressive_frame_ptr frameEndRegisteredCallback;
       extern png_progressive_frame_ptr frameInfoRegisteredCallback;
-      errRegisteredCallback      = pngSandbox->registerCallback<png_error_ptr>(nsPNGDecoder_error_callback, nullptr);
-      warnRegisteredCallback     = pngSandbox->registerCallback<png_error_ptr>(nsPNGDecoder_warning_callback, nullptr);
-      infoRegisteredCallback     = pngSandbox->registerCallback<png_progressive_info_ptr>(nsPNGDecoder_info_callback, nullptr);
-      rowRegisteredCallback      = pngSandbox->registerCallback<png_progressive_row_ptr>(nsPNGDecoder_row_callback, nullptr);
-      endRegisteredCallback      = pngSandbox->registerCallback<png_progressive_end_ptr>(nsPNGDecoder_end_callback, nullptr);
-      frameEndRegisteredCallback = pngSandbox->registerCallback<png_progressive_frame_ptr>(nsPNGDecoder_frame_end_callback, nullptr);
+      cb_my_err_fn = nsPNGDecoder_error_callback;
+      cb_my_warn_fn = nsPNGDecoder_warning_callback;
+      cb_my_info_fn = nsPNGDecoder_info_callback;
+      cb_my_row_fn = nsPNGDecoder_row_callback;
+      cb_my_end_fn = nsPNGDecoder_end_callback;
+      cb_my_frame_end_fn = nsPNGDecoder_frame_end_callback;
+      errRegisteredCallback      = pngSandbox->registerCallback<png_error_ptr>(my_err_fn_stub, nullptr);
+      warnRegisteredCallback     = pngSandbox->registerCallback<png_error_ptr>(my_warn_fn_stub, nullptr);
+      infoRegisteredCallback     = pngSandbox->registerCallback<png_progressive_info_ptr>(my_info_fn_stub, nullptr);
+      rowRegisteredCallback      = pngSandbox->registerCallback<png_progressive_row_ptr>(my_row_fn_stub, nullptr);
+      endRegisteredCallback      = pngSandbox->registerCallback<png_progressive_end_ptr>(my_end_fn_stub, nullptr);
+      frameEndRegisteredCallback = pngSandbox->registerCallback<png_progressive_frame_ptr>(my_frame_end_fn_stub, nullptr);
       #ifdef PNG_APNG_SUPPORTED
-        frameInfoRegisteredCallback = pngSandbox->registerCallback<png_progressive_frame_ptr>(nsPNGDecoder_frame_info_callback, nullptr);
+        cb_my_frame_info_fn = nsPNGDecoder_frame_info_callback;
+        frameInfoRegisteredCallback = pngSandbox->registerCallback<png_progressive_frame_ptr>(my_frame_info_fn_stub, nullptr);
       #endif
     #endif
 
@@ -704,8 +719,10 @@ PNG_ALLOCATED png_structp d_png_create_read_struct(png_const_charp user_png_ver,
     //printf("Calling func d_png_create_read_struct\n");
     START_TIMER(d_png_create_read_struct);
 
+    #if(USE_SANDBOXING != 3)
     cb_my_err_fn = error_fn;
     cb_my_warn_fn = warn_fn;
+    #endif
 
     #if(USE_SANDBOXING == 2)
         uintptr_t errRegisteredCallback = registerSandboxCallback(pngSandbox, ERROR_FN_SLOT, (uintptr_t) my_err_fn_stub);
@@ -722,7 +739,7 @@ PNG_ALLOCATED png_structp d_png_create_read_struct(png_const_charp user_png_ver,
         unsigned len = strlen(user_png_ver) + 1;
         char* stringInSandbox = (char*) mallocInPngSandbox(len);
         strncpy(stringInSandbox, user_png_ver, len);
-        png_structp ret = ptr_png_create_read_struct((png_const_charp)stringInSandbox, error_ptr, my_err_fn_stub, my_warn_fn_stub);
+        png_structp ret = ptr_png_create_read_struct((png_const_charp)stringInSandbox, error_ptr, error_fn, warn_fn);
         freeInPngSandbox(stringInSandbox);
     #elif(USE_SANDBOXING == 1)
         png_structp ret = ptr_png_create_read_struct(user_png_ver, error_ptr, my_err_fn_stub, my_warn_fn_stub);
@@ -1013,9 +1030,11 @@ void d_png_set_progressive_read_fn(png_structrp png_ptr, png_voidp progressive_p
     //printf("Calling func d_png_set_progressive_read_fn\n");
     START_TIMER(d_png_set_progressive_read_fn);
 
+    #if(USE_SANDBOXING != 3)
     cb_my_info_fn = info_fn;
     cb_my_row_fn = row_fn;
     cb_my_end_fn = end_fn;
+    #endif
 
     #if(USE_SANDBOXING == 2)
         uintptr_t infoRegisteredCallback = registerSandboxCallback(pngSandbox, INFO_FN_SLOT, (uintptr_t) my_info_fn_stub);
@@ -1031,7 +1050,7 @@ void d_png_set_progressive_read_fn(png_structrp png_ptr, png_voidp progressive_p
         PUSH_VAL_TO_STACK(threadData, png_progressive_end_ptr, endRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_set_progressive_read_fn);
     #elif(USE_SANDBOXING == 3)
-        ptr_png_set_progressive_read_fn(png_ptr, progressive_ptr, my_info_fn_stub, my_row_fn_stub, my_end_fn_stub);
+        ptr_png_set_progressive_read_fn(png_ptr, progressive_ptr, info_fn, row_fn, end_fn);
     #elif(USE_SANDBOXING == 1)
         ptr_png_set_progressive_read_fn(png_ptr, progressive_ptr, my_info_fn_stub, my_row_fn_stub, my_end_fn_stub);
     #elif(USE_SANDBOXING == 0)
@@ -1453,8 +1472,10 @@ void d_png_set_progressive_frame_fn(png_structp png_ptr, png_progressive_frame_p
     //printf("Calling func d_png_set_progressive_frame_fn\n");
     START_TIMER(d_png_set_progressive_frame_fn);
 
+    #if(USE_SANDBOXING != 3)
     cb_my_frame_info_fn = frame_info_fn;
     cb_my_frame_end_fn = frame_end_fn;
+    #endif
 
     #if(USE_SANDBOXING == 2)
         uintptr_t frameInfoRegisteredCallback = registerSandboxCallback(pngSandbox, FRAME_INFO_FN_SLOT, (uintptr_t) my_frame_info_fn_stub);
@@ -1466,7 +1487,7 @@ void d_png_set_progressive_frame_fn(png_structp png_ptr, png_progressive_frame_p
         PUSH_VAL_TO_STACK(threadData, png_progressive_end_ptr, frameEndRegisteredCallback);
         invokeFunctionCall(threadData, (void *)ptr_png_set_progressive_frame_fn);
     #elif(USE_SANDBOXING == 3)
-        ptr_png_set_progressive_frame_fn(png_ptr, my_frame_info_fn_stub, my_frame_end_fn_stub);
+        ptr_png_set_progressive_frame_fn(png_ptr, frame_info_fn, frame_end_fn);
     #elif(USE_SANDBOXING == 1)
         ptr_png_set_progressive_frame_fn(png_ptr, my_frame_info_fn_stub, my_frame_end_fn_stub);
     #elif(USE_SANDBOXING == 0)
@@ -1849,7 +1870,9 @@ jmp_buf* d_png_set_longjmp_fn(png_structrp png_ptr, png_longjmp_ptr longjmp_fn, 
     //printf("Calling func d_png_set_longjmp_fn\n");
     START_TIMER(d_png_set_longjmp_fn);
 
+    #if(USE_SANDBOXING != 3)
     cb_my_longjmp_fn = longjmp_fn;
+    #endif
 
     #if(USE_SANDBOXING == 2)
         uintptr_t longJmpRegisteredCallback = registerSandboxCallback(pngSandbox, LONGJMP_FN_SLOT, (uintptr_t) my_longjmp_fn_stub);
@@ -1860,7 +1883,9 @@ jmp_buf* d_png_set_longjmp_fn(png_structrp png_ptr, png_longjmp_ptr longjmp_fn, 
         PUSH_VAL_TO_STACK(threadData, size_t, jmp_buf_size);
         invokeFunctionCall(threadData, (void *)ptr_png_set_longjmp_fn);
         jmp_buf* ret = (jmp_buf*)functionCallReturnPtr(threadData);
-    #elif(USE_SANDBOXING == 1 || USE_SANDBOXING == 3)
+    #elif(USE_SANDBOXING == 3)
+        jmp_buf* ret = ptr_png_set_longjmp_fn(png_ptr, longjmp_fn, jmp_buf_size);
+    #elif(USE_SANDBOXING == 1)
         jmp_buf* ret = ptr_png_set_longjmp_fn(png_ptr, my_longjmp_fn_stub, jmp_buf_size);
     #elif(USE_SANDBOXING == 0)
         jmp_buf* ret = png_set_longjmp_fn(png_ptr, my_longjmp_fn_stub, jmp_buf_size);
