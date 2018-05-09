@@ -34,9 +34,7 @@ done
 echo -n "Enter number of iterations:"
 read iterationsToRun
 
-echo "Starting. Make sure to "
-echo "1. Disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
-echo "2. Run the zlib testing server with node server.js"
+echo "Starting. Make sure to disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
 
 
 #param: outputfile
