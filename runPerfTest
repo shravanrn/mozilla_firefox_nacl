@@ -1,3 +1,4 @@
+#!/bin/bash
 export MOZ_DISABLE_CONTENT_SANDBOX=1
 
 if [ -z "$1" ]; then 
@@ -34,7 +35,9 @@ done
 echo -n "Enter number of iterations:"
 read iterationsToRun
 
-echo "Starting. Make sure to disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
+echo "Starting. Make sure to "
+echo "1. Disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
+echo "2. Run the zlib testing server with node server.js"
 
 
 #param: outputfile
@@ -136,3 +139,4 @@ done
 
 echo "Output results to $1"
 cat "$1" | grep -E '(^FFBuild)|("name")|("value")|(Final JPEG_Time)|(Final PNG_Time)' | grep --invert-match "INFO -"
+
