@@ -92,10 +92,11 @@ using std::min;
   #include "pnginfo.h"
   #include <set>
   #include <map>
-
-  thread_local bool jumpBufferFilledIn = false;
-  thread_local jmp_buf pngJmpBufferValue;
+  #include <mutex>
+  static std::mutex pngMapMutex;
   thread_local void* pngRendererSaved = nullptr;
+  thread_local unsigned long jumpBufferFilledIn = 0;
+  std::map<unsigned long, jmp_buf> pngJmpBuffers;
   typedef struct png_unknown_chunk_t
   {
      png_byte name[5]; /* Textual chunk name with '\0' terminator */
@@ -348,6 +349,25 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
 volatile int gdb = 1;
 
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+static unsigned long freshMapId()
+{
+  unsigned long startingPoint = rand();
+  std::lock_guard<std::mutex> guard(pngMapMutex);
+  //keep looking around for a free location, unsigned addition wraps
+  for(unsigned long current = startingPoint + 1; current != startingPoint; current++)
+  {
+    if(pngJmpBuffers.find(current) == pngJmpBuffers.end() ) {
+      //ensure the location is cerated and initialized
+      auto &jmpBuffLoc = pngJmpBuffers[current];
+      //not using the location yet
+      (void)(jmpBuffLoc);
+      return current;
+    }
+  }
+
+  printf("nsPNGDecoder::nsPNGDecoder Could not find any more jump buffer locations. All locations are used?\n");
+  exit(1);
+}
 void nsPNGDecoder::checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_data<int> unv_status)
 {
   if(!jumpBufferFilledIn)
@@ -355,11 +375,12 @@ void nsPNGDecoder::checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_
     printf("nsPNGDecoder::nsPNGDecoder: Critical Error in finding the right jmp_buf\n");
     exit(1);
   }
-
+  //clear the jmpBufferIndex on the way out as it is unsafe to call setjmp after this
+  int savedJumpBufferFilledIn = jumpBufferFilledIn;
   jumpBufferFilledIn = 0;
 
   int status = unv_status.sandbox_copyAndVerify([](int val){ return val; });
-  longjmp(pngJmpBufferValue, status);
+  longjmp(pngJmpBuffers[savedJumpBufferFilledIn], status);
 }
 #endif
 
@@ -845,12 +866,11 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
       exit(1);
     }
 
-    auto setLongJumpRet = *(sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress());
-    if (setLongJumpRet != 0 && setjmp(pngJmpBufferValue)) {
+    sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress();
+    jumpBufferFilledIn = freshMapId();
+    if (setjmp(pngJmpBuffers[jumpBufferFilledIn])) {
       return Transition::TerminateFailure();
     }
-
-    jumpBufferFilledIn = 1;
   #else
     auto setLongJumpRet = *d_png_set_longjmp_fn((mPNG), longjmp, (sizeof (jmp_buf)));
     if (setLongJumpRet != 0 && setjmp(setLongJumpRet)) {
@@ -888,6 +908,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
   MOZ_ASSERT_IF(HasError(), mNextTransition.NextStateIsTerminal());
 
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+    //clear the jmpBufferIndex on the way out as it is unsafe to call setjmp after this
     jumpBufferFilledIn = 0;
   #endif
   // Continue with whatever transition the callback code requested. We
@@ -2161,13 +2182,12 @@ nsPNGDecoder::IsValidICOResource() const
       exit(1);
     }
 
-    auto setLongJumpRet = *(sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress());
-    if (setLongJumpRet != 0 && setjmp(pngJmpBufferValue)) {
+    sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress();
+    jumpBufferFilledIn = freshMapId();
+    if (setjmp(pngJmpBuffers[jumpBufferFilledIn])) {
       // We got here from a longjmp call indirectly from png_get_IHDR
       return false;
     }
-
-    jumpBufferFilledIn = 1;
 
     auto p_png_width  = newInSandbox<png_uint_32>(pngSandbox);
     auto p_png_height = newInSandbox<png_uint_32>(pngSandbox);
@@ -2198,11 +2218,13 @@ nsPNGDecoder::IsValidICOResource() const
         return *val; 
       });
 
+      //clear the jmpBufferIndex on the way out as it is unsafe to call setjmp after this
       jumpBufferFilledIn = 0;
       return ((png_color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
          png_color_type == PNG_COLOR_TYPE_RGB) &&
         png_bit_depth == 8);
     } else {
+      //clear the jmpBufferIndex on the way out as it is unsafe to call setjmp after this
       jumpBufferFilledIn = 0;
       return false;
     }
