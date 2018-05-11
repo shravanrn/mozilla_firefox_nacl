@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cmath>
 #include <type_traits>
+#include <sys/syscall.h>
 #include "gfxColor.h"
 #include "gfxPlatform.h"
 #include "imgFrame.h"
@@ -25,7 +26,6 @@
 #include "SurfacePipeFactory.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/Telemetry.h"
-
 using namespace mozilla::gfx;
 
 using std::min;
@@ -93,7 +93,7 @@ using std::min;
   #include <set>
   #include <map>
 
-  thread_local typename std::decay<jmp_buf>::type pngJmpBufferKey = nullptr;
+  thread_local bool jumpBufferFilledIn = false;
   thread_local jmp_buf pngJmpBufferValue;
   thread_local void* pngRendererSaved = nullptr;
   typedef struct png_unknown_chunk_t
@@ -345,19 +345,18 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
   mTimeout = GetNextFrameDelay(aPNG, aInfo);
 }
 #endif
+volatile int gdb = 1;
 
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
 void nsPNGDecoder::checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_data<int> unv_status)
 {
-  auto envRef = unv_env.sandbox_onlyVerifyAddress();
-
-  if(envRef != pngJmpBufferKey)
+  if(!jumpBufferFilledIn)
   {
     printf("nsPNGDecoder::nsPNGDecoder: Critical Error in finding the right jmp_buf\n");
     exit(1);
   }
 
-  pngJmpBufferKey = nullptr;
+  jumpBufferFilledIn = 0;
 
   int status = unv_status.sandbox_copyAndVerify([](int val){ return val; });
   longjmp(pngJmpBufferValue, status);
@@ -840,9 +839,9 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
 
   // libpng uses setjmp/longjmp for error handling.
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    if(pngJmpBufferKey != nullptr)
+    if(jumpBufferFilledIn)
     {
-      printf("nsPNGDecoder::nsPNGDecoder - jump buffer already in use\n");
+      printf("nsPNGDecoder::nsPNGDecoder - jmp_buf jump buffer already in use1\n");
       exit(1);
     }
 
@@ -851,7 +850,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
       return Transition::TerminateFailure();
     }
 
-    pngJmpBufferKey = setLongJumpRet;
+    jumpBufferFilledIn = 1;
   #else
     auto setLongJumpRet = *d_png_set_longjmp_fn((mPNG), longjmp, (sizeof (jmp_buf)));
     if (setLongJumpRet != 0 && setjmp(setLongJumpRet)) {
@@ -889,7 +888,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
   MOZ_ASSERT_IF(HasError(), mNextTransition.NextStateIsTerminal());
 
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    pngJmpBufferKey = nullptr;
+    jumpBufferFilledIn = 0;
   #endif
   // Continue with whatever transition the callback code requested. We
   // initialized this to Transition::ContinueUnbuffered(State::PNG_DATA) above,
@@ -924,8 +923,7 @@ nsPNGDecoder::FinishedPNGData()
       double aGamma = p_aGamma.sandbox_copyAndVerify([&png_ptr](double* val){ 
         if(val == nullptr)
         {
-          sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - got a null gamma"));
-          return double(0);
+          printf("Sbox - got a null gamma\n"); exit(1);
         }
 
         return *val; 
@@ -995,7 +993,7 @@ nsPNGDecoder::FinishedPNGData()
 
       if(profileData == nullptr)
       {
-        sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - profileData array invalid value"));
+        printf("Sbox - profileData array invalid value\n"); exit(1);
       }
     #else
       png_uint_32* p_profileLen = (png_uint_32*) mallocInPngSandbox(sizeof(png_uint_32));
@@ -1060,7 +1058,7 @@ nsPNGDecoder::FinishedPNGData()
 
         int fileIntent = p_fileIntent.sandbox_copyAndVerify([&png_ptr](int *val){
           if(val != nullptr && *val >= 0 && *val < 4) { return *val; }
-          sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - fileIntent value out of range"));
+          printf("Sbox - fileIntent value out of range\n");
           return 0;
         });
       #else
@@ -1137,7 +1135,7 @@ nsPNGDecoder::FinishedPNGData()
           return ret;
         }
 
-        sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - gamma value out of range"));
+        printf("Sbox - gamma value out of range\n"); exit(1);
         return double(0);
       });
 
@@ -1231,7 +1229,7 @@ nsPNGDecoder::FinishedPNGData()
 
     if(getProgPtrRet != pngRendererSaved)
     {
-      sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - bad nsPNGDecoder pointer returned"));
+      printf("Sbox - bad nsPNGDecoder pointer returned 1\n"); exit(1);
     }
 
     nsPNGDecoder* decoder = static_cast<nsPNGDecoder*>(getProgPtrRet);
@@ -1250,7 +1248,7 @@ nsPNGDecoder::FinishedPNGData()
         return *val;
       }
 
-      sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - color_type value out of range"));
+      printf("Sbox - color_type value out of range\n"); exit(1);
       return 0;
     });
 
@@ -1279,7 +1277,7 @@ nsPNGDecoder::FinishedPNGData()
         }
       }
 
-      sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - bit_depth value out of range"));
+      printf("Sbox - bit_depth value out of range\n"); exit(1);
       return 0;
     });
 
@@ -1289,7 +1287,7 @@ nsPNGDecoder::FinishedPNGData()
         return *val;
       }
 
-      sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - interlace_type value out of range"));
+      printf("Sbox - interlace_type value out of range\n"); exit(1);
       return 0;
     });
 
@@ -1385,7 +1383,7 @@ nsPNGDecoder::FinishedPNGData()
 
       if(trans_values == nullptr)
       {
-        sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - *p_trans_values is null"));
+        printf("Sbox - *p_trans_values is null\n"); exit(1);
       }
 
       png_uint_16 trans_values_red   = trans_values->red  .sandbox_copyAndVerify([](png_uint_16 val) { return val; });
@@ -1531,7 +1529,7 @@ nsPNGDecoder::FinishedPNGData()
           return val;
         }
 
-        sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - channels value out of range"));
+        printf("Sbox - channels value out of range\n"); exit(1);
         return 0;
       });
   #else
@@ -1752,7 +1750,7 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
 
     if(getProgPtrRet != pngRendererSaved)
     {
-      sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - bad nsPNGDecoder pointer returned"));
+      printf("Sbox - bad nsPNGDecoder pointer returned 2\n"); exit(1);
     }
 
     nsPNGDecoder* decoder = static_cast<nsPNGDecoder*>(getProgPtrRet);
@@ -1975,7 +1973,7 @@ nsPNGDecoder::FinishInternal()
 
     if(getProgPtrRet != pngRendererSaved)
     {
-      sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - bad nsPNGDecoder pointer returned"));
+      printf("Sbox - bad nsPNGDecoder pointer returned 3\n"); exit(1);
     }
 
     nsPNGDecoder* decoder = static_cast<nsPNGDecoder*>(getProgPtrRet);
@@ -2078,7 +2076,7 @@ nsPNGDecoder::FinishInternal()
 
     if(getProgPtrRet != pngRendererSaved)
     {
-      sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Sbox - bad nsPNGDecoder pointer returned"));
+      printf("Sbox - bad nsPNGDecoder pointer returned 4\n"); exit(1);
     }
 
     nsPNGDecoder* decoder = static_cast<nsPNGDecoder*>(getProgPtrRet);
@@ -2157,9 +2155,9 @@ nsPNGDecoder::IsValidICOResource() const
   // proper callstack.
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
 
-    if(pngJmpBufferKey != nullptr)
+    if(jumpBufferFilledIn)
     {
-      printf("nsPNGDecoder::nsPNGDecoder - jump buffer already in use\n");
+      printf("nsPNGDecoder::nsPNGDecoder - jump buffer already in usein IsValidICOResource\n");
       exit(1);
     }
 
@@ -2169,7 +2167,7 @@ nsPNGDecoder::IsValidICOResource() const
       return false;
     }
 
-    pngJmpBufferKey = setLongJumpRet;
+    jumpBufferFilledIn = 1;
 
     auto p_png_width  = newInSandbox<png_uint_32>(pngSandbox);
     auto p_png_height = newInSandbox<png_uint_32>(pngSandbox);
@@ -2180,8 +2178,7 @@ nsPNGDecoder::IsValidICOResource() const
     auto png_get_IHDRRet = sandbox_invoke_custom(pngSandbox, png_get_IHDR, mPNG, mInfo, p_png_width, p_png_height, p_png_bit_depth, p_png_color_type, nullptr, nullptr, nullptr)
       .sandbox_copyAndVerify([this](png_uint_32 val){
         if(val == 0 || val == 1) { return val; }
-        sandbox_invoke_custom(pngSandbox, png_error, mPNG, sandbox_stackarr("Sbox - png_get_IHDRRet value out of range"));
-        return png_uint_32(0);
+        printf("Sbox - png_get_IHDRRet value out of range\n");exit(1);
       });
 
     if (png_get_IHDRRet) {
@@ -2189,24 +2186,24 @@ nsPNGDecoder::IsValidICOResource() const
       int png_bit_depth  = p_png_bit_depth.sandbox_copyAndVerify([this](int* val) { 
         if(val == nullptr) 
         {
-          sandbox_invoke_custom(pngSandbox, png_error, mPNG, sandbox_stackarr("Sbox - png_bit_depth value null"));
+          printf("Sbox - png_bit_depth value null"); exit(1);
         }
         return *val;
       });
       int png_color_type = p_png_color_type.sandbox_copyAndVerify([this](int* val) { 
         if(val == nullptr) 
         {
-          sandbox_invoke_custom(pngSandbox, png_error, mPNG, sandbox_stackarr("Sbox - png_color_type value null"));
+          printf("Sbox - png_color_type value null"); exit(1);
         }
         return *val; 
       });
 
-      pngJmpBufferKey = nullptr;
+      jumpBufferFilledIn = 0;
       return ((png_color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
          png_color_type == PNG_COLOR_TYPE_RGB) &&
         png_bit_depth == 8);
     } else {
-      pngJmpBufferKey = nullptr;
+      jumpBufferFilledIn = 0;
       return false;
     }
   #else
