@@ -1,4 +1,4 @@
-.PHONY: build64 build32 \
+.PHONY: build64 build32 minbuild64 \
 				static64 static32 \
 				dynamic64 dynamic32 \
 				nacl64 nacl32 \
@@ -22,6 +22,8 @@ inithasrun:
 build32: static32 dynamic32 nacl32 ps32 nacl32_nosimd
 
 build64: static64 static64_buffcopy dynamic64 nacl64 ps64 nacl64_cpp ps64_cpp
+
+minbuild64: nacl64_cpp ps64_cpp
 
 CP=./cpIfDifferent.sh
 
