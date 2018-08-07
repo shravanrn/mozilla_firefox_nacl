@@ -43,6 +43,7 @@ void jpegStartTimerCore();
 void jpegEndTimer();
 void jpegEndTimerCore();
 
+void getSandboxingFolder(char* SandboxingCodeRootFolder);
 void initializeLibJpegSandbox(void(*additionalSetup)());
 uintptr_t getUnsandboxedJpegPtr(uintptr_t uaddr);
 uintptr_t getSandboxedJpegPtr(uintptr_t uaddr);

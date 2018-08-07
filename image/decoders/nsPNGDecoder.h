@@ -14,6 +14,12 @@
 #include "StreamingLexer.h"
 #include "SurfacePipe.h"
 
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+  #include "RLBox_NaCl.h"
+  #include "rlbox.h"
+  using namespace rlbox;
+#endif
+
 #ifdef NACL_SANDBOX_USE_CPP_API
   #define NACL_SANDBOX_API_NO_STL_DS
   #define NACL_SANDBOX_API_NO_OPTIONAL
@@ -32,7 +38,7 @@
   #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
   #include "pnglib_structs_for_cpp_api.h"
 #endif
 
@@ -94,7 +100,10 @@ private:
 
   // Convenience methods to make interacting with StreamingLexer from inside
   // a libpng callback easier.
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+  #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    void DoTerminate(tainted<png_structp, RLBox_NaCl> aPNGStruct, TerminalState aState);
+    void DoYield(tainted<png_structp, RLBox_NaCl> aPNGStruct);  
+  #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     void DoTerminate(unverified_data<png_structp> aPNGStruct, TerminalState aState);
     void DoYield(unverified_data<png_structp> aPNGStruct);
   #else
@@ -128,7 +137,10 @@ private:
   size_t mLastChunkLength;
 
 public:
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+  #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    tainted<png_structp, RLBox_NaCl> mPNG;
+    tainted<png_infop, RLBox_NaCl> mInfo;
+  #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     unverified_data<png_structp> mPNG;
     unverified_data<png_infop> mInfo;
   #else
@@ -154,7 +166,9 @@ public:
   {
     AnimFrameInfo();
 #ifdef PNG_APNG_SUPPORTED
-    #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+    #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+      AnimFrameInfo(tainted<png_structp, RLBox_NaCl> aPNG, tainted<png_infop, RLBox_NaCl> aInfo);
+    #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       AnimFrameInfo(unverified_data<png_structp> aPNG, unverified_data<png_infop> aInfo);
     #else
       AnimFrameInfo(png_structp aPNG, png_infop aInfo);
@@ -175,7 +189,17 @@ public:
 
   // libpng callbacks
   // We put these in the class so that they can access protected members.
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+  #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    static void PNGAPI info_callback(RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<png_structp, RLBox_NaCl> png_ptr, tainted<png_infop, RLBox_NaCl> info_ptr);
+    static void PNGAPI row_callback(RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<png_structp, RLBox_NaCl> png_ptr, tainted<png_bytep, RLBox_NaCl> new_row, tainted<png_uint_32, RLBox_NaCl> row_num, tainted<int, RLBox_NaCl> pass);
+    #ifdef PNG_APNG_SUPPORTED
+      static void PNGAPI frame_info_callback(RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<png_structp, RLBox_NaCl> png_ptr, tainted<png_uint_32, RLBox_NaCl> frame_num);
+    #endif
+    static void PNGAPI end_callback(RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<png_structp, RLBox_NaCl> png_ptr, tainted<png_infop, RLBox_NaCl> info_ptr);
+    static void PNGAPI error_callback(RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<png_structp, RLBox_NaCl> png_ptr, tainted<png_const_charp, RLBox_NaCl> error_msg);
+    static void PNGAPI warning_callback(RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<png_structp, RLBox_NaCl> png_ptr, tainted<png_const_charp, RLBox_NaCl> warning_msg);
+    static void PNGAPI checked_longjmp(RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<jmp_buf, RLBox_NaCl> unv_env, tainted<int, RLBox_NaCl> unv_status);
+  #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     static void PNGAPI info_callback(unverified_data<png_structp> png_ptr, unverified_data<png_infop> info_ptr);
     static void PNGAPI row_callback(unverified_data<png_structp> png_ptr, unverified_data<png_bytep> new_row, unverified_data<png_uint_32> row_num, unverified_data<int> pass);
     #ifdef PNG_APNG_SUPPORTED

@@ -224,14 +224,8 @@ void SandboxOnFirefoxExiting()
 void* jpegDlPtr;
 std::once_flag jpegFinishedInit;
 
-void initializeLibJpegSandbox(void(*additionalSetup)())
+void getSandboxingFolder(char* SandboxingCodeRootFolder)
 {
-  std::call_once(jpegFinishedInit, [](void(*additionalSetup)()){
-    //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_NON_NACL_DL_PATH, PS_OTHERSIDE_PATH are defined as macros in the moz.build of this folder
-
-    char SandboxingCodeRootFolder[1024];
-    int index;
-
     if(!getcwd(SandboxingCodeRootFolder, 256))
     {
       abort();
@@ -243,9 +237,18 @@ void initializeLibJpegSandbox(void(*additionalSetup)())
       printf("Error initializing start directory for NaCl\n");   
       exit(1);
     }
-    
-    index = found - SandboxingCodeRootFolder + 1;
+
+    int index = found - SandboxingCodeRootFolder + 1;
     SandboxingCodeRootFolder[index] = '\0';
+}
+
+void initializeLibJpegSandbox(void(*additionalSetup)())
+{
+  std::call_once(jpegFinishedInit, [](void(*additionalSetup)()){
+    //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, JPEG_NON_NACL_DL_PATH, PS_OTHERSIDE_PATH are defined as macros in the moz.build of this folder
+
+    char SandboxingCodeRootFolder[1024];
+    getSandboxingFolder(SandboxingCodeRootFolder);
 
     #if(USE_SANDBOXING == 0)
     {

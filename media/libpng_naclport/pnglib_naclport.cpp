@@ -256,22 +256,7 @@ void initializeLibPngSandbox(void(*additionalSetup)(),
     //Note STARTUP_LIBRARY_PATH, SANDBOX_INIT_APP, PNG_NON_NACL_DL_PATH are defined as macros in the moz.build of this folder
 
     char SandboxingCodeRootFolder[1024];
-    int index;
-
-    if(!getcwd(SandboxingCodeRootFolder, 256))
-    {
-      abort();
-    }
-
-    char * found = strstr(SandboxingCodeRootFolder, "/mozilla-release");
-    if (found == NULL)
-    {
-      printf("Error initializing start directory for NaCl\n");   
-      exit(1);
-    }
-    
-    index = found - SandboxingCodeRootFolder + 1;
-    SandboxingCodeRootFolder[index] = '\0';
+    getSandboxingFolder(SandboxingCodeRootFolder);
 
     #if(USE_SANDBOXING == 0)
     {

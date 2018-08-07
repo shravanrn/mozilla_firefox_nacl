@@ -55,6 +55,13 @@ void pngStartTimerCore();
 void pngEndTimer();
 void pngEndTimerCore();
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+void getSandboxingFolder(char* SandboxingCodeRootFolder);
+#ifdef __cplusplus
+}
+#endif
 void initializeLibPngSandbox(void(*additionalSetup)(),
   png_error_ptr nsPNGDecoder_error_callback,
   png_error_ptr nsPNGDecoder_warning_callback,

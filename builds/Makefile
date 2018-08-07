@@ -145,6 +145,16 @@ nacl64_cpp: inithasrun
 	$(CP) ../netwerk/streamconv/converters/moz_nacl.build ../netwerk/streamconv/converters/moz.build
 	cd .. && ./mach build
 
+new_nacl64_cpp: inithasrun
+	if [ ! -d ../firefox_64bit_optdebug_new_nacl_cpp ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_new_nacl_cpp; fi
+	$(CP) ../image/decoders/moz_copy_new_nacl_cpp.build ../image/decoders/moz.build
+	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../mozconfig64_new_nacl_cpp ../mozconfig
+	$(CP) ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
+	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
+	$(CP) ../netwerk/streamconv/converters/moz_nacl.build ../netwerk/streamconv/converters/moz.build
+	cd .. && ./mach build
+
 ps64_cpp: inithasrun
 	if [ ! -d ../firefox_64bit_optdebug_process_cpp ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_process_cpp; fi
 	$(CP) ../image/decoders/moz_copy_process_cpp.build ../image/decoders/moz.build
@@ -262,6 +272,10 @@ run64_nacl_nosimd:
 
 run64_naclcpp:
 	$(CP) ../mozconfig64_nacl_cpp ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+
+run64_newnaclcpp:
+	$(CP) ../mozconfig64_new_nacl_cpp ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 run64_perf:
