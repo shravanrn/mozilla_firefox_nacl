@@ -1450,7 +1450,7 @@ ${helpers.single_keyword_system("font-kerning",
     ///    annotation(<feature-value-name>) ]
     pub fn parse<'i, 't>(_context: &ParserContext, input: &mut Parser<'i, 't>)
                          -> Result<SpecifiedValue, ParseError<'i>> {
-        #[allow(unused_imports)] use std::ascii::AsciiExt;
+         #[allow(deprecated, unused_imports)] use std::ascii::AsciiExt;
 
         let mut alternates = Vec::new();
         if input.try(|input| input.expect_ident_matching("normal")).is_ok() {
@@ -2144,7 +2144,7 @@ https://drafts.csswg.org/css-fonts-4/#low-level-font-variation-settings-control-
 
         #[inline]
         fn to_computed_value(&self, _context: &Context) -> computed_value::T {
-            use std::ascii::AsciiExt;
+             #[allow(deprecated, unused_imports)] use std::ascii::AsciiExt;
             match *self {
                 SpecifiedValue::Normal => computed_value::T(0),
                 SpecifiedValue::Override(ref lang) => {
