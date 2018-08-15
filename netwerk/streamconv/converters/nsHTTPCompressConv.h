@@ -15,7 +15,11 @@
 #include "mozilla/Atomics.h"
 #include "mozilla/Mutex.h"
 
-#if SANDBOX_CPP == 1
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+#include "RLBox_NaCl.h"
+#include "rlbox.h"
+using namespace rlbox;
+#elif SANDBOX_CPP == 1
 #define NACL_SANDBOX_API_NO_OPTIONAL
 #include "nacl_sandbox.h"
 #undef NACL_SANDBOX_API_NO_OPTIONAL
@@ -28,7 +32,7 @@
 #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 
-#ifdef SANDBOX_CPP
+#if defined(SANDBOX_CPP) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
 #include "zlib_structs_for_cpp_api.h"
 #endif
 
@@ -120,7 +124,12 @@ private:
     nsCOMPtr<nsIStreamListener> mListener; // this guy gets the converted data via his OnDataAvailable ()
     Atomic<CompressMode, Relaxed> mMode;
 
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    tainted<unsigned char*, RLBox_NaCl> mInpBuffer;
+    #ifdef USE_COPYING_BUFFERS
+      tainted<unsigned char*, RLBox_NaCl> sbOutBuffer;
+    #endif
+#elif defined(SANDBOX_CPP)
     unverified_data<unsigned char*> mInpBuffer;
     #ifdef USE_COPYING_BUFFERS
       unverified_data<unsigned char*> sbOutBuffer;
@@ -155,7 +164,9 @@ private:
     bool         mDummyStreamInitialised;
     bool         mFailUncleanStops;
 
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    tainted<z_stream*, RLBox_NaCl> p_d_stream;
+#elif defined(SANDBOX_CPP)
     unverified_data<z_stream*> p_d_stream;
 #else
     z_stream d_stream;

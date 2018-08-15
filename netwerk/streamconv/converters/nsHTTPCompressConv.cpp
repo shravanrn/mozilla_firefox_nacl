@@ -28,14 +28,22 @@
 #include <string.h>
 #include <signal.h>
 
-#if SANDBOX_CPP == 1
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+RLBoxSandbox<RLBox_NaCl>* rlbox_zlib = NULL;
+#elif SANDBOX_CPP == 1
 void ensureNaClSandboxInit();
 NaClSandbox* sbox = NULL;
 #elif SANDBOX_CPP == 2
 static ZProcessSandbox* sbox = NULL;
 #endif
 
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+#include <mutex>
+
+rlbox_load_library_api(zlib, RLBox_NaCl)
+
+static std::mutex mtx;
+#elif defined(SANDBOX_CPP)
 #include <mutex>
 
 sandbox_nacl_load_library_api(zlib)
@@ -85,11 +93,15 @@ void SandboxOnFirefoxExitingZLIB()
   #endif
 }
 
-#ifdef SANDBOX_CPP
+#if defined(SANDBOX_CPP) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
 
 static void constructZlibSandboxIfNecessary() {
   mtx.lock();
+  #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    if(!rlbox_zlib) {
+  #elif defined(SANDBOX_CPP)
     if(!sbox) {
+  #endif
       char SandboxingCodeRootFolder[1024];
       int index;
 
@@ -105,7 +117,7 @@ static void constructZlibSandboxIfNecessary() {
       index = found - SandboxingCodeRootFolder + 1;
       SandboxingCodeRootFolder[index] = '\0';
 
-#if SANDBOX_CPP == 1
+#if SANDBOX_CPP == 1 || defined(NACL_SANDBOX_USE_NEW_CPP_API)
       char full_STARTUP_LIBRARY_PATH[1024];
       char full_SANDBOX_INIT_APP[1024];
 
@@ -116,8 +128,13 @@ static void constructZlibSandboxIfNecessary() {
       strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
 
       printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
-      ensureNaClSandboxInit();
-      sbox = createDlSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+        rlbox_zlib = RLBoxSandbox<RLBox_NaCl>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+      #else
+        ensureNaClSandboxInit();
+        sbox = createDlSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+        initCPPApi(sbox);
+      #endif
 #elif SANDBOX_CPP == 2
       char full_PS_OTHERSIDE_PATH[1024];
 
@@ -126,8 +143,8 @@ static void constructZlibSandboxIfNecessary() {
 
       printf("Creating zlib process sandbox %s\n", full_PS_OTHERSIDE_PATH);
       sbox = createDlSandbox<ZProcessSandbox>(full_PS_OTHERSIDE_PATH);
-#endif
       initCPPApi(sbox);
+#endif
     }
   mtx.unlock();
 }
@@ -167,7 +184,14 @@ nsHTTPCompressConv::nsHTTPCompressConv()
   , mDecodedDataLength(0)
   , mMutex("nsHTTPCompressConv")
 {
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+  constructZlibSandboxIfNecessary();
+  p_d_stream = rlbox_zlib->mallocInSandbox<z_stream>();
+  if(p_d_stream == nullptr) {
+    printf("Error in malloc for p_d_stream\n");
+    exit(1);
+  }
+#elif defined(SANDBOX_CPP)
   constructZlibSandboxIfNecessary();
   p_d_stream = newInSandbox<z_stream>(sbox);
   if(p_d_stream == nullptr) {
@@ -187,8 +211,10 @@ nsHTTPCompressConv::nsHTTPCompressConv()
 nsHTTPCompressConv::~nsHTTPCompressConv()
 {
   LOG(("nsHttpCompresssConv %p dtor\n", this));
-  if (mInpBuffer) {
-#ifdef SANDBOX_CPP
+  if (mInpBuffer != nullptr) {
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    rlbox_zlib->freeInSandbox(mInpBuffer);
+#elif defined(SANDBOX_CPP)
     freeInSandbox(sbox, mInpBuffer);
 #else
     free(mInpBuffer);
@@ -196,8 +222,10 @@ nsHTTPCompressConv::~nsHTTPCompressConv()
   }
 
 #ifdef USE_COPYING_BUFFERS
-  if (sbOutBuffer) {
-    #ifdef SANDBOX_CPP
+  if (sbOutBuffer != nullptr) {
+    #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+      rlbox_zlib->freeInSandbox(sbOutBuffer);
+    #elif defined(SANDBOX_CPP)
       freeInSandbox(sbox, sbOutBuffer);
     #else
       free(sbOutBuffer);
@@ -212,14 +240,18 @@ nsHTTPCompressConv::~nsHTTPCompressConv()
   // For some reason we are not getting Z_STREAM_END.  But this was also seen
   //    for mozilla bug 198133.  Need to handle this case.
   if (mStreamInitialized && !mStreamEnded) {
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    sandbox_invoke(rlbox_zlib, inflateEnd, p_d_stream);
+#elif defined(SANDBOX_CPP)
     sandbox_invoke(sbox, inflateEnd, p_d_stream);
 #else
     inflateEnd(&d_stream);
 #endif
   }
 
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+  rlbox_zlib->freeInSandbox(p_d_stream);
+#elif defined(SANDBOX_CPP)
   freeInSandbox(sbox, p_d_stream);
 #endif
 }
@@ -438,7 +470,10 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
   case HTTP_COMPRESS_DEFLATE:
 
     if (mInpBuffer != nullptr && streamLen > mInpBufferLen) {
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+      rlbox_zlib->freeInSandbox(mInpBuffer);
+      mInpBuffer = rlbox_zlib->mallocInSandbox<unsigned char>(mInpBufferLen = streamLen);
+#elif defined(SANDBOX_CPP)
       freeInSandbox(sbox, mInpBuffer);
       mInpBuffer = newInSandbox<unsigned char>(sbox, mInpBufferLen = streamLen);
 #else
@@ -449,7 +484,10 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         mOutBufferLen = streamLen * 3;
         mOutBuffer = (unsigned char *) realloc(mOutBuffer, mOutBufferLen);
         #ifdef USE_COPYING_BUFFERS
-          #ifdef SANDBOX_CPP
+          #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+            rlbox_zlib->freeInSandbox(sbOutBuffer);
+            sbOutBuffer = rlbox_zlib->mallocInSandbox<unsigned char>(mOutBufferLen);
+          #elif defined(SANDBOX_CPP)
             freeInSandbox(sbox, sbOutBuffer);
             sbOutBuffer = newInSandbox<unsigned char>(sbox, mOutBufferLen);
           #else
@@ -469,7 +507,9 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
     }
 
     if (mInpBuffer == nullptr) {
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+      mInpBuffer = rlbox_zlib->mallocInSandbox<unsigned char>(mInpBufferLen = streamLen);
+#elif defined(SANDBOX_CPP)
       mInpBuffer = newInSandbox<unsigned char>(sbox, mInpBufferLen = streamLen);
 #else
       mInpBuffer = (unsigned char *) malloc(mInpBufferLen = streamLen);
@@ -480,7 +520,9 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
       mOutBufferLen = streamLen * 3;
       mOutBuffer = (unsigned char *) malloc(mOutBufferLen);
       #ifdef USE_COPYING_BUFFERS
-        #ifdef SANDBOX_CPP
+        #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+          sbOutBuffer = rlbox_zlib->mallocInSandbox<unsigned char>(mOutBufferLen);
+        #elif defined(SANDBOX_CPP)
           sbOutBuffer = newInSandbox<unsigned char>(sbox, mOutBufferLen);
         #else
           sbOutBuffer = (unsigned char*) malloc(mOutBufferLen);
@@ -497,7 +539,9 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
     }
 
     uint32_t unused;
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    iStr->Read((char *)(mInpBuffer.UNSAFE_Unverified()), streamLen, &unused);
+#elif defined(SANDBOX_CPP)
     iStr->Read((char *)(mInpBuffer.sandbox_onlyVerifyAddress()), streamLen, &unused);
 #else
     iStr->Read((char *)mInpBuffer, streamLen, &unused);
@@ -505,7 +549,13 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
 
     if (mMode == HTTP_COMPRESS_DEFLATE) {
       if (!mStreamInitialized) {
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+        memset(p_d_stream.UNSAFE_Unverified(), 0, sizeof (*p_d_stream));
+        auto rv = sandbox_invoke(rlbox_zlib, inflateInit_, p_d_stream, rlbox_zlib->stackarr(ZLIB_VERSION), sizeof(z_stream)).copyAndVerify([](int i){
+                // safe in all cases - we only care about ==Z_OK or not
+                return i;
+              });
+#elif defined(SANDBOX_CPP)
         memset(p_d_stream, 0, sizeof (*p_d_stream));
         auto rv = sandbox_invoke(sbox, inflateInit_, p_d_stream, sandbox_stackarr(ZLIB_VERSION), sizeof(z_stream)).sandbox_copyAndVerify([](int i){
                 // safe in all cases - we only care about ==Z_OK or not
@@ -522,7 +572,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         mStreamInitialized = true;
       }
 
-#ifdef SANDBOX_CPP
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(SANDBOX_CPP)
       p_d_stream->next_in  = mInpBuffer;
       p_d_stream->avail_in = (uInt)streamLen;
 #else
@@ -532,7 +582,20 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
 
       mDummyStreamInitialised = false;
       for (;;) {
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+        p_d_stream->next_out  = sbOutBuffer;
+        p_d_stream->avail_out = (uInt)mOutBufferLen;
+
+        int code = sandbox_invoke(rlbox_zlib, inflate, p_d_stream, Z_NO_FLUSH).copyAndVerify([](int i){
+                        // all values are safe - we handle all values of 'code'
+                        return i;
+                      });
+        uInt avail_out = p_d_stream->avail_out.copyAndVerify([this](uInt i){
+                            if(i <= mOutBufferLen) return i;
+                            printf("Unexpected avail_out %u vs. mOutBufferLen %u\n", i, mOutBufferLen);
+                            exit(1);
+                          });
+#elif defined(SANDBOX_CPP)
         p_d_stream->next_out  = sbOutBuffer;
         p_d_stream->avail_out = (uInt)mOutBufferLen;
 
@@ -562,7 +625,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
           if (bytesWritten) {
 
             #ifdef USE_COPYING_BUFFERS
-              #ifdef SANDBOX_CPP
+              #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+                mOutBuffer = sbOutBuffer.copyAndVerifyArray(rlbox_zlib, [](unsigned char* c){
+                              // no validation needed, we simply copy the array to prevent
+                              // double-fetch / TOCTOU i.e. capture a persistent snapshot of
+                              // its contents
+                              return RLBox_Verify_Status::SAFE;
+                            }, mOutBufferLen, (unsigned char *)nullptr);
+              #elif defined(SANDBOX_CPP)
                 mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char* c){
                             // no validation needed, we simply copy the array to prevent
                             // double-fetch / TOCTOU i.e. capture a persistent snapshot of
@@ -579,7 +649,9 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
             }
           }
 
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+          sandbox_invoke(rlbox_zlib, inflateEnd, p_d_stream);
+#elif defined(SANDBOX_CPP)
           sandbox_invoke(sbox, inflateEnd, p_d_stream);
 #else
           inflateEnd(&d_stream);
@@ -589,7 +661,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         } else if (code == Z_OK) {
           if (bytesWritten) {
             #ifdef USE_COPYING_BUFFERS
-              #ifdef SANDBOX_CPP
+              #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+                mOutBuffer = sbOutBuffer.copyAndVerifyArray(rlbox_zlib, [](unsigned char* c){
+                            // no validation needed, we simply copy the array to prevent
+                            // double-fetch / TOCTOU i.e. capture a persistent snapshot of
+                            // its contents
+                            return RLBox_Verify_Status::SAFE;
+                          }, mOutBufferLen, (unsigned char *)nullptr);
+              #elif defined(SANDBOX_CPP)
                 mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char* c){
                             // no validation needed, we simply copy the array to prevent
                             // double-fetch / TOCTOU i.e. capture a persistent snapshot of
@@ -608,7 +687,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         } else if (code == Z_BUF_ERROR) {
           if (bytesWritten) {
             #ifdef USE_COPYING_BUFFERS
-              #ifdef SANDBOX_CPP
+              #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+                mOutBuffer = sbOutBuffer.copyAndVerifyArray(rlbox_zlib, [](unsigned char* c){
+                            // no validation needed, we simply copy the array to prevent
+                            // double-fetch / TOCTOU i.e. capture a persistent snapshot of
+                            // its contents
+                            return RLBox_Verify_Status::SAFE;
+                          }, mOutBufferLen, (unsigned char *)nullptr);
+              #elif defined(SANDBOX_CPP)
                 mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char* c){
                             // no validation needed, we simply copy the array to prevent
                             // double-fetch / TOCTOU i.e. capture a persistent snapshot of
@@ -633,7 +719,18 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
               0x8 + 0x7 * 0x10,
               (((0x8 + 0x7 * 0x10) * 0x100 + 30) / 31 * 31) & 0xFF,
             };
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+          auto sb_dummy_head = rlbox_zlib->mallocInSandbox<unsigned char>(2);
+          memcpy(sb_dummy_head.UNSAFE_Unverified(), dummy_head, 2);
+          sandbox_invoke(rlbox_zlib, inflateReset, p_d_stream);
+          p_d_stream->next_in  = sb_dummy_head;
+          p_d_stream->avail_in = sizeof(dummy_head);
+
+          code = sandbox_invoke(rlbox_zlib, inflate, p_d_stream, Z_NO_FLUSH).copyAndVerify([](int i){
+                      // all values of code are safe, we only care about ==Z_OK or not
+                      return i;
+                    });
+#elif defined(SANDBOX_CPP)
           auto sb_dummy_head = newInSandbox<unsigned char>(sbox, 2);
           memcpy(sb_dummy_head, dummy_head, 2);
           sandbox_invoke(sbox, inflateReset, p_d_stream);
@@ -663,7 +760,11 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
           }
           mDummyStreamInitialised = true;
           // reset stream pointers to our original data
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+          p_d_stream->next_in  = mInpBuffer;
+          p_d_stream->avail_in = (uInt)streamLen;
+          rlbox_zlib->freeInSandbox(sb_dummy_head);
+#elif defined(SANDBOX_CPP)
           p_d_stream->next_in  = mInpBuffer;
           p_d_stream->avail_in = (uInt)streamLen;
           freeInSandbox(sbox, sb_dummy_head);
@@ -677,7 +778,13 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
       } /* for */
     } else {
       if (!mStreamInitialized) {
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+        memset(p_d_stream.UNSAFE_Unverified(), 0, sizeof (*p_d_stream));
+        auto rv = sandbox_invoke(rlbox_zlib, inflateInit2_, p_d_stream, -MAX_WBITS, rlbox_zlib->stackarr(ZLIB_VERSION), sizeof(z_stream)).copyAndVerify([](int i){
+              // safe in all cases - we only care about ==Z_OK or not
+              return i;
+              });
+#elif defined(SANDBOX_CPP)
         memset(p_d_stream, 0, sizeof (*p_d_stream));
         auto rv = sandbox_invoke(sbox, inflateInit2_, p_d_stream, -MAX_WBITS, sandbox_stackarr(ZLIB_VERSION), sizeof(z_stream)).sandbox_copyAndVerify([](int i){
               // safe in all cases - we only care about ==Z_OK or not
@@ -694,7 +801,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         mStreamInitialized = true;
       }
 
-#ifdef SANDBOX_CPP
+#if defined(SANDBOX_CPP) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
       p_d_stream->next_in  = mInpBuffer;
       p_d_stream->avail_in = (uInt)streamLen;
 #else
@@ -703,7 +810,21 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
 #endif
 
       for (;;) {
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+        p_d_stream->next_out  = sbOutBuffer;
+        p_d_stream->avail_out = (uInt)mOutBufferLen;
+
+        int code = sandbox_invoke(rlbox_zlib, inflate, p_d_stream, Z_NO_FLUSH).copyAndVerify([](int i){
+            // safe in all cases - we handle all possible values of code
+            return i;
+            });
+        //int code = inflate (&d_stream, Z_NO_FLUSH);
+        uInt avail_out = p_d_stream->avail_out.copyAndVerify([this](uInt i){
+                            if(i <= mOutBufferLen) return i;
+                            printf("Unexpected avail_out %u vs mOutBufferLen %u\n", i, mOutBufferLen);
+                            exit(1);
+                          });
+#elif defined(SANDBOX_CPP)
         p_d_stream->next_out  = sbOutBuffer;
         p_d_stream->avail_out = (uInt)mOutBufferLen;
 
@@ -733,7 +854,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         if (code == Z_STREAM_END) {
           if (bytesWritten) {
             #ifdef USE_COPYING_BUFFERS
-              #ifdef SANDBOX_CPP
+              #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+                mOutBuffer = sbOutBuffer.copyAndVerifyArray(rlbox_zlib, [](unsigned char* c){
+                            // no validation needed, we simply copy the array to prevent
+                            // double-fetch / TOCTOU i.e. capture a persistent snapshot of
+                            // its contents
+                            return RLBox_Verify_Status::SAFE;
+                          }, mOutBufferLen, (unsigned char *)nullptr);
+              #elif defined(SANDBOX_CPP)
                 mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char* c){
                             // no validation needed, we simply copy the array to prevent
                             // double-fetch / TOCTOU i.e. capture a persistent snapshot of
@@ -750,7 +878,9 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
             }
           }
 
-#ifdef SANDBOX_CPP
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+          sandbox_invoke(rlbox_zlib, inflateEnd, p_d_stream);
+#elif defined(SANDBOX_CPP)
           sandbox_invoke(sbox, inflateEnd, p_d_stream);
 #else
           inflateEnd(&d_stream);
@@ -760,7 +890,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         } else if (code == Z_OK) {
           if (bytesWritten) {
             #ifdef USE_COPYING_BUFFERS
-              #ifdef SANDBOX_CPP
+              #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+                mOutBuffer = sbOutBuffer.copyAndVerifyArray(rlbox_zlib, [](unsigned char* c){
+                            // no validation needed, we simply copy the array to prevent
+                            // double-fetch / TOCTOU i.e. capture a persistent snapshot of
+                            // its contents
+                            return RLBox_Verify_Status::SAFE;
+                          }, mOutBufferLen, (unsigned char *)nullptr);
+              #elif defined(SANDBOX_CPP)
                 mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char* c){
                             // no validation needed, we simply copy the array to prevent
                             // double-fetch / TOCTOU i.e. capture a persistent snapshot of
@@ -779,7 +916,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         } else if (code == Z_BUF_ERROR) {
           if (bytesWritten) {
             #ifdef USE_COPYING_BUFFERS
-              #ifdef SANDBOX_CPP
+              #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+                mOutBuffer = sbOutBuffer.copyAndVerifyArray(rlbox_zlib, [](unsigned char* c){
+                            // no validation needed, we simply copy the array to prevent
+                            // double-fetch / TOCTOU i.e. capture a persistent snapshot of
+                            // its contents
+                            return RLBox_Verify_Status::SAFE;
+                          }, mOutBufferLen, (unsigned char *)nullptr);
+              #elif defined(SANDBOX_CPP)
                 mOutBuffer = sbOutBuffer.sandbox_copyAndVerifyArray([](unsigned char* c){
                             // no validation needed, we simply copy the array to prevent
                             // double-fetch / TOCTOU i.e. capture a persistent snapshot of

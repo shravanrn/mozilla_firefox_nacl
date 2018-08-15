@@ -35,13 +35,16 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'cocoa':
 FINAL_LIBRARY = 'xul'
 
 # Choose 1 for NaCl sandbox, 2 for process sandbox, or comment this out for no sandbox
-DEFINES["SANDBOX_CPP"] = 1
+# DEFINES["SANDBOX_CPP"] = 1
+# Uncomment for to use the new CPP sandbox API
+DEFINES["NACL_SANDBOX_USE_NEW_CPP_API"] = 42
 DEFINES['ZLIB_NON_NACL_DL_PATH'] = '"zlib_nacl/builds/x64/non_nacl_build/libz.so"'
 DEFINES['STARTUP_LIBRARY_PATH'] = '"Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe"'
 DEFINES['SANDBOX_INIT_APP'] = '"zlib_nacl/builds/x64/nacl_build/mainCombine/libz.nexe"'
 DEFINES['USE_COPYING_BUFFERS'] = 42
 
 LOCAL_INCLUDES += [
+    '/../rlbox_api',
     '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
     '/modules/brotli/dec',
     '/netwerk/base',

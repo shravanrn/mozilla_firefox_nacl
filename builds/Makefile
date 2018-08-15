@@ -152,7 +152,7 @@ new_nacl64_cpp: inithasrun
 	$(CP) ../mozconfig64_new_nacl_cpp ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
-	$(CP) ../netwerk/streamconv/converters/moz_nacl.build ../netwerk/streamconv/converters/moz.build
+	$(CP) ../netwerk/streamconv/converters/moz_new_nacl.build ../netwerk/streamconv/converters/moz.build
 	cd .. && ./mach build
 
 ps64_cpp: inithasrun

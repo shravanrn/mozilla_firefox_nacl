@@ -1,62 +1,62 @@
-#define sandbox_fields_reflection_zlib_class_z_stream_s(f, g) \
-    f(z_const Bytef *,next_in) \
+#define sandbox_fields_reflection_zlib_class_z_stream_s(f, g, ...) \
+    f(z_const Bytef *,next_in, ##__VA_ARGS__) \
     g() \
-    f(uInt           ,avail_in) \
+    f(uInt           ,avail_in, ##__VA_ARGS__) \
     g() \
-    f(uLong          ,total_in) \
+    f(uLong          ,total_in, ##__VA_ARGS__) \
     g() \
-    f(Bytef *        ,next_out) \
+    f(Bytef *        ,next_out, ##__VA_ARGS__) \
     g() \
-    f(uInt           ,avail_out) \
+    f(uInt           ,avail_out, ##__VA_ARGS__) \
     g() \
-    f(uLong          ,total_out) \
+    f(uLong          ,total_out, ##__VA_ARGS__) \
     g() \
-    f(z_const char * ,msg) \
+    f(z_const char * ,msg, ##__VA_ARGS__) \
     g() \
-    f(void *         ,state) \
+    f(void *         ,state, ##__VA_ARGS__) \
     g() \
-    f(alloc_func     ,zalloc) \
+    f(alloc_func     ,zalloc, ##__VA_ARGS__) \
     g() \
-    f(free_func      ,zfree) \
+    f(free_func      ,zfree, ##__VA_ARGS__) \
     g() \
-    f(voidpf         ,opaque) \
+    f(voidpf         ,opaque, ##__VA_ARGS__) \
     g() \
-    f(int            ,data_type) \
+    f(int            ,data_type, ##__VA_ARGS__) \
     g() \
-    f(uLong          ,adler) \
+    f(uLong          ,adler, ##__VA_ARGS__) \
     g() \
-    f(uLong          ,reserved)
+    f(uLong          ,reserved, ##__VA_ARGS__) \
+    g()
+
+#define sandbox_fields_reflection_zlib_class_gz_header(f, g, ...) \
+    f(int,     text, ##__VA_ARGS__) \
+    g() \
+    f(uLong,   time, ##__VA_ARGS__) \
+    g() \
+    f(int,     xflags, ##__VA_ARGS__) \
+    g() \
+    f(int,     os, ##__VA_ARGS__) \
+    g() \
+    f(Bytef*,  extra, ##__VA_ARGS__) \
+    g() \
+    f(uInt,    extra_len, ##__VA_ARGS__) \
+    g() \
+    f(uInt,    extra_max, ##__VA_ARGS__) \
+    g() \
+    f(Bytef*,  name, ##__VA_ARGS__) \
+    g() \
+    f(uInt,    name_max, ##__VA_ARGS__) \
+    g() \
+    f(Bytef*,  comment, ##__VA_ARGS__) \
+    g() \
+    f(uInt,    comm_max, ##__VA_ARGS__) \
+    g() \
+    f(int,     hcrc, ##__VA_ARGS__) \
+    g() \
+    f(int,     done, ##__VA_ARGS__) \
+    g() \
 
 
-#define sandbox_fields_reflection_zlib_class_gz_header(f, g) \
-    f(int,     text) \
-    g() \
-    f(uLong,   time) \
-    g() \
-    f(int,     xflags) \
-    g() \
-    f(int,     os) \
-    g() \
-    f(Bytef*,  extra) \
-    g() \
-    f(uInt,    extra_len) \
-    g() \
-    f(uInt,    extra_max) \
-    g() \
-    f(Bytef*,  name) \
-    g() \
-    f(uInt,    name_max) \
-    g() \
-    f(Bytef*,  comment) \
-    g() \
-    f(uInt,    comm_max) \
-    g() \
-    f(int,     hcrc) \
-    g() \
-    f(int,     done) \
-    g() \
-
-
-#define sandbox_fields_reflection_zlib_allClasses(f) \
-    f(z_stream_s, zlib) \
-    f(gz_header, zlib)
+#define sandbox_fields_reflection_zlib_allClasses(f, ...) \
+    f(z_stream_s, zlib, ##__VA_ARGS__) \
+    f(gz_header, zlib, ##__VA_ARGS__)
