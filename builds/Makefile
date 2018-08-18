@@ -14,6 +14,12 @@
 inithasrun:
 	cd .. && ./mach bootstrap --no-interactive --application-choice browser
 	cd .. && ./mach configure
+	#fix a bug that sometimes crops up in firefox's build system
+	if [ ! -f ../ipc/chromium/src/third_party/libevent/evconfig-private.h ] && [ -f ../ipc/chromium/src/third_party/libevent/configure.ac ]; then \
+		cd ../ipc/chromium/src/third_party/libevent && \
+		autoconf -i && \
+		./configure; \
+	fi
 	echo hi > "inithasrun"
 
 .NOTPARALLEL: build32 build64 static32 static64 dynamic32 dynamic64 nacl32 nacl64 ps32 ps64 \
