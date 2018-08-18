@@ -4,6 +4,6 @@
 # This avoids spuriously marking file timestamp as newer
 #   and thus can speed up the build process
 
-if [[ $(diff $1 $2) ]]; then
+if [ ! -f $2 ] || [[ $(diff $1 $2) ]]; then
 		cp $1 $2
 fi
