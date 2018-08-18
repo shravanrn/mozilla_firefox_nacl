@@ -12,7 +12,7 @@
 .DEFAULT_GOAL: build64
 
 inithasrun:
-	cd .. && ./mach bootstrap --no-interactive --application-choice 2 
+	cd .. && ./mach bootstrap --no-interactive --application-choice browser
 	cd .. && ./mach configure
 	echo hi > "inithasrun"
 
