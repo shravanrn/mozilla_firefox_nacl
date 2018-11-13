@@ -251,6 +251,15 @@ ps64_asan: inithasrun
 	$(CP) ../netwerk/streamconv/converters/moz_ps.build ../netwerk/streamconv/converters/moz.build
 	cd .. && ./mach build
 
+wasm64_debug: inithasrun
+	$(CP) ../image/decoders/moz_copy_wasm.build ../image/decoders/moz.build
+	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../mozconfig64_wasm_debug ../mozconfig
+	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
+	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
+	$(CP) ../netwerk/streamconv/converters/moz_static.build ../netwerk/streamconv/converters/moz.build
+	cd .. && ./mach build
+
 run64_static:
 	$(CP) ../mozconfig64_static ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
