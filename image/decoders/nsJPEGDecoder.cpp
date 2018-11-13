@@ -73,16 +73,59 @@ extern "C" {
   extern t_jpeg_consume_input          ptr_jpeg_consume_input;
 #endif
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
   using namespace mozilla::image;
-  sandbox_nacl_load_library_api(jpeglib)
+  #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    std::once_flag rlbox_jpeg_init;
+    rlbox_load_library_api(jpeglib, RLBox_NaCl)
+  #else
+    sandbox_nacl_load_library_api(jpeglib)
+  #endif
 
   #include <set>
 
   thread_local void* jpegRendererSaved = nullptr;
 #endif
 
-#ifdef NACL_SANDBOX_USE_CPP_API
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+  RLBoxSandbox<RLBox_NaCl>* rlbox_jpeg;
+
+  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_jpeg(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName), ##__VA_ARGS__)
+  #define sandbox_invoke_custom_return_app_ptr(sandbox, fnName, ...) sandbox_invoke_custom_return_app_ptr_helper_jpeg(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName), ##__VA_ARGS__)
+
+  template<typename TFunc, typename... TArgs>
+  inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
+  tainted<return_argument<TFunc>, RLBox_NaCl>
+  >::type sandbox_invoke_custom_helper_jpeg(RLBoxSandbox<RLBox_NaCl>* sandbox, TFunc* fnPtr, TArgs&&... params)
+  {
+    jpegStartTimer();
+    auto ret = sandbox->invokeWithFunctionPointer(fnPtr, params...);
+    jpegEndTimer();
+    return ret;
+  }
+
+  template<typename TFunc, typename... TArgs>
+  inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
+  void
+  >::type sandbox_invoke_custom_helper_jpeg(RLBoxSandbox<RLBox_NaCl>* sandbox, TFunc* fnPtr, TArgs&&... params)
+  {
+    jpegStartTimer();
+    sandbox->invokeWithFunctionPointer(fnPtr, params...);
+    jpegEndTimer();
+  }
+
+  template<typename TFunc, typename... TArgs>
+  inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
+  return_argument<TFunc>
+  >::type sandbox_invoke_custom_return_app_ptr_helper_jpeg(RLBoxSandbox<RLBox_NaCl>* sandbox, TFunc* fnPtr, TArgs&&... params)
+  {
+    jpegStartTimer();
+    auto ret = sandbox->invokeWithFunctionPointerReturnAppPtr(fnPtr, params...);
+    jpegEndTimer();
+    return ret;
+  }
+
+#elif defined(NACL_SANDBOX_USE_CPP_API)
   extern NaClSandbox* jpegSandbox;
 
   #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_jpeg<decltype(fnName)>(sandbox, (void *)(uintptr_t) ptr_##fnName, ##__VA_ARGS__)
@@ -201,7 +244,28 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
 #define MAX_BYTES_IN_MARKER  65533       /* maximum data len of a JPEG marker */
 #define MAX_DATA_BYTES_IN_MARKER  (MAX_BYTES_IN_MARKER - ICC_OVERHEAD_LEN)
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+  static boolean marker_is_icc_cpp (tainted<jpeg_saved_marker_ptr, RLBox_NaCl> marker)
+  {
+    auto data = marker->data;
+    return
+      marker->marker.UNSAFE_Unverified() == ICC_MARKER &&
+      marker->data_length.UNSAFE_Unverified() >= ICC_OVERHEAD_LEN &&
+      /* verify the identifying string */
+      GETJOCTET(data[0].UNSAFE_Unverified()) == 0x49 &&
+      GETJOCTET(data[1].UNSAFE_Unverified()) == 0x43 &&
+      GETJOCTET(data[2].UNSAFE_Unverified()) == 0x43 &&
+      GETJOCTET(data[3].UNSAFE_Unverified()) == 0x5F &&
+      GETJOCTET(data[4].UNSAFE_Unverified()) == 0x50 &&
+      GETJOCTET(data[5].UNSAFE_Unverified()) == 0x52 &&
+      GETJOCTET(data[6].UNSAFE_Unverified()) == 0x4F &&
+      GETJOCTET(data[7].UNSAFE_Unverified()) == 0x46 &&
+      GETJOCTET(data[8].UNSAFE_Unverified()) == 0x49 &&
+      GETJOCTET(data[9].UNSAFE_Unverified()) == 0x4C &&
+      GETJOCTET(data[10].UNSAFE_Unverified()) == 0x45 &&
+      GETJOCTET(data[11].UNSAFE_Unverified()) == 0x0;
+  }
+#elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   static boolean marker_is_icc_cpp (unverified_data<jpeg_saved_marker_ptr> marker)
   {
     unverified_data<JOCTET *> data = marker->data;
@@ -224,10 +288,18 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
   }
 #endif
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
+  #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+  boolean read_icc_profile_cpp (tainted<j_decompress_ptr, RLBox_NaCl> cinfo, JOCTET** icc_data_ptr, unsigned int* icc_data_len)
+  #else
   boolean read_icc_profile_cpp (unverified_data<j_decompress_ptr> cinfo, JOCTET** icc_data_ptr, unsigned int* icc_data_len)
+  #endif
   {
+    #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    tainted<jpeg_saved_marker_ptr, RLBox_NaCl> marker;
+    #else
     unverified_data<jpeg_saved_marker_ptr> marker;
+    #endif
     int num_markers = 0;
     int seq_no;
     JOCTET* icc_data;
@@ -253,16 +325,27 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
     for (marker = cinfo->marker_list; marker != nullptr; marker = marker->next) {
 
       if (marker_is_icc_cpp(marker)) {
+        #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+        auto data = marker->data;
+        //data13 read twice so read it once so it doesn't change after one read
+        //data itself is handled carefully below so we don't need any verifications
+        JOCTET data13 = data[13].UNSAFE_Unverified();
+        #else
         unverified_data<JOCTET *> data = marker->data.sandbox_onlyVerifyAddress();
         //data13 read twice so read it once so it doesn't change after one read
         //data itself is handled carefully below so we don't need any verifications
         JOCTET data13 = data[13].UNSAFE_noVerify();
+        #endif
         if (num_markers == 0) {
           num_markers = GETJOCTET(data13);
         } else if (num_markers != GETJOCTET(data13)) {
           return FALSE;  /* inconsistent num_markers fields */
         }
+        #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+        data_seq[currSeqNum] = GETJOCTET(data[12].UNSAFE_Unverified());
+        #else
         data_seq[currSeqNum] = GETJOCTET(data[12].UNSAFE_noVerify());
+        #endif
         seq_no = data_seq[currSeqNum];
         currSeqNum++;
         if (seq_no <= 0 || seq_no > num_markers) {
@@ -273,7 +356,11 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
         }
         marker_present[seq_no] = 1;
         //data_length is used with caution below, so we don't have to verify its contents here
+        #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+        data_length[seq_no] = marker->data_length.UNSAFE_Unverified() - ICC_OVERHEAD_LEN;
+        #else
         data_length[seq_no] = marker->data_length.UNSAFE_noVerify() - ICC_OVERHEAD_LEN;
+        #endif
       }
     }
 
@@ -307,7 +394,11 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
     /* and fill it in */
     currSeqNum= 0;
     for (marker = cinfo->marker_list; marker != nullptr; marker = marker->next) {
+      #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+      tainted<JOCTET *, RLBox_NaCl> data = marker->data;
+      #else
       unverified_data<JOCTET *> data = marker->data;
+      #endif
   
       if (marker_is_icc_cpp(marker)) {
         JOCTET* dst_ptr;
@@ -315,14 +406,20 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
         seq_no = data_seq[currSeqNum];
         currSeqNum++;
         dst_ptr = icc_data + data_offset[seq_no];
-        #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+        #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+          tainted<JOCTET*, RLBox_NaCl> src_ptr = data + ICC_OVERHEAD_LEN;
+        #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
           unverified_data<JOCTET*> src_ptr = data + ICC_OVERHEAD_LEN;
         #else
           JOCTET FAR* src_ptr = data + ICC_OVERHEAD_LEN;
         #endif
         length = data_length[seq_no];
         while (length--) {
-          #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+          #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+            *dst_ptr = (*src_ptr).UNSAFE_Unverified();
+            dst_ptr++;
+            src_ptr = src_ptr + 1;
+          #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
             //just let the automatic pointer check happen, no data validation as firefox is responsible for dealing with data
             *dst_ptr = (*src_ptr).UNSAFE_noVerify();
             dst_ptr++;
@@ -342,7 +439,9 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
 
 #endif
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+  static qcms_profile* GetICCProfile(tainted<struct jpeg_decompress_struct *, RLBox_NaCl> info)
+#elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   static qcms_profile* GetICCProfile(unverified_data<struct jpeg_decompress_struct *> info)
 #else
   static qcms_profile* GetICCProfile(struct jpeg_decompress_struct* info)
@@ -352,7 +451,7 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
     uint32_t profileLength;
     qcms_profile* profile = nullptr;
 
-    #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
       if (read_icc_profile_cpp(info, &profilebuf, &profileLength)) 
     #else
       if (read_icc_profile(info, &profilebuf, &profileLength)) 
@@ -365,7 +464,14 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
     return profile;
 }
 
-#if defined(NACL_SANDBOX_USE_CPP_API)
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+  sandbox_callback_helper<void(tainted<j_decompress_ptr, RLBox_NaCl> jd)> cpp_cb_jpeg_init_source;
+  sandbox_callback_helper<boolean(tainted<j_decompress_ptr, RLBox_NaCl> jd)> cpp_cb_jpeg_fill_input_buffer;
+  sandbox_callback_helper<void(tainted<j_decompress_ptr, RLBox_NaCl> jd, tainted<long, RLBox_NaCl> num_bytes)> cpp_cb_jpeg_skip_input_data;
+  sandbox_callback_helper<void(tainted<j_decompress_ptr, RLBox_NaCl> jd)> cpp_cb_jpeg_term_source;
+  sandbox_callback_helper<void(tainted<j_common_ptr, RLBox_NaCl> cinfo)> cpp_cb_jpeg_my_error_exit;
+  sandbox_function_helper<boolean(j_decompress_ptr, int)> cpp_resync_to_restart;
+#elif defined(NACL_SANDBOX_USE_CPP_API)
   sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_init_source;
   sandbox_callback_helper<boolean(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_fill_input_buffer;
   sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd, unverified_data<long> num_bytes)>* cpp_cb_jpeg_skip_input_data;
@@ -381,7 +487,13 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
   sandbox_function_helper<boolean(j_decompress_ptr, int)> cpp_resync_to_restart;
 #endif
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+  METHODDEF(void) init_source (tainted<j_decompress_ptr, RLBox_NaCl> jd);
+  METHODDEF(boolean) fill_input_buffer (tainted<j_decompress_ptr, RLBox_NaCl> jd);
+  METHODDEF(void) skip_input_data (tainted<j_decompress_ptr, RLBox_NaCl> jd, tainted<long, RLBox_NaCl> num_bytes);
+  METHODDEF(void) term_source (tainted<j_decompress_ptr, RLBox_NaCl> jd);
+  METHODDEF(void) my_error_exit (tainted<j_common_ptr, RLBox_NaCl> cinfo);
+#elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   METHODDEF(void) init_source (unverified_data<j_decompress_ptr> jd);
   METHODDEF(boolean) fill_input_buffer (unverified_data<j_decompress_ptr> jd);
   METHODDEF(void) skip_input_data (unverified_data<j_decompress_ptr> jd, unverified_data<long> num_bytes);
@@ -409,7 +521,32 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
 {
   //printf("FF Flag nsJPEGDecoder\n");
 
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+  #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    std::call_once(rlbox_jpeg_init, [](){
+      char SandboxingCodeRootFolder[1024];
+      getSandboxingFolder(SandboxingCodeRootFolder);
+
+      char full_STARTUP_LIBRARY_PATH[1024];
+      char full_SANDBOX_INIT_APP[1024];
+
+      strcpy(full_STARTUP_LIBRARY_PATH, SandboxingCodeRootFolder);
+      strcat(full_STARTUP_LIBRARY_PATH, STARTUP_LIBRARY_PATH);
+
+      strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
+      strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP_JPEG);
+
+      printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+
+      rlbox_jpeg = RLBoxSandbox<RLBox_NaCl>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+      cpp_cb_jpeg_init_source = rlbox_png->createCallback(init_source);
+      cpp_cb_jpeg_fill_input_buffer = rlbox_png->createCallback(fill_input_buffer);
+      cpp_cb_jpeg_skip_input_data = rlbox_png->createCallback(skip_input_data);
+      cpp_cb_jpeg_term_source = rlbox_png->createCallback(term_source);
+      cpp_resync_to_restart = sandbox_function(jpegSandbox, jpeg_resync_to_restart);
+      cpp_cb_jpeg_my_error_exit = rlbox_png->createCallback(my_error_exit);
+
+    });
+  #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     initializeLibJpegSandbox([](){
       cpp_cb_jpeg_init_source = sandbox_callback(jpegSandbox, init_source);
       cpp_cb_jpeg_fill_input_buffer = sandbox_callback(jpegSandbox, fill_input_buffer);
