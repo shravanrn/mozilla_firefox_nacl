@@ -92,6 +92,7 @@ extern "C" {
 
   #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_jpeg(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName), ##__VA_ARGS__)
   #define sandbox_invoke_custom_return_app_ptr(sandbox, fnName, ...) sandbox_invoke_custom_return_app_ptr_helper_jpeg(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName), ##__VA_ARGS__)
+  #define sandbox_invoke_custom_with_ptr(sandbox, fnPtr, ...) sandbox_invoke_custom_helper_jpeg(sandbox, fnPtr, ##__VA_ARGS__)
 
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
@@ -247,23 +248,24 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
 #ifdef NACL_SANDBOX_USE_NEW_CPP_API
   static boolean marker_is_icc_cpp (tainted<jpeg_saved_marker_ptr, RLBox_NaCl> marker)
   {
-    auto data = marker->data;
+    JOCTET data[12] = { 0 };
+    JOCTET* dataCopy = marker->data.copyAndVerifyArray(rlbox_jpeg, [](JOCTET* arr){ return RLBox_Verify_Status::SAFE; }, 12, (JOCTET*) data);
     return
       marker->marker.UNSAFE_Unverified() == ICC_MARKER &&
       marker->data_length.UNSAFE_Unverified() >= ICC_OVERHEAD_LEN &&
       /* verify the identifying string */
-      GETJOCTET(data[0].UNSAFE_Unverified()) == 0x49 &&
-      GETJOCTET(data[1].UNSAFE_Unverified()) == 0x43 &&
-      GETJOCTET(data[2].UNSAFE_Unverified()) == 0x43 &&
-      GETJOCTET(data[3].UNSAFE_Unverified()) == 0x5F &&
-      GETJOCTET(data[4].UNSAFE_Unverified()) == 0x50 &&
-      GETJOCTET(data[5].UNSAFE_Unverified()) == 0x52 &&
-      GETJOCTET(data[6].UNSAFE_Unverified()) == 0x4F &&
-      GETJOCTET(data[7].UNSAFE_Unverified()) == 0x46 &&
-      GETJOCTET(data[8].UNSAFE_Unverified()) == 0x49 &&
-      GETJOCTET(data[9].UNSAFE_Unverified()) == 0x4C &&
-      GETJOCTET(data[10].UNSAFE_Unverified()) == 0x45 &&
-      GETJOCTET(data[11].UNSAFE_Unverified()) == 0x0;
+      GETJOCTET(dataCopy[0]) == 0x49 &&
+      GETJOCTET(dataCopy[1]) == 0x43 &&
+      GETJOCTET(dataCopy[2]) == 0x43 &&
+      GETJOCTET(dataCopy[3]) == 0x5F &&
+      GETJOCTET(dataCopy[4]) == 0x50 &&
+      GETJOCTET(dataCopy[5]) == 0x52 &&
+      GETJOCTET(dataCopy[6]) == 0x4F &&
+      GETJOCTET(dataCopy[7]) == 0x46 &&
+      GETJOCTET(dataCopy[8]) == 0x49 &&
+      GETJOCTET(dataCopy[9]) == 0x4C &&
+      GETJOCTET(dataCopy[10]) == 0x45 &&
+      GETJOCTET(dataCopy[11]) == 0x0;
   }
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   static boolean marker_is_icc_cpp (unverified_data<jpeg_saved_marker_ptr> marker)
@@ -326,10 +328,10 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
 
       if (marker_is_icc_cpp(marker)) {
         #ifdef NACL_SANDBOX_USE_NEW_CPP_API
-        auto data = marker->data;
+        tainted<JOCTET *, RLBox_NaCl> data = marker->data;
         //data13 read twice so read it once so it doesn't change after one read
         //data itself is handled carefully below so we don't need any verifications
-        JOCTET data13 = data[13].UNSAFE_Unverified();
+        JOCTET data13 = (data.UNSAFE_Unverified())[13];
         #else
         unverified_data<JOCTET *> data = marker->data.sandbox_onlyVerifyAddress();
         //data13 read twice so read it once so it doesn't change after one read
@@ -342,7 +344,7 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
           return FALSE;  /* inconsistent num_markers fields */
         }
         #ifdef NACL_SANDBOX_USE_NEW_CPP_API
-        data_seq[currSeqNum] = GETJOCTET(data[12].UNSAFE_Unverified());
+        data_seq[currSeqNum] = GETJOCTET((data.UNSAFE_Unverified())[12]);
         #else
         data_seq[currSeqNum] = GETJOCTET(data[12].UNSAFE_noVerify());
         #endif
@@ -465,12 +467,12 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
 }
 
 #ifdef NACL_SANDBOX_USE_NEW_CPP_API
-  sandbox_callback_helper<void(tainted<j_decompress_ptr, RLBox_NaCl> jd)> cpp_cb_jpeg_init_source;
-  sandbox_callback_helper<boolean(tainted<j_decompress_ptr, RLBox_NaCl> jd)> cpp_cb_jpeg_fill_input_buffer;
-  sandbox_callback_helper<void(tainted<j_decompress_ptr, RLBox_NaCl> jd, tainted<long, RLBox_NaCl> num_bytes)> cpp_cb_jpeg_skip_input_data;
-  sandbox_callback_helper<void(tainted<j_decompress_ptr, RLBox_NaCl> jd)> cpp_cb_jpeg_term_source;
-  sandbox_callback_helper<void(tainted<j_common_ptr, RLBox_NaCl> cinfo)> cpp_cb_jpeg_my_error_exit;
-  sandbox_function_helper<boolean(j_decompress_ptr, int)> cpp_resync_to_restart;
+  sandbox_callback_helper<void(j_decompress_ptr jd), RLBox_NaCl> cpp_cb_jpeg_init_source;
+  sandbox_callback_helper<boolean(j_decompress_ptr jd), RLBox_NaCl> cpp_cb_jpeg_fill_input_buffer;
+  sandbox_callback_helper<void(j_decompress_ptr jd, long num_bytes), RLBox_NaCl> cpp_cb_jpeg_skip_input_data;
+  sandbox_callback_helper<void(j_decompress_ptr jd), RLBox_NaCl> cpp_cb_jpeg_term_source;
+  sandbox_callback_helper<void(j_common_ptr cinfo), RLBox_NaCl> cpp_cb_jpeg_my_error_exit;
+  tainted<boolean(*)(j_decompress_ptr, int), RLBox_NaCl> cpp_resync_to_restart;
 #elif defined(NACL_SANDBOX_USE_CPP_API)
   sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_init_source;
   sandbox_callback_helper<boolean(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_fill_input_buffer;
@@ -488,11 +490,11 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
 #endif
 
 #ifdef NACL_SANDBOX_USE_NEW_CPP_API
-  METHODDEF(void) init_source (tainted<j_decompress_ptr, RLBox_NaCl> jd);
-  METHODDEF(boolean) fill_input_buffer (tainted<j_decompress_ptr, RLBox_NaCl> jd);
-  METHODDEF(void) skip_input_data (tainted<j_decompress_ptr, RLBox_NaCl> jd, tainted<long, RLBox_NaCl> num_bytes);
-  METHODDEF(void) term_source (tainted<j_decompress_ptr, RLBox_NaCl> jd);
-  METHODDEF(void) my_error_exit (tainted<j_common_ptr, RLBox_NaCl> cinfo);
+  METHODDEF(void) init_source (RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<j_decompress_ptr, RLBox_NaCl> jd);
+  METHODDEF(boolean) fill_input_buffer (RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<j_decompress_ptr, RLBox_NaCl> jd);
+  METHODDEF(void) skip_input_data (RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<j_decompress_ptr, RLBox_NaCl> jd, tainted<long, RLBox_NaCl> num_bytes);
+  METHODDEF(void) term_source (RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<j_decompress_ptr, RLBox_NaCl> jd);
+  METHODDEF(void) my_error_exit (RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<j_common_ptr, RLBox_NaCl> cinfo);
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   METHODDEF(void) init_source (unverified_data<j_decompress_ptr> jd);
   METHODDEF(boolean) fill_input_buffer (unverified_data<j_decompress_ptr> jd);
@@ -544,10 +546,10 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
       cpp_cb_jpeg_term_source = rlbox_jpeg->createCallback(term_source);
       cpp_resync_to_restart = sandbox_function(rlbox_jpeg, jpeg_resync_to_restart);
       cpp_cb_jpeg_my_error_exit = rlbox_jpeg->createCallback(my_error_exit);
-      p_mInfo = rlbox_jpeg->mallocInSandbox<jpeg_decompress_struct>();
-      p_mErr = rlbox_jpeg->mallocInSandbox<decoder_error_mgr>();
-      p_mSourceMgr = rlbox_jpeg->mallocInSandbox<jpeg_source_mgr>();
     });
+    p_mInfo = rlbox_jpeg->mallocInSandbox<jpeg_decompress_struct>();
+    p_mErr = rlbox_jpeg->mallocInSandbox<decoder_error_mgr>();
+    p_mSourceMgr = rlbox_jpeg->mallocInSandbox<jpeg_source_mgr>();
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     initializeLibJpegSandbox([](){
       cpp_cb_jpeg_init_source = sandbox_callback(jpegSandbox, init_source);
@@ -586,9 +588,15 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
   mImageData = nullptr;
 
   mBytesToSkip = 0;
+  #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+  memset((&mInfo).UNSAFE_Unverified(), 0, sizeof(jpeg_decompress_struct));
+  memset((&mSourceMgr).UNSAFE_Unverified(), 0, sizeof(mSourceMgr));
+  mInfo.client_data = rlbox_jpeg->app_ptr((void*)this);
+  #else
   memset(&mInfo, 0, sizeof(jpeg_decompress_struct));
   memset(&mSourceMgr, 0, sizeof(mSourceMgr));
   mInfo.client_data = (void*)this;
+  #endif
 
   mSegment = nullptr;
   mSegmentLen = 0;
@@ -624,7 +632,9 @@ nsJPEGDecoder::~nsJPEGDecoder()
   auto& mInfo = *p_mInfo;
   mInfo.src = nullptr;
 
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+    sandbox_invoke_custom(rlbox_jpeg, jpeg_destroy_decompress, &mInfo);
+  #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(jpegSandbox, jpeg_destroy_decompress, &mInfo);
   #else
     d_jpeg_destroy_decompress(&mInfo);
@@ -1217,7 +1227,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
                               "JPEG_DECOMPRESS_SEQUENTIAL case");
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
         m_output_height_shadow = mInfo.output_height.UNSAFE_Unverified();
-      #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+      #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
         m_output_height_shadow = mInfo.output_height.UNSAFE_noVerify();
       #else
         m_output_height_shadow = mInfo.output_height;
@@ -1655,10 +1665,9 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       //Jpeg provides an api to allocate a buffer for a particular image, that will be destroyed automatically
       //we use this instead of malloc
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
-        tainted<j_common_ptr, RLBox_NaCl> common_ptr = (j_common_ptr) ((&mInfo).UNSAFE_Unverified());
+        tainted<j_common_ptr, RLBox_NaCl> common_ptr = sandbox_reinterpret_cast<j_common_ptr>(&mInfo);
         tainted<jpeg_memory_mgr *, RLBox_NaCl> mem_mgr = mInfo.mem;
         auto p_alloc_sarray = mem_mgr->alloc_sarray.UNSAFE_Unverified();
-        //CPP_TODO - really need a cast
         pBufferSys = sandbox_invoke_custom_with_ptr(rlbox_jpeg, p_alloc_sarray, common_ptr, JPOOL_IMAGE, row_stride, 1);
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
         unverified_data<j_common_ptr> common_ptr = (j_common_ptr) ((&mInfo).sandbox_onlyVerifyAddress());
@@ -1804,7 +1813,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       // if (jpeg_read_scanlines(&mInfo, &sampleRow, 1) != 1) {
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
           jpegStartTimerCore();
-          JDIMENSION readScanLinesRet2 = sandbox_invoke_custom(rlbox_jpeg, jpeg_read_scanlines, &mInfo, pBufferSys, 1).UNSAFE_Unverified(readScanLinesVerif);
+          JDIMENSION readScanLinesRet2 = sandbox_invoke_custom(rlbox_jpeg, jpeg_read_scanlines, &mInfo, pBufferSys, 1).copyAndVerify(readScanLinesVerif);
           jpegEndTimerCore();
           void* pBufferSysMemCpyTarget2 = (*pBufferSys).UNSAFE_Unverified();
           memcpy((void *)sampleRow, pBufferSysMemCpyTarget2, row_stride);
@@ -1917,7 +1926,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
 // Override the standard error method in the IJG JPEG decoder code.
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
-  METHODDEF(void) my_error_exit (tainted<j_common_ptr, RLBox_NaCl> cinfo)
+  METHODDEF(void) my_error_exit (RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<j_common_ptr, RLBox_NaCl> cinfo)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   METHODDEF(void) my_error_exit (unverified_data<j_common_ptr> cinfo)
 #else
@@ -1925,8 +1934,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 #endif
 {
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
-      //CPP_TODO - should we have a safe casting function??
-      tainted<decoder_error_mgr *, RLBox_NaCl> err = (decoder_error_mgr *) (cinfo->err.UNSAFE_Unverified());
+      tainted<decoder_error_mgr *, RLBox_NaCl> err = sandbox_reinterpret_cast<decoder_error_mgr *>(cinfo->err);
       // Convert error to a browser error code
       nsresult error_code = err->pub.msg_code.UNSAFE_Unverified() == JERR_OUT_OF_MEMORY
                         ? NS_ERROR_OUT_OF_MEMORY
@@ -1975,7 +1983,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     sandbox_invoke_custom_with_ptr(rlbox_jpeg, formatMessagePtr, cinfo, buffer);
 
     auto verifBuffer = buffer.copyAndVerifyString(rlbox_jpeg, [](char*){ 
-      return true; 
+      return RLBox_Verify_Status::SAFE; 
     }, (char*) "String Verification of ErrMsg Failed: Unknown Error occurred in jpeg lib");
 
     fprintf(stderr, "JPEG decoding error:\n%s\n", verifBuffer);
@@ -2072,7 +2080,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 */
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
-  METHODDEF(void) init_source (tainted<j_decompress_ptr, RLBox_NaCl> jd)
+  METHODDEF(void) init_source (RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<j_decompress_ptr, RLBox_NaCl> jd)
   {
     jpegEndTimer();
     jpegStartTimer();
@@ -2102,9 +2110,10 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
         A zero or negative skip count should be treated as a no-op.
 */
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
-  METHODDEF(void) skip_input_data (tainted<j_decompress_ptr, RLBox_NaCl> jd, tainted<long, RLBox_NaCl> unv_num_bytes)
+  METHODDEF(void) skip_input_data (RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<j_decompress_ptr, RLBox_NaCl> jd, tainted<long, RLBox_NaCl> unv_num_bytes)
   {
-    jpegEndTimer();#elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+    jpegEndTimer();
+#elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   METHODDEF(void) skip_input_data (unverified_data<j_decompress_ptr> jd, unverified_data<long> unv_num_bytes)
   {
     jpegEndTimer();
@@ -2135,7 +2144,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     long bytes_in_buffer = (long) src->bytes_in_buffer.UNSAFE_Unverified();
     //next_input_byte is only used to set fields on an unverified data structure only
     //hence no verification is necessary
-    auto next_input_byte = src->next_input_byte.UNSAFE_Unverified();
+    tainted<const JOCTET*, RLBox_NaCl> next_input_byte = src->next_input_byte;
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     unverified_data<jpeg_source_mgr*> src = jd->src;
     long num_bytes = unv_num_bytes.sandbox_copyAndVerify([](int val){
@@ -2208,7 +2217,11 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
   if(currLen != 0 && newLen > currLen)
   {
     //printf("Free segment/back buffer: %u -> %u\n", (unsigned) currLen, (unsigned) newLen); 
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+    rlbox_jpeg->freeInSandbox(currBuff);
+    #else
     freeInJpegSandbox(currBuff);
+    #endif
     currLen = 0;
   }
 
@@ -2227,7 +2240,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 }
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
-  METHODDEF(boolean) fill_input_buffer (tainted<j_decompress_ptr, RLBox_NaCl> jd)
+  METHODDEF(boolean) fill_input_buffer (RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<j_decompress_ptr, RLBox_NaCl> jd)
   {
     jpegEndTimer();
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -2295,7 +2308,11 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
     #if(USE_SANDBOXING_BUFFERS != 0)
       ensureBufferLength(decoder->s_mSegment, decoder->s_mSegmentLen, new_buflen);
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+      memcpy(decoder->s_mSegment.UNSAFE_Unverified(), new_buffer, new_buflen);
+      #else
       memcpy(decoder->s_mSegment, new_buffer, new_buflen);
+      #endif
       #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
         src->next_input_byte = decoder->s_mSegment;
       #else
@@ -2351,7 +2368,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     // for it
     if (new_backtrack_buflen > MAX_JPEG_MARKER_LENGTH) {
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
-        my_error_exit((j_common_ptr)decoder->p_mInfo.UNSAFE_Unverified());
+        my_error_exit(rlbox_jpeg, sandbox_reinterpret_cast<j_common_ptr>(decoder->p_mInfo));
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
         //CPP_TODO - Again we need a better cast
         //Don't need any verifications as my_error_exit accepts an unverified as a param
@@ -2371,7 +2388,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
         err->msg_code = JERR_OUT_OF_MEMORY;
         //CPP_TODO - Again we need a better cast
         //Don't need any verifications as my_error_exit accepts an unverified as a param
-        my_error_exit((j_common_ptr)decoder->p_mInfo.UNSAFE_Unverified());
+        my_error_exit(rlbox_jpeg, sandbox_reinterpret_cast<j_common_ptr>(decoder->p_mInfo));
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
         struct jpeg_error_mgr* err = decoder->p_mInfo->err.sandbox_onlyVerifyAddress();
         err->msg_code = JERR_OUT_OF_MEMORY;
@@ -2414,7 +2431,11 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
                          decoder->mBackBufferUnreadLen;
     ensureBufferLength(decoder->s_mBackBuffer, decoder->s_mBackBufferLen, bytes_in_buffer);
     auto new_backBuffer = decoder->s_mBackBuffer;
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+    memcpy(new_backBuffer.UNSAFE_Unverified(), new_input_byte_val, bytes_in_buffer);
+    #else
     memcpy(new_backBuffer, new_input_byte_val, bytes_in_buffer);
+    #endif
 
     #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
       src->next_input_byte = new_backBuffer;
@@ -2443,7 +2464,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
  * jpeg_abort() or jpeg_destroy().
  */
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
-  METHODDEF(void) term_source (tainted<j_decompress_ptr, RLBox_NaCl> jd)
+  METHODDEF(void) term_source (RLBoxSandbox<RLBox_NaCl>* sandbox, tainted<j_decompress_ptr, RLBox_NaCl> jd)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   METHODDEF(void) term_source (unverified_data<j_decompress_ptr> jd)
 #else
@@ -2528,6 +2549,7 @@ static void cmyk_convert_rgb(JSAMPROW row, JDIMENSION width)
 
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
   #undef sandbox_invoke_custom
+  #undef sandbox_invoke_custom_return_app_ptr
   #undef sandbox_invoke_custom_ret_unsandboxed_ptr
   #undef sandbox_invoke_custom_with_ptr
 #endif
