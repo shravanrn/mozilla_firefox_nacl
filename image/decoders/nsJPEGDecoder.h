@@ -25,6 +25,12 @@ extern "C" {
 
 #include <setjmp.h>
 
+#ifdef NACL_SANDBOX_USE_NEW_CPP_API
+  #include "RLBox_NaCl.h"
+  #include "rlbox.h"
+  using namespace rlbox;
+#endif
+
 #ifdef NACL_SANDBOX_USE_CPP_API
   #define NACL_SANDBOX_API_NO_STL_DS
   #define NACL_SANDBOX_API_NO_OPTIONAL
@@ -43,7 +49,7 @@ extern "C" {
   #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
   #include "jpeglib_structs_for_cpp_api.h"
 #endif
 
@@ -107,7 +113,15 @@ private:
 
 public:
 
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+  #ifdef NACL_SANDBOX_USE_NEW_CPP_API
+    tainted<struct jpeg_decompress_struct*, RLBox_NaCl> p_mInfo;
+    tainted<struct jpeg_source_mgr*, RLBox_NaCl> p_mSourceMgr;
+    tainted<decoder_error_mgr*, RLBox_NaCl> p_mErr;
+    boolean m_buffered_image_shadow;
+    J_COLOR_SPACE m_out_color_space;
+    jmp_buf m_jmpBuff;
+    bool m_jmpBuffValid = FALSE; 
+  #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     unverified_data<struct jpeg_decompress_struct*> p_mInfo;
     unverified_data<struct jpeg_source_mgr*> p_mSourceMgr;
     unverified_data<decoder_error_mgr*> p_mErr;
@@ -132,7 +146,10 @@ public:
   uint32_t mSegmentLen;     // amount of data in mSegment
 
   #if(USE_SANDBOXING_BUFFERS != 0)
-    #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+      tainted<JOCTET*, RLBox_NaCl> s_mSegment;
+      tainted<JOCTET*, RLBox_NaCl> s_mBackBuffer;
+    #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       unverified_data<JOCTET*> s_mSegment;
       unverified_data<JOCTET*> s_mBackBuffer;
     #else

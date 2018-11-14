@@ -50,6 +50,7 @@ include('/ipc/chromium/chromium-config.mozbuild')
 
 DEFINES['STARTUP_LIBRARY_PATH'] = '"Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe"'
 DEFINES['SANDBOX_INIT_APP'] = '"libpng_nacl/builds/x64/nacl_build/mainCombine/libpng.nexe"'
+DEFINES['SANDBOX_INIT_APP_JPEG'] = '"libjpeg-turbo/builds/x64/nacl_build_simd/mainCombine/libjpeg.nexe"'
 
 LOCAL_INCLUDES += [
     '/../rlbox_api',
