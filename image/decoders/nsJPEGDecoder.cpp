@@ -409,7 +409,7 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
         currSeqNum++;
         dst_ptr = icc_data + data_offset[seq_no];
         #ifdef NACL_SANDBOX_USE_NEW_CPP_API
-          tainted<JOCTET*, RLBox_NaCl> src_ptr = data + ICC_OVERHEAD_LEN;
+          tainted<JOCTET*, RLBox_NaCl> src_ptr = data.getPointerIncrement(rlbox_jpeg, ICC_OVERHEAD_LEN);
         #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
           unverified_data<JOCTET*> src_ptr = data + ICC_OVERHEAD_LEN;
         #else
@@ -420,7 +420,7 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
           #ifdef NACL_SANDBOX_USE_NEW_CPP_API
             *dst_ptr = (*src_ptr).UNSAFE_Unverified();
             dst_ptr++;
-            src_ptr = src_ptr + 1;
+            src_ptr = src_ptr.getPointerIncrement(rlbox_jpeg, 1);
           #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
             //just let the automatic pointer check happen, no data validation as firefox is responsible for dealing with data
             *dst_ptr = (*src_ptr).UNSAFE_noVerify();
@@ -2173,13 +2173,21 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     // network stream. Set things up so that fill_input_buffer
     // will skip remaining amount.
     decoder->mBytesToSkip = (size_t)num_bytes - bytes_in_buffer;
-    src->next_input_byte = next_input_byte + bytes_in_buffer;
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+      src->next_input_byte = next_input_byte.getPointerIncrement(rlbox_jpeg, bytes_in_buffer);
+    #else
+      src->next_input_byte = next_input_byte + bytes_in_buffer;
+    #endif
     src->bytes_in_buffer = 0;
 
   } else {
     // Simple case. Just advance buffer pointer
     src->bytes_in_buffer = bytes_in_buffer - (size_t)num_bytes;
-    src->next_input_byte = next_input_byte + num_bytes;
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+      src->next_input_byte = next_input_byte.getPointerIncrement(rlbox_jpeg, num_bytes);
+    #else
+      src->next_input_byte = next_input_byte + num_bytes;
+    #endif
   }
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
   jpegStartTimer();
