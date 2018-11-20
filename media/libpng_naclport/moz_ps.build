@@ -10,6 +10,7 @@ with Files("**"):
 EXPORTS += [
     'pnglib_naclport.h',
     'pnglib_structs_for_cpp_api.h',
+    'pnglib_structs_for_cpp_api_new.h',
 ]
 
 SOURCES += [

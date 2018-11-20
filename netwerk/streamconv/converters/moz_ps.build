@@ -12,6 +12,7 @@ XPIDL_MODULE = 'necko_http'
 
 EXPORTS += [
     'zlib_structs_for_cpp_api.h',
+    'zlib_structs_for_cpp_api_new.h',
 ]
 
 UNIFIED_SOURCES += [

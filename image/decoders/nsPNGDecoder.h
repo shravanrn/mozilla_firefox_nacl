@@ -38,7 +38,9 @@
   #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+  #include "pnglib_structs_for_cpp_api_new.h"
+#elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   #include "pnglib_structs_for_cpp_api.h"
 #endif
 

@@ -49,7 +49,9 @@ extern "C" {
   #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+  #include "jpeglib_structs_for_cpp_api_new.h"
+#elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   #include "jpeglib_structs_for_cpp_api.h"
 #endif
 
@@ -117,7 +119,6 @@ public:
     tainted<struct jpeg_decompress_struct*, RLBox_NaCl> p_mInfo;
     tainted<struct jpeg_source_mgr*, RLBox_NaCl> p_mSourceMgr;
     tainted<decoder_error_mgr*, RLBox_NaCl> p_mErr;
-    boolean m_buffered_image_shadow;
     J_COLOR_SPACE m_out_color_space;
     jmp_buf m_jmpBuff;
     bool m_jmpBuffValid = FALSE; 

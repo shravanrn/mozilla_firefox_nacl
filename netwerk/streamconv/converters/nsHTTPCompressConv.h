@@ -32,7 +32,9 @@ using namespace rlbox;
 #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 
-#if defined(SANDBOX_CPP) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+#include "zlib_structs_for_cpp_api_new.h"
+#elif defined(SANDBOX_CPP)
 #include "zlib_structs_for_cpp_api.h"
 #endif
 

@@ -1106,12 +1106,8 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
     // when not doing a progressive decode.
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
       m_out_color_space = mInfo.out_color_space.copyAndVerify(jpegJColorSpaceVerifier);
-      //We set mInfo.buffered_image at some point in the parsing and then read it out when determining whether to allocate arrays
-      //This variable lives in sandbox memory and this can be modified by the library, so we instead create a member var in this class that shadows this
-      m_buffered_image_shadow = mDecodeStyle == PROGRESSIVE &&
-        //just a boolean. No verification needed 
-        sandbox_invoke_custom(rlbox_jpeg, jpeg_has_multiple_scans, &mInfo).UNSAFE_Unverified();
-      mInfo.buffered_image = m_buffered_image_shadow;
+      mInfo.buffered_image = mDecodeStyle == PROGRESSIVE && sandbox_invoke_custom(rlbox_jpeg, jpeg_has_multiple_scans, &mInfo).UNSAFE_Unverified();
+      mInfo.buffered_image.freeze();
 
       /* Used to set up image size so arrays can be allocated */
       sandbox_invoke_custom(rlbox_jpeg, jpeg_calc_output_dimensions, &mInfo);
@@ -1195,14 +1191,12 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
       return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
     }
 
-    #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API)
-      // If this is a progressive JPEG ...
-      mState = mInfo.buffered_image
-      #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
-      .copyAndVerify([this](boolean val){
-      #else
-      .sandbox_copyAndVerify([this](boolean val){
-      #endif
+    // If this is a progressive JPEG ...
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+      mState = mInfo.buffered_image.UNSAFE_Unverified()? JPEG_DECOMPRESS_PROGRESSIVE : JPEG_DECOMPRESS_SEQUENTIAL;
+      mInfo.buffered_image.unfreeze();
+    #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+      mState = mInfo.buffered_image.sandbox_copyAndVerify([this](boolean val){
         if (val != m_buffered_image_shadow)
         {
           printf("nsJPEGDecoder::nsJPEGDecoder: buffered_image and m_buffered_image_shadow are different values\n");
@@ -1210,15 +1204,13 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
         }
         return val;
       }) 
-      ?
-               JPEG_DECOMPRESS_PROGRESSIVE : JPEG_DECOMPRESS_SEQUENTIAL;
-      MOZ_FALLTHROUGH; // to decompress sequential JPEG.
+      ? JPEG_DECOMPRESS_PROGRESSIVE : JPEG_DECOMPRESS_SEQUENTIAL;
     #else
       // If this is a progressive JPEG ...
       mState = mInfo.buffered_image ?
                JPEG_DECOMPRESS_PROGRESSIVE : JPEG_DECOMPRESS_SEQUENTIAL;
-      MOZ_FALLTHROUGH; // to decompress sequential JPEG.
     #endif
+    MOZ_FALLTHROUGH; // to decompress sequential JPEG.
   }
 
   case JPEG_DECOMPRESS_SEQUENTIAL: {
