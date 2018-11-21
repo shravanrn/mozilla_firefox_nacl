@@ -348,6 +348,10 @@ run64_psasan:
 	$(CP) ../mozconfig64_asan_ps ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
+run64_wasmdebug:
+	$(CP) ../mozconfig64_wasm_debug ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+
 clean:
 	-rm -rf ../firefox_32bit_optdebug
 	-rm -rf ../firefox_32bit_optdebug_static

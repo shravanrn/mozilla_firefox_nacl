@@ -25,8 +25,15 @@ extern "C" {
 
 #include <setjmp.h>
 
-#ifdef NACL_SANDBOX_USE_NEW_CPP_API
-  #include "RLBox_NaCl.h"
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+#include "RLBox_NaCl.h"
+using TRLSandbox = RLBox_NaCl;
+#elif defined(WASM_SANDBOX_USE_CPP_API)
+#include "RLBox_Wasm.h"
+using TRLSandbox = RLBox_Wasm;
+#endif
+
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
   #include "rlbox.h"
   using namespace rlbox;
 #endif
@@ -49,7 +56,7 @@ extern "C" {
   #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
   #include "jpeglib_structs_for_cpp_api_new.h"
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   #include "jpeglib_structs_for_cpp_api.h"
@@ -115,10 +122,10 @@ private:
 
 public:
 
-  #ifdef NACL_SANDBOX_USE_NEW_CPP_API
-    tainted<struct jpeg_decompress_struct*, RLBox_NaCl> p_mInfo;
-    tainted<struct jpeg_source_mgr*, RLBox_NaCl> p_mSourceMgr;
-    tainted<decoder_error_mgr*, RLBox_NaCl> p_mErr;
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    tainted<struct jpeg_decompress_struct*, TRLSandbox> p_mInfo;
+    tainted<struct jpeg_source_mgr*, TRLSandbox> p_mSourceMgr;
+    tainted<decoder_error_mgr*, TRLSandbox> p_mErr;
     J_COLOR_SPACE m_out_color_space;
     jmp_buf m_jmpBuff;
     bool m_jmpBuffValid = FALSE; 
@@ -147,9 +154,9 @@ public:
   uint32_t mSegmentLen;     // amount of data in mSegment
 
   #if(USE_SANDBOXING_BUFFERS != 0)
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
-      tainted<JOCTET*, RLBox_NaCl> s_mSegment;
-      tainted<JOCTET*, RLBox_NaCl> s_mBackBuffer;
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+      tainted<JOCTET*, TRLSandbox> s_mSegment;
+      tainted<JOCTET*, TRLSandbox> s_mBackBuffer;
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       unverified_data<JOCTET*> s_mSegment;
       unverified_data<JOCTET*> s_mBackBuffer;
