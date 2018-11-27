@@ -897,7 +897,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
             }
 
             printf("nsJPEGDecoder jpeg_read_header bad return value\n");
-            exit(1);
+            abort();
           });
         if (read_header_ret == JPEG_SUSPENDED) {
       #else
@@ -921,7 +921,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
             if(s.width < 0 || ((unsigned) s.width) != val)
             {
               printf("nsJPEGDecoder::nsJPEGDecoder: unexpected image width\n");
-              exit(1);
+              abort();
             }
           }
           return val; 
@@ -938,7 +938,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
             if(s.height < 0 || ((unsigned) s.height) != val)
             {
               printf("nsJPEGDecoder::nsJPEGDecoder: unexpected image height\n");
-              exit(1);
+              abort();
             }
           }
           return val; 
@@ -1206,7 +1206,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
         if (val != m_buffered_image_shadow)
         {
           printf("nsJPEGDecoder::nsJPEGDecoder: buffered_image and m_buffered_image_shadow are different values\n");
-          exit(1);
+          abort();
         }
         return val;
       }) 
@@ -1281,7 +1281,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
               }
 
               printf("nsJPEGDecoder::nsJPEGDecoder got an unknown status from jpeg_consume_input\n");
-              exit(1);
+              abort();
             });
         #else
           status = d_jpeg_consume_input(&mInfo);
@@ -1294,7 +1294,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
           if(val > m_output_height_shadow)
           {
             printf("nsJPEGDecoder::nsJPEGDecoder: output_scanline > output_height\n");
-            exit(1);
+            abort();
           }
           return val;
         };
@@ -1308,7 +1308,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
             if(val > scan)
             {
               printf("nsJPEGDecoder::nsJPEGDecoder: output_scan_number > input_scan_number\n");
-              exit(1);
+              abort();
             }
             return val;
           });
@@ -1324,7 +1324,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
             if(val > scan)
             {
               printf("nsJPEGDecoder::nsJPEGDecoder: output_scan_number > input_scan_number\n");
-              exit(1);
+              abort();
             }
             return val;
           });
@@ -1429,7 +1429,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
               if(val > input_scan_number)
               {
                 printf("nsJPEGDecoder::nsJPEGDecoder: output_scan_number > input_scan_number\n");
-                exit(1);
+                abort();
               }
               return val;
             });
@@ -1445,7 +1445,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
               if(val > input_scan_number)
               {
                 printf("nsJPEGDecoder::nsJPEGDecoder: output_scan_number > input_scan_number\n");
-                exit(1);
+                abort();
               }
               return val;
             });
@@ -1610,7 +1610,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       if(val > m_output_height_shadow)
       {
         printf("nsJPEGDecoder::nsJPEGDecoder: output_scanline > output_height\n");
-        exit(1);
+        abort();
       }
       return val;
     };
@@ -1636,7 +1636,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       if(val < 1)
       {
         printf("nsJPEGDecoder::nsJPEGDecoder: output_components < 1. Unexpected value\n");
-        exit(1);
+        abort();
       }
       return val;
     });
@@ -1699,7 +1699,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
         }
 
         printf("Could not validate image height: %u %u\n", m_output_height_shadow, val);
-        exit(1);
+        abort();
       });
     #else
       auto output_height_non_rounded = mInfo.output_height;
@@ -1738,8 +1738,8 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
           //max lines asked for is 1, so only valid values are 0 and 1
           if (val != 0 && val != 1) 
           {
-            printf("nsJPEGDecoder::nsJPEGDecoder: readScanLinesRet unexpected value\n");
-            exit(1);
+            printf("nsJPEGDecoder::nsJPEGDecoder: readScanLinesRet unexpected value - %d\n", val);
+            abort();
           }
           return val;
         };
@@ -1754,7 +1754,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
           if (val != m_out_color_space)
           {
             printf("nsJPEGDecoder::nsJPEGDecoder: out_color_space changed\n");
-            exit(1);
+            abort();
           }
           return val;
         });
@@ -1942,7 +1942,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
         if(val != jpegRendererSaved)
         {
           printf("Sbox - bad nsJPEGDecoder pointer returned\n");
-          exit(1);
+          abort();
         }
         return val;
       });
@@ -1959,7 +1959,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
         if(val != jpegRendererSaved)
         {
           printf("Sbox - bad nsJPEGDecoder pointer returned\n");
-          exit(1);
+          abort();
         }
         return val;
       });
@@ -2024,7 +2024,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     if(!(decoder->m_jmpBuffValid))
     {
       printf("Trying to jump to an invalid jump buffer\n");
-      exit(1);
+      abort();
     }
     else
     {
@@ -2132,7 +2132,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       if(val != jpegRendererSaved)
       {
         printf("Sbox - bad nsJPEGDecoder pointer returned\n");
-        exit(1);
+        abort();
       }
       return val;
     });
@@ -2156,7 +2156,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       if(val != jpegRendererSaved)
       {
         printf("Sbox - bad nsJPEGDecoder pointer returned\n");
-        exit(1);
+        abort();
       }
       return val;
     });
@@ -2268,7 +2268,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       if(val != jpegRendererSaved)
       {
         printf("Sbox - bad nsJPEGDecoder pointer returned\n");
-        exit(1);
+        abort();
       }
       return val;
     });
@@ -2487,7 +2487,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       if(val != jpegRendererSaved)
       {
         printf("Sbox - bad nsJPEGDecoder pointer returned\n");
-        exit(1);
+        abort();
       }
       return val;
     });
