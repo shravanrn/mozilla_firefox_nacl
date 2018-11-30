@@ -17,6 +17,13 @@
 
 #ifdef NACL_SANDBOX_USE_NEW_CPP_API
 #include "RLBox_NaCl.h"
+using TRLSandbox = RLBox_NaCl;
+#elif defined(WASM_SANDBOX_USE_NEW_CPP_API)
+#include "RLBox_Wasm.h"
+using TRLSandbox = RLBox_Wasm;
+#endif
+
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API)
 #include "rlbox.h"
 using namespace rlbox;
 #elif SANDBOX_CPP == 1
@@ -32,7 +39,7 @@ using namespace rlbox;
 #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API)
 #include "zlib_structs_for_cpp_api_new.h"
 #elif defined(SANDBOX_CPP)
 #include "zlib_structs_for_cpp_api.h"
@@ -126,10 +133,10 @@ private:
     nsCOMPtr<nsIStreamListener> mListener; // this guy gets the converted data via his OnDataAvailable ()
     Atomic<CompressMode, Relaxed> mMode;
 
-#ifdef NACL_SANDBOX_USE_NEW_CPP_API
-    tainted<unsigned char*, RLBox_NaCl> mInpBuffer;
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API)
+    tainted<unsigned char*, TRLSandbox> mInpBuffer;
     #ifdef USE_COPYING_BUFFERS
-      tainted<unsigned char*, RLBox_NaCl> sbOutBuffer;
+      tainted<unsigned char*, TRLSandbox> sbOutBuffer;
     #endif
 #elif defined(SANDBOX_CPP)
     unverified_data<unsigned char*> mInpBuffer;
@@ -166,8 +173,8 @@ private:
     bool         mDummyStreamInitialised;
     bool         mFailUncleanStops;
 
-#ifdef NACL_SANDBOX_USE_NEW_CPP_API
-    tainted<z_stream*, RLBox_NaCl> p_d_stream;
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API)
+    tainted<z_stream*, TRLSandbox> p_d_stream;
 #elif defined(SANDBOX_CPP)
     unverified_data<z_stream*> p_d_stream;
 #else

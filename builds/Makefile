@@ -257,7 +257,7 @@ wasm64_debug: inithasrun
 	$(CP) ../mozconfig64_wasm_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
-	$(CP) ../netwerk/streamconv/converters/moz_static.build ../netwerk/streamconv/converters/moz.build
+	$(CP) ../netwerk/streamconv/converters/moz_wasm.build ../netwerk/streamconv/converters/moz.build
 	cd .. && ./mach build
 
 run64_static:
