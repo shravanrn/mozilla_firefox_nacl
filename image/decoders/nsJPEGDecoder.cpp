@@ -2242,6 +2242,10 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       currBuff = (JOCTET*) mallocInJpegSandbox(newLen);
     #endif
     currLen = newLen;
+    if(currBuff == nullptr){
+      printf("Reallocation of buffer has failed: %u\n", newLen);
+      abort();
+    }
   }
 }
 
