@@ -20,8 +20,8 @@ inithasrun:
 		autoreconf -i --force && \
 		./configure; \
 	fi
-	if [ ! -f ./toolkit/crashreporter/google-breakpad/src/third_party/lss/linux_syscall_support.h ]; then \
-		git clone https://chromium.googlesource.com/linux-syscall-support ./toolkit/crashreporter/google-breakpad/src/third_party/lss; \
+	if [ ! -f ../toolkit/crashreporter/google-breakpad/src/third_party/lss/linux_syscall_support.h ]; then \
+		git clone https://chromium.googlesource.com/linux-syscall-support ../toolkit/crashreporter/google-breakpad/src/third_party/lss; \
 	fi
 	echo hi > "inithasrun"
 
