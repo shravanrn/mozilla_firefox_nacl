@@ -50,7 +50,7 @@ DEFINES['WASM_SANDBOX_USE_CPP_API'] = 42
 include('/ipc/chromium/chromium-config.mozbuild')
 
 DEFINES['STARTUP_LIBRARY_PATH'] = '""'
-DEFINES['SANDBOX_INIT_APP'] = '"libpng_nacl/builds/x64/wasm_build/.libs/libpng_wasm.so"'
+DEFINES['SANDBOX_INIT_APP'] = '"libpng_nacl/builds/x64/wasm_build_debug/libpng_wasm.so"'
 DEFINES['SANDBOX_INIT_APP_JPEG'] = '"libjpeg-turbo/builds/x64/wasm_build/.libs/libjpeg_wasm.so"'
 
 LOCAL_INCLUDES += [

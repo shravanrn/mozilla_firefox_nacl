@@ -41,7 +41,7 @@ FINAL_LIBRARY = 'xul'
 # Uncomment for to use the new CPP sandbox API
 DEFINES["WASM_SANDBOX_USE_NEW_CPP_API"] = 42
 DEFINES['STARTUP_LIBRARY_PATH'] = '""'
-DEFINES['SANDBOX_INIT_APP'] = '"zlib_nacl/builds/x64/wasm_build_debug/libz_wasm.so"'
+DEFINES['SANDBOX_INIT_APP'] = '"zlib_nacl/builds/x64/wasm_build/libz_wasm.so"'
 DEFINES['USE_COPYING_BUFFERS'] = 42
 
 LOCAL_INCLUDES += [
