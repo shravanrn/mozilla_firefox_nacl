@@ -16,10 +16,10 @@
 
 #ifdef NACL_SANDBOX_USE_NEW_CPP_API
   #include "RLBox_NaCl.h"
-  using TRLSandbox = RLBox_NaCl;
+  using TRLSandboxP = RLBox_NaCl;
 #elif defined(WASM_SANDBOX_USE_CPP_API)
   #include "RLBox_Wasm.h"
-  using TRLSandbox = RLBox_Wasm;
+  using TRLSandboxP = RLBox_Wasm;
 #endif
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
@@ -110,8 +110,8 @@ private:
   // Convenience methods to make interacting with StreamingLexer from inside
   // a libpng callback easier.
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
-    void DoTerminate(tainted<png_structp, TRLSandbox> aPNGStruct, TerminalState aState);
-    void DoYield(tainted<png_structp, TRLSandbox> aPNGStruct);  
+    void DoTerminate(tainted<png_structp, TRLSandboxP> aPNGStruct, TerminalState aState);
+    void DoYield(tainted<png_structp, TRLSandboxP> aPNGStruct);  
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     void DoTerminate(unverified_data<png_structp> aPNGStruct, TerminalState aState);
     void DoYield(unverified_data<png_structp> aPNGStruct);
@@ -147,8 +147,8 @@ private:
 
 public:
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
-    tainted<png_structp, TRLSandbox> mPNG;
-    tainted<png_infop, TRLSandbox> mInfo;
+    tainted<png_structp, TRLSandboxP> mPNG;
+    tainted<png_infop, TRLSandboxP> mInfo;
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     unverified_data<png_structp> mPNG;
     unverified_data<png_infop> mInfo;
@@ -176,7 +176,7 @@ public:
     AnimFrameInfo();
 #ifdef PNG_APNG_SUPPORTED
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
-      AnimFrameInfo(tainted<png_structp, TRLSandbox> aPNG, tainted<png_infop, TRLSandbox> aInfo);
+      AnimFrameInfo(tainted<png_structp, TRLSandboxP> aPNG, tainted<png_infop, TRLSandboxP> aInfo);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       AnimFrameInfo(unverified_data<png_structp> aPNG, unverified_data<png_infop> aInfo);
     #else
@@ -199,15 +199,15 @@ public:
   // libpng callbacks
   // We put these in the class so that they can access protected members.
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
-    static void PNGAPI info_callback(RLBoxSandbox<TRLSandbox>* sandbox, tainted<png_structp, TRLSandbox> png_ptr, tainted<png_infop, TRLSandbox> info_ptr);
-    static void PNGAPI row_callback(RLBoxSandbox<TRLSandbox>* sandbox, tainted<png_structp, TRLSandbox> png_ptr, tainted<png_bytep, TRLSandbox> new_row, tainted<png_uint_32, TRLSandbox> row_num, tainted<int, TRLSandbox> pass);
+    static void PNGAPI info_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_infop, TRLSandboxP> info_ptr);
+    static void PNGAPI row_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_bytep, TRLSandboxP> new_row, tainted<png_uint_32, TRLSandboxP> row_num, tainted<int, TRLSandboxP> pass);
     #ifdef PNG_APNG_SUPPORTED
-      static void PNGAPI frame_info_callback(RLBoxSandbox<TRLSandbox>* sandbox, tainted<png_structp, TRLSandbox> png_ptr, tainted<png_uint_32, TRLSandbox> frame_num);
+      static void PNGAPI frame_info_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_uint_32, TRLSandboxP> frame_num);
     #endif
-    static void PNGAPI end_callback(RLBoxSandbox<TRLSandbox>* sandbox, tainted<png_structp, TRLSandbox> png_ptr, tainted<png_infop, TRLSandbox> info_ptr);
-    static void PNGAPI error_callback(RLBoxSandbox<TRLSandbox>* sandbox, tainted<png_structp, TRLSandbox> png_ptr, tainted<png_const_charp, TRLSandbox> error_msg);
-    static void PNGAPI warning_callback(RLBoxSandbox<TRLSandbox>* sandbox, tainted<png_structp, TRLSandbox> png_ptr, tainted<png_const_charp, TRLSandbox> warning_msg);
-    static void PNGAPI checked_longjmp(RLBoxSandbox<TRLSandbox>* sandbox, tainted<jmp_buf, TRLSandbox> unv_env, tainted<int, TRLSandbox> unv_status);
+    static void PNGAPI end_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_infop, TRLSandboxP> info_ptr);
+    static void PNGAPI error_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_const_charp, TRLSandboxP> error_msg);
+    static void PNGAPI warning_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_const_charp, TRLSandboxP> warning_msg);
+    static void PNGAPI checked_longjmp(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<jmp_buf, TRLSandboxP> unv_env, tainted<int, TRLSandboxP> unv_status);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     static void PNGAPI info_callback(unverified_data<png_structp> png_ptr, unverified_data<png_infop> info_ptr);
     static void PNGAPI row_callback(unverified_data<png_structp> png_ptr, unverified_data<png_bytep> new_row, unverified_data<png_uint_32> row_num, unverified_data<int> pass);
