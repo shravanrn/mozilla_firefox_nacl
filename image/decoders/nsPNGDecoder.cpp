@@ -86,11 +86,11 @@ using std::min;
   extern PNGProcessSandbox* pngSandbox;
 #endif
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   RLBoxSandbox<TRLSandboxP>* rlbox_png;
 #endif
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   #include "pngstruct.h"
   #include "pnginfo.h"
   #include <set>
@@ -136,7 +136,7 @@ using std::min;
      unsigned int for_write       ; /* Otherwise it is a read structure */
      unsigned int owned_file      ; /* We own the file in io_ptr */
   } png_control;
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     std::once_flag rlbox_png_init;
     rlbox_load_library_api(pnglib, TRLSandboxP)
   #else
@@ -167,7 +167,7 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
 #  define MOZ_PNG_MAX_HEIGHT 0x7fffffff // Unlimited
 #endif
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   sandbox_callback_helper<void(png_structp,png_const_charp), TRLSandboxP> cpp_cb_png_error_fn;
   sandbox_callback_helper<void(png_structp,png_const_charp), TRLSandboxP> cpp_cb_png_warn_fn;
   sandbox_callback_helper<void(png_structp,png_infop), TRLSandboxP> cpp_cb_png_progressive_info_fn;
@@ -194,9 +194,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
 
 #endif
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
-  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_png(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName), ##__VA_ARGS__)
-  #define sandbox_invoke_custom_return_app_ptr(sandbox, fnName, ...) sandbox_invoke_custom_return_app_ptr_helper_png(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName), ##__VA_ARGS__)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_png(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName, false), ##__VA_ARGS__)
+  #define sandbox_invoke_custom_return_app_ptr(sandbox, fnName, ...) sandbox_invoke_custom_return_app_ptr_helper_png(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName, false), ##__VA_ARGS__)
 
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
@@ -332,7 +332,7 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
 
 #ifdef PNG_APNG_SUPPORTED
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   int32_t GetNextFrameDelay(tainted<png_structp, TRLSandboxP> aPNG, tainted<png_infop, TRLSandboxP> aInfo)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   int32_t GetNextFrameDelay(unverified_data<png_structp> aPNG, unverified_data<png_infop> aInfo)
@@ -341,7 +341,7 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
 #endif
 {
   // Delay, in seconds, is delayNum / delayDen.
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     png_uint_16 delayNum = sandbox_invoke_custom(rlbox_png, png_get_next_frame_delay_num, aPNG, aInfo)
       .copyAndVerify([](png_uint_16 val){ return val; });
     png_uint_16 delayDen = sandbox_invoke_custom(rlbox_png, png_get_next_frame_delay_den, aPNG, aInfo)
@@ -369,7 +369,7 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
   return static_cast<int32_t>(static_cast<double>(delayNum) * 1000 / delayDen);
 }
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   nsPNGDecoder::AnimFrameInfo::AnimFrameInfo(tainted<png_structp, TRLSandboxP> aPNG, tainted<png_infop, TRLSandboxP> aInfo)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   nsPNGDecoder::AnimFrameInfo::AnimFrameInfo(unverified_data<png_structp> aPNG, unverified_data<png_infop> aInfo)
@@ -380,7 +380,7 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
  , mBlend(BlendMethod::OVER)
  , mTimeout(0)
 {
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     png_byte dispose_op = sandbox_invoke_custom(rlbox_png, png_get_next_frame_dispose_op, aPNG, aInfo)
       .copyAndVerify([](png_byte val){ return val; });
     png_byte blend_op = sandbox_invoke_custom(rlbox_png, png_get_next_frame_blend_op, aPNG, aInfo)
@@ -414,7 +414,7 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
 #endif
 volatile int gdb = 1;
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
 static unsigned long freshMapId()
 {
   unsigned long startingPoint = rand();
@@ -435,7 +435,7 @@ static unsigned long freshMapId()
   abort();
 }
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
 void nsPNGDecoder::checked_longjmp(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<jmp_buf, TRLSandboxP> unv_env, tainted<int, TRLSandboxP> unv_status)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
 void nsPNGDecoder::checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_data<int> unv_status)
@@ -450,7 +450,7 @@ void nsPNGDecoder::checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_
   int savedJumpBufferFilledIn = jumpBufferFilledIn;
   jumpBufferFilledIn = 0;
 
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   int status = unv_status.copyAndVerify([](int val){ return val; });
   #else
   int status = unv_status.sandbox_copyAndVerify([](int val){ return val; });
@@ -485,7 +485,7 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
  , mDisablePremultipliedAlpha(false)
  , mNumFrames(0)
 {
-      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         std::call_once(rlbox_png_init, [](){
           char SandboxingCodeRootFolder[1024];
           getSandboxingFolder(SandboxingCodeRootFolder);
@@ -565,7 +565,7 @@ nsPNGDecoder::~nsPNGDecoder()
 {
   if (mPNG != nullptr) {
 
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       auto new_mPNG_Loc = rlbox_png->mallocInSandbox<png_structp>();
       *new_mPNG_Loc = mPNG;
 
@@ -595,7 +595,7 @@ nsPNGDecoder::~nsPNGDecoder()
     free(mCMSLine);
   }
   if (interlacebuf) {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       tainted<uint8_t*, TRLSandboxP> interlacebufTainted;
       interlacebufTainted.assignPointerInSandbox(rlbox_png, interlacebuf);
       rlbox_png->freeInSandbox(interlacebufTainted);
@@ -705,7 +705,7 @@ nsPNGDecoder::CreateFrame(const FrameInfo& aFrameInfo)
 #ifdef PNG_APNG_SUPPORTED
 
   if (
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_get_valid, mPNG, mInfo, PNG_INFO_acTL)
         .copyAndVerify([](png_uint_32 val){ return val; })
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -792,7 +792,7 @@ nsPNGDecoder::InitInternal()
     else
     {
       chunks_generated_started = 1;
-      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         color_chunks_replace = rlbox_png->mallocInSandbox<png_bytep>(sizeof(color_chunks_orig)).UNSAFE_Unverified();
         unused_chunks_replace = rlbox_png->mallocInSandbox<png_bytep>(sizeof(unused_chunks_orig)).UNSAFE_Unverified();
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -829,7 +829,7 @@ nsPNGDecoder::InitInternal()
   // Initialize the container's source image header
   // Always decode to 24 bit pixdepth
 
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     mPNG = sandbox_invoke_custom(rlbox_png, png_create_read_struct, rlbox_png->stackarr(PNG_LIBPNG_VER_STRING),
                                 nullptr, cpp_cb_png_error_fn,
                                 cpp_cb_png_warn_fn);
@@ -847,7 +847,7 @@ nsPNGDecoder::InitInternal()
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     mInfo = sandbox_invoke_custom(rlbox_png, png_create_info_struct, mPNG);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     mInfo = sandbox_invoke_custom(pngSandbox, png_create_info_struct, mPNG);
@@ -856,7 +856,7 @@ nsPNGDecoder::InitInternal()
   #endif
 
   if (mInfo == nullptr) {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       auto new_mPNG_Loc = rlbox_png->mallocInSandbox<png_structp>();
       *new_mPNG_Loc = mPNG;
       sandbox_invoke_custom(rlbox_png, png_destroy_read_struct, new_mPNG_Loc, nullptr, nullptr);
@@ -875,7 +875,7 @@ nsPNGDecoder::InitInternal()
 #ifdef PNG_HANDLE_AS_UNKNOWN_SUPPORTED
   // Ignore unused chunks
   if (mCMSMode == eCMSMode_Off || IsMetadataDecode()) {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_set_keep_unknown_chunks, mPNG, 1, color_chunks_replace, 2);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       sandbox_invoke_custom(pngSandbox, png_set_keep_unknown_chunks, mPNG, 1, color_chunks_replace, 2);
@@ -884,7 +884,7 @@ nsPNGDecoder::InitInternal()
     #endif
   }
 
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_set_keep_unknown_chunks, mPNG, 1, unused_chunks_replace,
                               (int)sizeof(unused_chunks_orig)/5);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -897,7 +897,7 @@ nsPNGDecoder::InitInternal()
 #endif
 
 #ifdef PNG_SET_USER_LIMITS_SUPPORTED
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_set_user_limits, mPNG, MOZ_PNG_MAX_WIDTH, MOZ_PNG_MAX_HEIGHT);
     if (mCMSMode != eCMSMode_Off) {
       sandbox_invoke_custom(rlbox_png, png_set_chunk_malloc_max, mPNG, 4000000L);
@@ -921,7 +921,7 @@ nsPNGDecoder::InitInternal()
   // in the embedded libpng but enabled by default in the system libpng.  This
   // call also disables it in the system libpng, for decoding speed.
   // Bug #745202.
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_set_check_for_invalid_index, mPNG, 0);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     sandbox_invoke_custom(pngSandbox, png_set_check_for_invalid_index, mPNG, 0);
@@ -933,7 +933,7 @@ nsPNGDecoder::InitInternal()
 #ifdef PNG_SET_OPTION_SUPPORTED
 #if defined(PNG_sRGB_PROFILE_CHECKS) && PNG_sRGB_PROFILE_CHECKS >= 0
   // Skip checking of sRGB ICC profiles
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_set_option, mPNG, PNG_SKIP_sRGB_CHECK_PROFILE, PNG_OPTION_ON);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     sandbox_invoke_custom(pngSandbox, png_set_option, mPNG, PNG_SKIP_sRGB_CHECK_PROFILE, PNG_OPTION_ON);
@@ -946,7 +946,7 @@ nsPNGDecoder::InitInternal()
   // Force a larger zlib inflate window as some images in the wild have
   // incorrectly set metadata (specifically CMF bits) which prevent us from
   // decoding them otherwise.
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_set_option, mPNG, PNG_MAXIMUM_INFLATE_WINDOW, PNG_OPTION_ON);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     sandbox_invoke_custom(pngSandbox, png_set_option, mPNG, PNG_MAXIMUM_INFLATE_WINDOW, PNG_OPTION_ON);
@@ -957,7 +957,7 @@ nsPNGDecoder::InitInternal()
 #endif
 
   // use this as libpng "progressive pointer" (retrieve in callbacks)
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_set_progressive_read_fn, mPNG, rlbox_png->app_ptr(static_cast<png_voidp>(this)),
                               cpp_cb_png_progressive_info_fn,
                               cpp_cb_png_progressive_row_fn,
@@ -981,7 +981,7 @@ nsPNGDecoder::InitInternal()
 LexerResult
 nsPNGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     pngRendererSaved = this;
   #endif
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
@@ -1015,7 +1015,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
   }
 
   // libpng uses setjmp/longjmp for error handling.
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     if(jumpBufferFilledIn)
     {
       printf("nsPNGDecoder::nsPNGDecoder - jmp_buf jump buffer already in use1\n");
@@ -1047,7 +1047,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
   #endif
 
   #if(USE_SANDBOXING_BUFFERS != 0)
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       auto aData_sandbox = rlbox_png->mallocInSandbox<char>(aLength);
       memcpy(aData_sandbox.UNSAFE_Unverified(), aData, aLength);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -1064,7 +1064,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
   // Pass the data off to libpng.
   mLastChunkLength = aLength;
   mNextTransition = Transition::ContinueUnbuffered(State::PNG_DATA);
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_process_data, mPNG, mInfo,
                    sandbox_reinterpret_cast<unsigned char*>(aData_sandbox),
                    aLength);
@@ -1082,7 +1082,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
   MOZ_ASSERT_IF(GetDecodeDone(), mNextTransition.NextStateIsTerminal());
   MOZ_ASSERT_IF(HasError(), mNextTransition.NextStateIsTerminal());
 
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     //clear the jmpBufferIndex on the way out as it is unsafe to call setjmp after this
     jumpBufferFilledIn = 0;
   #endif
@@ -1103,7 +1103,7 @@ nsPNGDecoder::FinishedPNGData()
 
 // Sets up gamma pre-correction in libpng before our callback gets called.
 // We need to do this if we don't end up with a CMS profile.
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   static void PNGDoGammaCorrection(tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_infop, TRLSandboxP> info_ptr)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   static void PNGDoGammaCorrection(unverified_data<png_structp> png_ptr, unverified_data<png_infop> info_ptr)
@@ -1111,7 +1111,7 @@ nsPNGDecoder::FinishedPNGData()
   static void PNGDoGammaCorrection(png_structp png_ptr, png_infop info_ptr)
 #endif
 {
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
 
     auto p_aGamma = rlbox_png->mallocInSandbox<double>();
     auto pngGetGammaRet = sandbox_invoke_custom(rlbox_png, png_get_gAMA, png_ptr, info_ptr, p_aGamma)
@@ -1177,7 +1177,7 @@ nsPNGDecoder::FinishedPNGData()
 }
 
 // Adapted from http://www.littlecms.com/pngchrm.c example code
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   static qcms_profile* PNGGetColorProfile(tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_infop, TRLSandboxP> info_ptr, int color_type, qcms_data_type* inType, uint32_t* intent)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   static qcms_profile* PNGGetColorProfile(unverified_data<png_structp> png_ptr, unverified_data<png_infop> info_ptr, int color_type, qcms_data_type* inType, uint32_t* intent)
@@ -1190,7 +1190,7 @@ nsPNGDecoder::FinishedPNGData()
 
   // First try to see if iCCP chunk is present
   if (
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_get_valid, png_ptr, info_ptr, PNG_INFO_iCCP)
         .copyAndVerify([](png_uint_32 val){ return val; })
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -1201,7 +1201,7 @@ nsPNGDecoder::FinishedPNGData()
     #endif
   ) {
 
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       auto p_profileLen  = rlbox_png->mallocInSandbox<png_uint_32>();
       auto p_profileData = rlbox_png->mallocInSandbox<png_bytep>();
       auto p_profileName = rlbox_png->mallocInSandbox<png_charp>();
@@ -1268,7 +1268,7 @@ nsPNGDecoder::FinishedPNGData()
         }
       } else {
         if (profileSpace == icSigRgbData) {
-          #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+          #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
             sandbox_invoke_custom(rlbox_png, png_set_gray_to_rgb, png_ptr);
           #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
             sandbox_invoke_custom(pngSandbox, png_set_gray_to_rgb, png_ptr);
@@ -1291,7 +1291,7 @@ nsPNGDecoder::FinishedPNGData()
 
   // Check sRGB chunk
   if (!profile &&
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_get_valid, png_ptr, info_ptr, PNG_INFO_sRGB)
         .copyAndVerify([](png_uint_32 val){ return val; })
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -1304,7 +1304,7 @@ nsPNGDecoder::FinishedPNGData()
     profile = qcms_profile_sRGB();
 
     if (profile) {
-      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         auto p_fileIntent = rlbox_png->mallocInSandbox<int>();
 
         sandbox_invoke_custom(rlbox_png, png_set_gray_to_rgb, png_ptr);
@@ -1344,7 +1344,7 @@ nsPNGDecoder::FinishedPNGData()
 
   // Check gAMA/cHRM chunks
   if (!profile &&
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_get_valid, png_ptr, info_ptr, PNG_INFO_gAMA)
         .copyAndVerify([](png_uint_32 val){ return val; })
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -1354,7 +1354,7 @@ nsPNGDecoder::FinishedPNGData()
       d_png_get_valid(png_ptr, info_ptr, PNG_INFO_gAMA)
     #endif
     &&
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_get_valid, png_ptr, info_ptr, PNG_INFO_cHRM)
         .copyAndVerify([](png_uint_32 val){ return val; })
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -1365,7 +1365,7 @@ nsPNGDecoder::FinishedPNGData()
     #endif
   )
   {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       auto p_primaries  = rlbox_png->mallocInSandbox<qcms_CIE_xyYTRIPLE>();
       auto p_whitePoint = rlbox_png->mallocInSandbox<qcms_CIE_xyY>();
 
@@ -1481,7 +1481,7 @@ nsPNGDecoder::FinishedPNGData()
                                                  1.0/gammaOfFile);
 
     if (profile) {
-      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         sandbox_invoke_custom(rlbox_png, png_set_gray_to_rgb, png_ptr);
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
         sandbox_invoke_custom(pngSandbox, png_set_gray_to_rgb, png_ptr);
@@ -1501,7 +1501,7 @@ nsPNGDecoder::FinishedPNGData()
       }
     } else {
       if (color_type & PNG_COLOR_MASK_ALPHA ||
-          #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+          #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
             sandbox_invoke_custom(rlbox_png, png_get_valid, png_ptr, info_ptr, PNG_INFO_tRNS)
               .copyAndVerify([](png_uint_32 val){ return val; })
           #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -1521,7 +1521,7 @@ nsPNGDecoder::FinishedPNGData()
   return profile;
 }
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   void nsPNGDecoder::info_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_infop, TRLSandboxP> info_ptr)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   void nsPNGDecoder::info_callback(unverified_data<png_structp> png_ptr, unverified_data<png_infop> info_ptr)
@@ -1529,7 +1529,7 @@ nsPNGDecoder::FinishedPNGData()
   void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr)
 #endif
 {
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     pngEndTimer();
     auto p_width  = rlbox_png->mallocInSandbox<png_uint_32>();
     auto p_height = rlbox_png->mallocInSandbox<png_uint_32>();
@@ -1743,7 +1743,7 @@ nsPNGDecoder::FinishedPNGData()
   if (width >
     SurfaceCache::MaximumCapacity()/(bit_depth > 8 ? 16:8)) {
     // libpng needs space to allocate two row buffers
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_error, decoder->mPNG, rlbox_png->stackarr("Image is too wide"));
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       sandbox_invoke_custom(pngSandbox, png_error, decoder->mPNG, sandbox_stackarr("Image is too wide"));
@@ -1754,7 +1754,7 @@ nsPNGDecoder::FinishedPNGData()
 
   if (decoder->HasError()) {
     // Setting the size led to an error.
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_error, decoder->mPNG, rlbox_png->stackarr("Sizing error"));
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       sandbox_invoke_custom(pngSandbox, png_error, decoder->mPNG, sandbox_stackarr("Sizing error"));
@@ -1764,7 +1764,7 @@ nsPNGDecoder::FinishedPNGData()
   }
 
   if (color_type == PNG_COLOR_TYPE_PALETTE) {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_set_expand, png_ptr);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       sandbox_invoke_custom(pngSandbox, png_set_expand, png_ptr);
@@ -1774,7 +1774,7 @@ nsPNGDecoder::FinishedPNGData()
   }
 
   if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8) {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_set_expand, png_ptr);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       sandbox_invoke_custom(pngSandbox, png_set_expand, png_ptr);
@@ -1784,7 +1784,7 @@ nsPNGDecoder::FinishedPNGData()
   }
 
   if (
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_get_valid, png_ptr, info_ptr, PNG_INFO_tRNS)
         .copyAndVerify([](png_uint_32 val){ return val; })
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -1795,7 +1795,7 @@ nsPNGDecoder::FinishedPNGData()
     #endif
   ) {
 
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       auto p_trans_values = rlbox_png->mallocInSandbox<png_color_16p>();
       sandbox_invoke_custom(rlbox_png, png_get_tRNS, png_ptr, info_ptr, p_trans, p_num_trans, p_trans_values);
       tainted<png_color_16p, TRLSandboxP> trans_values = *p_trans_values;
@@ -1836,7 +1836,7 @@ nsPNGDecoder::FinishedPNGData()
     if (bit_depth < 16) {
       png_uint_16 sample_max = (1 << bit_depth) - 1;
 
-      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         if ((color_type == PNG_COLOR_TYPE_GRAY &&
          trans_values_gray > sample_max) ||
          (color_type == PNG_COLOR_TYPE_RGB &&
@@ -1868,7 +1868,7 @@ nsPNGDecoder::FinishedPNGData()
         }
       #endif
     }
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       int num_trans = p_num_trans.copyAndVerify([decoder](int* val){ 
         if(val == nullptr) 
         {
@@ -1899,7 +1899,7 @@ nsPNGDecoder::FinishedPNGData()
   }
 
   if (bit_depth == 16) {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_set_scale_16, png_ptr);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       sandbox_invoke_custom(pngSandbox, png_set_scale_16, png_ptr);
@@ -1921,7 +1921,7 @@ nsPNGDecoder::FinishedPNGData()
     }
   }
 
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     int num_trans = p_num_trans.copyAndVerify([decoder](int* val){ 
       if(val == nullptr) 
       {
@@ -1954,7 +1954,7 @@ nsPNGDecoder::FinishedPNGData()
                                            outType,
                                            (qcms_intent)intent);
   } else {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_set_gray_to_rgb, png_ptr);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       sandbox_invoke_custom(pngSandbox, png_set_gray_to_rgb, png_ptr);
@@ -1979,7 +1979,7 @@ nsPNGDecoder::FinishedPNGData()
   // Let libpng expand interlaced images.
   const bool isInterlaced = interlace_type == PNG_INTERLACE_ADAM7;
   if (isInterlaced) {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_set_interlace_handling, png_ptr);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       sandbox_invoke_custom(pngSandbox, png_set_interlace_handling, png_ptr);
@@ -1990,7 +1990,7 @@ nsPNGDecoder::FinishedPNGData()
 
   // now all of those things we set above are used to update various struct
   // members and whatnot, after which we can get channels, rowbytes, etc.
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_read_update_info, png_ptr, info_ptr);
     decoder->mChannels = channels = sandbox_invoke_custom(rlbox_png, png_get_channels, png_ptr, info_ptr)
       .copyAndVerify([&png_ptr, &color_type](int val) {
@@ -2024,7 +2024,7 @@ nsPNGDecoder::FinishedPNGData()
   //---------------------------------------------------------------//
 
   if (channels < 1 || channels > 4) {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_error, decoder->mPNG, rlbox_png->stackarr("Invalid number of channels"));
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       sandbox_invoke_custom(pngSandbox, png_error, decoder->mPNG, sandbox_stackarr("Invalid number of channels"));
@@ -2035,7 +2035,7 @@ nsPNGDecoder::FinishedPNGData()
 
 #ifdef PNG_APNG_SUPPORTED
   bool isAnimated = 
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_get_valid, png_ptr, info_ptr, PNG_INFO_acTL)
     .copyAndVerify([](png_uint_32 val){ return val; });
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -2054,7 +2054,7 @@ nsPNGDecoder::FinishedPNGData()
       MOZ_ASSERT_UNREACHABLE("Doing downscale-during-decode "
                              "for an animated image?");
 
-      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         sandbox_invoke_custom(rlbox_png, png_error, decoder->mPNG, rlbox_png->stackarr("Invalid downscale attempt"));
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
         sandbox_invoke_custom(pngSandbox, png_error, decoder->mPNG, sandbox_stackarr("Invalid downscale attempt"));
@@ -2083,7 +2083,7 @@ nsPNGDecoder::FinishedPNGData()
 
 #ifdef PNG_APNG_SUPPORTED
   if (isAnimated) {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_set_progressive_frame_fn, png_ptr, cpp_cb_png_progressive_frame_info_fn,
                                    nullptr);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -2096,7 +2096,7 @@ nsPNGDecoder::FinishedPNGData()
   }
 
   if (
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_get_first_frame_is_hidden, png_ptr, info_ptr)
         .copyAndVerify([](png_byte val){ return val; })
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -2112,7 +2112,7 @@ nsPNGDecoder::FinishedPNGData()
     nsresult rv = decoder->CreateFrame(FrameInfo{ frameRect,
                                                   isInterlaced });
     if (NS_FAILED(rv)) {
-      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         sandbox_invoke_custom(rlbox_png, png_error, decoder->mPNG, rlbox_png->stackarr("CreateFrame failed"));
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
         sandbox_invoke_custom(pngSandbox, png_error, decoder->mPNG, sandbox_stackarr("CreateFrame failed"));
@@ -2130,7 +2130,7 @@ nsPNGDecoder::FinishedPNGData()
     decoder->mCMSLine =
       static_cast<uint8_t*>(malloc(bpp[channels] * frameRect.Width()));
     if (!decoder->mCMSLine) {
-      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         sandbox_invoke_custom(rlbox_png, png_error, decoder->mPNG, rlbox_png->stackarr("malloc of mCMSLine failed"));
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
         sandbox_invoke_custom(pngSandbox, png_error, decoder->mPNG, sandbox_stackarr("malloc of mCMSLine failed"));
@@ -2145,7 +2145,7 @@ nsPNGDecoder::FinishedPNGData()
       const size_t bufferSize = channels * frameRect.Width() * frameRect.Height();
 
       if (bufferSize > SurfaceCache::MaximumCapacity()) {
-        #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+        #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
           sandbox_invoke_custom(rlbox_png, png_error, decoder->mPNG, rlbox_png->stackarr("Insufficient memory to deinterlace image"));
         #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
           sandbox_invoke_custom(pngSandbox, png_error, decoder->mPNG, sandbox_stackarr("Insufficient memory to deinterlace image"));
@@ -2154,14 +2154,14 @@ nsPNGDecoder::FinishedPNGData()
         #endif
       }
 
-      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         decoder->interlacebuf = rlbox_png->mallocInSandbox<uint8_t>(bufferSize).UNSAFE_Unverified();
       #else
         decoder->interlacebuf = static_cast<uint8_t*>(mallocInPngSandbox(bufferSize));
       #endif
     }
     if (!decoder->interlacebuf) {
-      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         sandbox_invoke_custom(rlbox_png, png_error, decoder->mPNG, rlbox_png->stackarr("malloc of interlacebuf failed"));
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
         sandbox_invoke_custom(pngSandbox, png_error, decoder->mPNG, sandbox_stackarr("malloc of interlacebuf failed"));
@@ -2171,7 +2171,7 @@ nsPNGDecoder::FinishedPNGData()
     }
   }
 
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     pngStartTimer();
   #endif
 }
@@ -2218,7 +2218,7 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
   return AsVariant(pixel);
 }
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   void nsPNGDecoder::row_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_bytep, TRLSandboxP> new_row, tainted<png_uint_32, TRLSandboxP> row_num_unv, tainted<int, TRLSandboxP> pass_unv)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   void nsPNGDecoder::row_callback(unverified_data<png_structp> png_ptr, unverified_data<png_bytep> new_row, unverified_data<png_uint_32> row_num_unv, unverified_data<int> pass_unv)
@@ -2253,7 +2253,7 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
    * to pass the current row, and the function will combine the
    * old row and the new row.
    */
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     pngEndTimerCore();
     void* getProgPtrRet = sandbox_invoke_custom_return_app_ptr(rlbox_png, png_get_progressive_ptr, png_ptr);
 
@@ -2285,7 +2285,7 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
 
   MOZ_ASSERT_IF(decoder->IsFirstFrameDecode(), decoder->mNumFrames == 0);
 
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     //data sanity checks already exist below
     png_uint_32 row_num = row_num_unv.copyAndVerify([](png_uint_32 val){ return val; });
     int pass = pass_unv.copyAndVerify([](int val){ return val; });
@@ -2323,14 +2323,14 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
   if (decoder->interlacebuf) {
 
     // We'll output the deinterlaced version of the row.
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       rowToWrite.assignPointerInSandbox(rlbox_png, decoder->interlacebuf + (row_num * decoder->mChannels * width));
     #else
       rowToWrite = decoder->interlacebuf + (row_num * decoder->mChannels * width);
     #endif
 
     // Update the deinterlaced version of this row with the new data.
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_progressive_combine_row, png_ptr, rowToWrite, new_row);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       sandbox_invoke_custom(pngSandbox, png_progressive_combine_row, png_ptr, rowToWrite, new_row);
@@ -2339,7 +2339,7 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
     #endif
   }
 
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     auto rowToWriteVer = rowToWrite.UNSAFE_Unverified_Check_Range(rlbox_png, decoder->mChannels * width);
     decoder->WriteRow(rowToWriteVer);
     pngStartTimerCore();
@@ -2400,7 +2400,7 @@ void nsPNGDecoder::WriteRow(uint8_t* aRow)
   PostInvalidationIfNeeded();
 }
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   void nsPNGDecoder::DoTerminate(tainted<png_structp, TRLSandboxP> aPNGStruct, TerminalState aState)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   void nsPNGDecoder::DoTerminate(unverified_data<png_structp> aPNGStruct, TerminalState aState)
@@ -2413,7 +2413,7 @@ void nsPNGDecoder::WriteRow(uint8_t* aRow)
   // was passed to png_process_data() have not been consumed yet, because now
   // that we've reached a terminal state, we won't do any more decoding or call
   // back into libpng anymore.
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_process_data_pause, aPNGStruct, /* save = */ false);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     sandbox_invoke_custom(pngSandbox, png_process_data_pause, aPNGStruct, /* save = */ false);
@@ -2426,7 +2426,7 @@ void nsPNGDecoder::WriteRow(uint8_t* aRow)
                   : Transition::TerminateFailure();
 }
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   void nsPNGDecoder::DoYield(tainted<png_structp, TRLSandboxP> aPNGStruct)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   void nsPNGDecoder::DoYield(unverified_data<png_structp> aPNGStruct)
@@ -2438,7 +2438,7 @@ void nsPNGDecoder::WriteRow(uint8_t* aRow)
   // the data that was passed to png_process_data() have not been consumed yet.
   // We use this information to tell StreamingLexer where to place us in the
   // input stream when we come back from the yield.
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     png_size_t pendingBytes = sandbox_invoke_custom(rlbox_png, png_process_data_pause, aPNGStruct,
                                                      /* save = */ false)
       .copyAndVerify([](png_size_t val){
@@ -2475,7 +2475,7 @@ nsPNGDecoder::FinishInternal()
   int32_t loop_count = 0;
 #ifdef PNG_APNG_SUPPORTED
   if (
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_get_valid, mPNG, mInfo, PNG_INFO_acTL)
       .copyAndVerify([](png_uint_32 val){ return val; })
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -2485,7 +2485,7 @@ nsPNGDecoder::FinishInternal()
       d_png_get_valid(mPNG, mInfo, PNG_INFO_acTL)
     #endif
   ) {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       int32_t num_plays = sandbox_invoke_custom(rlbox_png, png_get_num_plays, mPNG, mInfo)
         .copyAndVerify([](int32_t val){ return val; });
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -2503,7 +2503,7 @@ nsPNGDecoder::FinishInternal()
   }
   PostDecodeDone(loop_count);
 
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     pngRendererSaved = nullptr;
   #endif
 
@@ -2513,7 +2513,7 @@ nsPNGDecoder::FinishInternal()
 
 #ifdef PNG_APNG_SUPPORTED
 // got the header of a new frame that's coming
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   void nsPNGDecoder::frame_info_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_uint_32, TRLSandboxP> frame_num)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   void nsPNGDecoder::frame_info_callback(unverified_data<png_structp> png_ptr, unverified_data<png_uint_32> frame_num)
@@ -2521,7 +2521,7 @@ nsPNGDecoder::FinishInternal()
   void nsPNGDecoder::frame_info_callback(png_structp png_ptr, png_uint_32 frame_num)
 #endif
 {
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     pngEndTimer();
     void* getProgPtrRet = sandbox_invoke_custom_return_app_ptr(rlbox_png, png_get_progressive_ptr, png_ptr);
 
@@ -2562,7 +2562,7 @@ nsPNGDecoder::FinishInternal()
 
   // Save the information necessary to create the frame; we'll actually create
   // it when we return from the yield.
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     const IntRect frameRect(sandbox_invoke_custom(rlbox_png, png_get_next_frame_x_offset, png_ptr, decoder->mInfo).copyAndVerify([](png_uint_32 val){ return val; }),
                             sandbox_invoke_custom(rlbox_png, png_get_next_frame_y_offset, png_ptr, decoder->mInfo).copyAndVerify([](png_uint_32 val){ return val; }),
                             sandbox_invoke_custom(rlbox_png, png_get_next_frame_width, png_ptr, decoder->mInfo).copyAndVerify([](png_uint_32 val){ return val; }),
@@ -2583,7 +2583,7 @@ nsPNGDecoder::FinishInternal()
 #ifndef MOZ_EMBEDDED_LIBPNG
   // if using system library, check frame_width and height against 0
   if (frameRect.width == 0) {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_error, png_ptr, rlbox_png->stackarr("Frame width must not be 0"));
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Frame width must not be 0"));
@@ -2592,7 +2592,7 @@ nsPNGDecoder::FinishInternal()
     #endif
   }
   if (frameRect.height == 0) {
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_error, png_ptr, rlbox_png->stackarr("Frame height must not be 0"));
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       sandbox_invoke_custom(pngSandbox, png_error, png_ptr, sandbox_stackarr("Frame height must not be 0"));
@@ -2620,13 +2620,13 @@ nsPNGDecoder::FinishInternal()
   decoder->mNextFrameInfo = Some(info);
   decoder->DoYield(png_ptr);
 
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     pngStartTimer();
   #endif  
 }
 #endif
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   void nsPNGDecoder::end_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_infop, TRLSandboxP> info_ptr)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   void nsPNGDecoder::end_callback(unverified_data<png_structp> png_ptr, unverified_data<png_infop> info_ptr)
@@ -2645,7 +2645,7 @@ nsPNGDecoder::FinishInternal()
    * Most people won't do much here, perhaps setting a flag that
    * marks the image as finished.
    */
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     pngEndTimer();
     void* getProgPtrRet = sandbox_invoke_custom_return_app_ptr(rlbox_png, png_get_progressive_ptr, png_ptr);
 
@@ -2681,12 +2681,12 @@ nsPNGDecoder::FinishInternal()
 
   decoder->DoTerminate(png_ptr, TerminalState::SUCCESS);
 
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     pngStartTimer();
   #endif
 }
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   void nsPNGDecoder::error_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_const_charp, TRLSandboxP> error_msg_unv)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   void nsPNGDecoder::error_callback(unverified_data<png_structp> png_ptr, unverified_data<png_const_charp> error_msg_unv)
@@ -2694,15 +2694,15 @@ nsPNGDecoder::FinishInternal()
   void nsPNGDecoder::error_callback(png_structp png_ptr,png_const_charp error_msg)
 #endif
 {
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     pngEndTimer();
-    const char* error_msg = error_msg_unv.copyAndVerifyString(rlbox_png, [](const char* val) { return strlen(val) < 10000? RLBox_Verify_Status::SAFE : RLBox_Verify_Status::UNSAFE; }, nullptr);
+    const char* error_msg = error_msg_unv.copyAndVerifyString(rlbox_png, [](const char* val) { return (val != nullptr && strlen(val) < 10000)? RLBox_Verify_Status::SAFE : RLBox_Verify_Status::UNSAFE; }, nullptr);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     pngEndTimer();
-    const char* error_msg = error_msg_unv.sandbox_copyAndVerifyString([](const char* val) { return strlen(val) < 10000; }, nullptr);
+    const char* error_msg = error_msg_unv.sandbox_copyAndVerifyString([](const char* val) { return (val != nullptr && strlen(val) < 10000); }, nullptr);
   #endif
   MOZ_LOG(sPNGLog, LogLevel::Error, ("libpng error: %s\n", error_msg));
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_longjmp, png_ptr, 1);
     pngStartTimer();
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -2714,7 +2714,7 @@ nsPNGDecoder::FinishInternal()
 }
 
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   void nsPNGDecoder::warning_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_const_charp, TRLSandboxP> warning_msg_unv)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   void nsPNGDecoder::warning_callback(unverified_data<png_structp> png_ptr, unverified_data<png_const_charp> warning_msg_unv)
@@ -2722,15 +2722,15 @@ nsPNGDecoder::FinishInternal()
   void nsPNGDecoder::warning_callback(png_structp png_ptr, png_const_charp warning_msg)
 #endif
 {
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     pngEndTimer();
-    const char* warning_msg = warning_msg_unv.copyAndVerifyString(rlbox_png, [](const char* val) { return strlen(val) < 10000? RLBox_Verify_Status::SAFE : RLBox_Verify_Status::UNSAFE; }, nullptr);
+    const char* warning_msg = warning_msg_unv.copyAndVerifyString(rlbox_png, [](const char* val) { return (val != nullptr && strlen(val) < 10000)? RLBox_Verify_Status::SAFE : RLBox_Verify_Status::UNSAFE; }, nullptr);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     pngEndTimer();
-    const char* warning_msg = warning_msg_unv.sandbox_copyAndVerifyString([](const char* val) { return strlen(val) < 10000; }, nullptr);
+    const char* warning_msg = warning_msg_unv.sandbox_copyAndVerifyString([](const char* val) { return (val != nullptr && strlen(val) < 10000); }, nullptr);
   #endif
   MOZ_LOG(sPNGLog, LogLevel::Warning, ("libpng warning: %s\n", warning_msg));
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     pngStartTimer();
   #endif
 }
@@ -2751,7 +2751,7 @@ nsPNGDecoder::IsValidICOResource() const
   // nsPNGDecoder.cpp is called.  In this error callback we do a longjmp, so
   // we need to save the jump buffer here. Otherwise we'll end up without a
   // proper callstack.
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     if(jumpBufferFilledIn)
     {
       printf("nsPNGDecoder::nsPNGDecoder - jump buffer already in usein IsValidICOResource\n");
@@ -2891,7 +2891,7 @@ nsPNGDecoder::IsValidICOResource() const
 } // namespace image
 } // namespace mozilla
 
-#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   #undef sandbox_invoke_custom
   #undef sandbox_invoke_custom_return_app_ptr
   #undef sandbox_invoke_custom_ret_unsandboxed_ptr

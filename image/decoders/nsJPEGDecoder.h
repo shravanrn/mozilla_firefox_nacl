@@ -26,14 +26,21 @@ extern "C" {
 #include <setjmp.h>
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
-#include "RLBox_NaCl.h"
-using TRLSandbox = RLBox_NaCl;
+  #include "RLBox_NaCl.h"
+  using TRLSandbox = RLBox_NaCl;
 #elif defined(WASM_SANDBOX_USE_CPP_API)
-#include "RLBox_Wasm.h"
-using TRLSandbox = RLBox_Wasm;
+  #include "RLBox_Wasm.h"
+  using TRLSandbox = RLBox_Wasm;
+#elif defined(PS_SANDBOX_USE_NEW_CPP_API)
+  #undef USE_LIBPNG
+  #define USE_LIBJPEG
+  #include "ProcessSandbox.h"
+  #include "RLBox_Process.h"
+  using TRLSandbox = RLBox_Process<JPEGProcessSandbox>;
+  #undef USE_LIBJPEG
 #endif
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   #include "rlbox.h"
   using namespace rlbox;
 #endif
@@ -56,7 +63,7 @@ using TRLSandbox = RLBox_Wasm;
   #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   #include "jpeglib_structs_for_cpp_api_new.h"
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   #include "jpeglib_structs_for_cpp_api.h"
@@ -122,7 +129,7 @@ private:
 
 public:
 
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     tainted<struct jpeg_decompress_struct*, TRLSandbox> p_mInfo;
     tainted<struct jpeg_source_mgr*, TRLSandbox> p_mSourceMgr;
     tainted<decoder_error_mgr*, TRLSandbox> p_mErr;
@@ -154,7 +161,7 @@ public:
   uint32_t mSegmentLen;     // amount of data in mSegment
 
   #if(USE_SANDBOXING_BUFFERS != 0)
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       tainted<JOCTET*, TRLSandbox> s_mSegment;
       tainted<JOCTET*, TRLSandbox> s_mBackBuffer;
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)

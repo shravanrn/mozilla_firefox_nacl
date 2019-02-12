@@ -20,9 +20,16 @@
 #elif defined(WASM_SANDBOX_USE_CPP_API)
   #include "RLBox_Wasm.h"
   using TRLSandboxP = RLBox_Wasm;
+#elif defined(PS_SANDBOX_USE_NEW_CPP_API)
+  #undef USE_LIBJPEG
+  #define USE_LIBPNG
+  #include "ProcessSandbox.h"
+  #include "RLBox_Process.h"
+  using TRLSandboxP = RLBox_Process<PNGProcessSandbox>;
+  #undef USE_LIBPNG
 #endif
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   #include "rlbox.h"
   using namespace rlbox;
 #endif
@@ -45,7 +52,7 @@
   #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   #include "pnglib_structs_for_cpp_api_new.h"
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   #include "pnglib_structs_for_cpp_api.h"
@@ -109,7 +116,7 @@ private:
 
   // Convenience methods to make interacting with StreamingLexer from inside
   // a libpng callback easier.
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     void DoTerminate(tainted<png_structp, TRLSandboxP> aPNGStruct, TerminalState aState);
     void DoYield(tainted<png_structp, TRLSandboxP> aPNGStruct);  
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -146,7 +153,7 @@ private:
   size_t mLastChunkLength;
 
 public:
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     tainted<png_structp, TRLSandboxP> mPNG;
     tainted<png_infop, TRLSandboxP> mInfo;
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -175,7 +182,7 @@ public:
   {
     AnimFrameInfo();
 #ifdef PNG_APNG_SUPPORTED
-    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       AnimFrameInfo(tainted<png_structp, TRLSandboxP> aPNG, tainted<png_infop, TRLSandboxP> aInfo);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       AnimFrameInfo(unverified_data<png_structp> aPNG, unverified_data<png_infop> aInfo);
@@ -198,7 +205,7 @@ public:
 
   // libpng callbacks
   // We put these in the class so that they can access protected members.
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     static void PNGAPI info_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_infop, TRLSandboxP> info_ptr);
     static void PNGAPI row_callback(RLBoxSandbox<TRLSandboxP>* sandbox, tainted<png_structp, TRLSandboxP> png_ptr, tainted<png_bytep, TRLSandboxP> new_row, tainted<png_uint_32, TRLSandboxP> row_num, tainted<int, TRLSandboxP> pass);
     #ifdef PNG_APNG_SUPPORTED

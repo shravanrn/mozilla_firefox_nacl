@@ -1,0 +1,71 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+toolkit = CONFIG['MOZ_WIDGET_TOOLKIT']
+
+# The Icon Channel stuff really shouldn't live in decoders/icon, but we'll
+# fix that another time.
+if 'gtk' in toolkit:
+    DIRS += ['icon/gtk', 'icon']
+
+if CONFIG['OS_ARCH'] == 'WINNT':
+    DIRS += ['icon/win', 'icon']
+
+if toolkit == 'cocoa':
+    DIRS += ['icon/mac', 'icon']
+elif toolkit == 'android':
+    DIRS += ['icon/android', 'icon']
+
+UNIFIED_SOURCES += [
+    'EXIF.cpp',
+    'iccjpeg.c',
+    'nsBMPDecoder.cpp',
+    'nsGIFDecoder2.cpp',
+    'nsICODecoder.cpp',
+    'nsIconDecoder.cpp',
+    'nsJPEGDecoder.cpp',
+    'nsPNGDecoder.cpp',
+]
+
+# Pick from one of the values below
+#
+# Don't copy sandbox data to intermediate buffers
+# DEFINES['USE_SANDBOXING_BUFFERS'] = 0
+#
+# Copy sandbox data to intermediate buffers
+DEFINES['USE_SANDBOXING_BUFFERS'] = 1
+
+# Comment out the following if you want to use the CPP api of NaClSandbox. The value '42' below is disregarded
+# DEFINES['NACL_SANDBOX_USE_CPP_API'] = 42
+
+# DEFINES['NACL_SANDBOX_USE_NEW_CPP_API'] = 42
+
+# Comment out the following if you want to use the CPP api of ProcessSandbox. The value '42' below is disregarded
+# DEFINES['PROCESS_SANDBOX_USE_CPP_API'] = 42
+
+DEFINES['PS_SANDBOX_USE_NEW_CPP_API'] = 42
+
+include('/ipc/chromium/chromium-config.mozbuild')
+
+DEFINES['STARTUP_LIBRARY_PATH'] = '""'
+DEFINES['SANDBOX_INIT_APP'] = '"ProcessSandbox/ProcessSandbox_otherside_png64"'
+DEFINES['SANDBOX_INIT_APP_JPEG'] = '"ProcessSandbox/ProcessSandbox_otherside_jpeg64_simd"'
+
+LOCAL_INCLUDES += [
+    '/../ProcessSandbox',
+    '/../rlbox_api',
+    # Access to Skia headers for Downscaler.
+    '/gfx/2d',
+    # Decoders need ImageLib headers.
+    '/image',
+]
+
+LOCAL_INCLUDES += CONFIG['SKIA_INCLUDES']
+
+FINAL_LIBRARY = 'xul'
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-error=shadow']

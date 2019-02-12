@@ -21,9 +21,15 @@ using TRLSandbox = RLBox_NaCl;
 #elif defined(WASM_SANDBOX_USE_NEW_CPP_API)
 #include "RLBox_Wasm.h"
 using TRLSandbox = RLBox_Wasm;
+#elif defined(PS_SANDBOX_USE_NEW_CPP_API)
+#define USE_ZLIB
+#include "ProcessSandbox.h"
+#include "RLBox_Process.h"
+using TRLSandbox = RLBox_Process<ZProcessSandbox>;
+#undef USE_ZLIB
 #endif
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
 #include "rlbox.h"
 using namespace rlbox;
 #elif SANDBOX_CPP == 1
@@ -39,7 +45,7 @@ using namespace rlbox;
 #undef PROCESS_SANDBOX_API_NO_OPTIONAL
 #endif
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
 #include "zlib_structs_for_cpp_api_new.h"
 #elif defined(SANDBOX_CPP)
 #include "zlib_structs_for_cpp_api.h"
@@ -133,7 +139,7 @@ private:
     nsCOMPtr<nsIStreamListener> mListener; // this guy gets the converted data via his OnDataAvailable ()
     Atomic<CompressMode, Relaxed> mMode;
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     tainted<unsigned char*, TRLSandbox> mInpBuffer;
     #ifdef USE_COPYING_BUFFERS
       tainted<unsigned char*, TRLSandbox> sbOutBuffer;
@@ -173,7 +179,7 @@ private:
     bool         mDummyStreamInitialised;
     bool         mFailUncleanStops;
 
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API)
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     tainted<z_stream*, TRLSandbox> p_d_stream;
 #elif defined(SANDBOX_CPP)
     unverified_data<z_stream*> p_d_stream;
