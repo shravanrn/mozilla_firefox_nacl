@@ -2121,10 +2121,9 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 #endif
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_CPP_API)
     tainted<jpeg_source_mgr*, TRLSandbox> src = jd->src;
-    long num_bytes = unv_num_bytes.copyAndVerify([](int val){
-      //this is used to set the number of bytes to skip by setting a member value
-      //nsJPEGDecoder is already cautious to not read past the buffer if this value is set larger than the buffer
-      //so no validation is needed
+    long num_bytes = unv_num_bytes.copyAndVerify([](long val) -> long{
+      //Firefox assumes this will be positive... no guarantee provided by the type though, so check it
+      if (val < 0) { return 0; }
       return val;
     });
 
@@ -2145,10 +2144,9 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     tainted<const JOCTET*, TRLSandbox> next_input_byte = src->next_input_byte;
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     unverified_data<jpeg_source_mgr*> src = jd->src;
-    long num_bytes = unv_num_bytes.sandbox_copyAndVerify([](int val){
-      //this is used to set the number of bytes to skip by setting a member value
-      //nsJPEGDecoder is already cautious to not read past the buffer if this value is set larger than the buffer
-      //so no validation is needed
+    long num_bytes = unv_num_bytes.sandbox_copyAndVerify([](long val) -> long{
+      //Firefox assumes this will be positive... no guarantee provided by the type though, so check it
+      if (val < 0) { return 0; }
       return val;
     });
 

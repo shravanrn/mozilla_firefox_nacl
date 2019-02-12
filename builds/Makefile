@@ -26,7 +26,7 @@ inithasrun:
 	echo hi > "inithasrun"
 
 .NOTPARALLEL: build32 build64 static32 static64 dynamic32 dynamic64 nacl32 nacl64 ps32 ps64 \
-							dynamic64_dbg nacl64_dbg ps64_dbg ps64_asan
+							dynamic64_dbg nacl64_dbg ps64_dbg ps64_asan new_nacl64_cpp new_nacl64_cpp_dbg
 
 build32: static32 dynamic32 nacl32 ps32 nacl32_nosimd
 
@@ -232,6 +232,16 @@ nacl64_cpp_dbg: inithasrun
 	$(CP) ../netwerk/streamconv/converters/moz_nacl.build ../netwerk/streamconv/converters/moz.build
 	cd .. && ./mach build
 
+new_nacl64_cpp_dbg: inithasrun
+	if [ ! -d ../firefox_64bit_optdebug_new_nacl_cpp_debug ] && [ -d ../firefox_64bit_optdebug_nacl_debug ]; then cp -r ../firefox_64bit_optdebug_nacl_debug ../firefox_64bit_optdebug_new_nacl_cpp_debug; fi
+	$(CP) ../image/decoders/moz_copy_new_nacl_cpp.build ../image/decoders/moz.build
+	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../mozconfig64_new_nacl_cpp_debug ../mozconfig
+	$(CP) ../media/libjpeg_naclport/moz_nacl_debug.build ../media/libjpeg_naclport/moz.build
+	$(CP) ../media/libpng_naclport/moz_nacl_debug.build ../media/libpng_naclport/moz.build
+	$(CP) ../netwerk/streamconv/converters/moz_new_nacl.build ../netwerk/streamconv/converters/moz.build
+	cd .. && ./mach build
+
 ps64_dbg: inithasrun
 	if [ ! -d ../firefox_64bit_optdebug_ps_debug ] && [ -d ../firefox_64bit_optdebug_process_cpp_debug ]; then cp -r ../firefox_64bit_optdebug_process_cpp_debug ../firefox_64bit_optdebug_ps_debug; fi
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
@@ -289,10 +299,14 @@ run64_nacl_nosimd:
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 run64_naclcpp:
-	$(CP) ../mozconfig64_nacl_cpp ../mozconfig
+	$(CP) ../mozconfig64_nacl_cpp_debug ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 run64_newnaclcpp:
+	$(CP) ../mozconfig64_new_nacl_cpp ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+
+run64_newnaclcppdebug:
 	$(CP) ../mozconfig64_new_nacl_cpp ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
