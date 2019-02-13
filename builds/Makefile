@@ -30,9 +30,9 @@ inithasrun:
 
 build32: static32 dynamic32 nacl32 ps32 nacl32_nosimd
 
-build64: static64 static64_buffcopy dynamic64 nacl64 ps64 nacl64_cpp ps64_cpp new_nacl64_cpp
+build64: static64 static64_buffcopy dynamic64 nacl64 ps64 nacl64_cpp ps64_cpp new_nacl64_cpp new_ps64_cpp
 
-minbuild64: new_nacl64_cpp ps64_cpp
+minbuild64: new_nacl64_cpp new_ps64_cpp
 
 CP=./cpIfDifferent.sh
 
@@ -162,6 +162,16 @@ new_nacl64_cpp: inithasrun
 	$(CP) ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
 	$(CP) ../netwerk/streamconv/converters/moz_new_nacl.build ../netwerk/streamconv/converters/moz.build
+	cd .. && ./mach build
+
+new_ps64_cpp: inithasrun
+	if [ ! -d ../firefox_64bit_optdebug_new_nacl_cpp ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_new_nacl_cpp; fi
+	$(CP) ../image/decoders/moz_copy_new_ps_cpp.build ../image/decoders/moz.build
+	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../mozconfig64_new_ps_cpp ../mozconfig
+	$(CP) ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
+	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
+	$(CP) ../netwerk/streamconv/converters/moz_new_ps.build ../netwerk/streamconv/converters/moz.build
 	cd .. && ./mach build
 
 ps64_cpp: inithasrun
@@ -304,6 +314,11 @@ run64_ps:
 run64_pscpp:
 	-pkill -f ProcessSandbox_otherside
 	$(CP) ../mozconfig64_process_cpp ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+
+run64_psnaclcpp:
+	-pkill -f ProcessSandbox_otherside
+	$(CP) ../mozconfig64_new_ps_cpp ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 run64_nacl_nosimd:

@@ -88,7 +88,7 @@ extern "C" {
 #endif
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  RLBoxSandbox<TRLSandbox>* rlbox_jpeg;
+  RLBoxSandbox<TRLSandbox>* rlbox_jpeg = nullptr;
 
   #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_jpeg(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName, false), ##__VA_ARGS__)
   #define sandbox_invoke_custom_return_app_ptr(sandbox, fnName, ...) sandbox_invoke_custom_return_app_ptr_helper_jpeg(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName, false), ##__VA_ARGS__)
@@ -224,6 +224,18 @@ extern "C" {
     jpegEndTimer();
   }
 #endif
+
+void SandboxOnFirefoxExiting_JPEGDecoder()
+{
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    if(rlbox_jpeg != nullptr)
+    {
+      rlbox_jpeg->destroySandbox();
+      free(rlbox_jpeg);
+      rlbox_jpeg = nullptr;
+    }
+  #endif
+}
 
 #if MOZ_BIG_ENDIAN
 #define MOZ_JCS_EXT_NATIVE_ENDIAN_XRGB JCS_EXT_XRGB

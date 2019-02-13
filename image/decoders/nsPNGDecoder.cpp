@@ -87,7 +87,7 @@ using std::min;
 #endif
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  RLBoxSandbox<TRLSandboxP>* rlbox_png;
+  RLBoxSandbox<TRLSandboxP>* rlbox_png = nullptr;
 #endif
 
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
@@ -323,6 +323,18 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   }
 
 #endif
+
+extern "C" void SandboxOnFirefoxExiting_PNGDecoder()
+{
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    if(rlbox_png != nullptr)
+    {
+      rlbox_png->destroySandbox();
+      free(rlbox_png);
+      rlbox_png = nullptr;
+    }
+  #endif
+}
 
 nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
  : mDispose(DisposalMethod::KEEP)

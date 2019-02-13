@@ -55,12 +55,23 @@ static std::mutex mtx;
 
 void SandboxOnFirefoxExitingZLIB()
 {
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    if(rlbox_zlib != nullptr)
+    {
+      rlbox_zlib->destroySandbox();
+      free(rlbox_zlib);
+      rlbox_zlib = nullptr;
+    }
+  #endif
   #if SANDBOX_CPP == 2
   {
     std::lock_guard<std::mutex> guard(mtx);
     sbox->destroySandbox();
     sbox = NULL;
   }
+  #endif
+
+  #if (SANDBOX_CPP == 2) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   //killProcessSandboxOthersides
   {
     DIR *dir = opendir("/proc/");

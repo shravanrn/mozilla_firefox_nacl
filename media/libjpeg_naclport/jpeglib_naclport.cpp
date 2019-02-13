@@ -177,26 +177,29 @@ void jpegEndTimerCore()
   END_TIMER_CORE("");
 }
 
-#if(USE_SANDBOXING == 3)
+#if(USE_SANDBOXING == 2 || USE_SANDBOXING == 3)
   std::mutex jpegProcessExitMutex;
 #endif
 void SandboxOnFirefoxExitingPNG();
+void SandboxOnFirefoxExiting_JPEGDecoder();
 void SandboxOnFirefoxExiting()
 {
+  #if(USE_SANDBOXING == 2 || USE_SANDBOXING == 3)
   {
-    #if(USE_SANDBOXING == 3)
-    {
-      std::lock_guard<std::mutex> guard(jpegProcessExitMutex);
+    std::lock_guard<std::mutex> guard(jpegProcessExitMutex);
 
+    #if(USE_SANDBOXING == 3)
       if(jpegSandbox != nullptr)
       {
         jpegSandbox->destroySandbox();
         jpegSandbox = nullptr;
       }
-    }
     #endif
-    SandboxOnFirefoxExitingPNG();
+
+    SandboxOnFirefoxExiting_JPEGDecoder();
   }
+  #endif
+  SandboxOnFirefoxExitingPNG();
 }
 
 #if(USE_SANDBOXING == 2)
