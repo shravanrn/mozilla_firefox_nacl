@@ -570,9 +570,6 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
       #endif
       cpp_cb_jpeg_my_error_exit = sandbox_callback(jpegSandbox, my_error_exit);
     });
-    #if defined(PROCESS_SANDBOX_USE_CPP_API)
-      jpegSandbox->setAsActiveSandbox();
-    #endif
     p_mInfo = newInSandbox<jpeg_decompress_struct>(jpegSandbox);
     p_mErr = newInSandbox<decoder_error_mgr>(jpegSandbox);
     p_mSourceMgr = newInSandbox<jpeg_source_mgr>(jpegSandbox);
@@ -636,9 +633,6 @@ unsigned long long timeInJpeg = 0;
 
 nsJPEGDecoder::~nsJPEGDecoder()
 {
-  #if defined(PROCESS_SANDBOX_USE_CPP_API)
-    jpegSandbox->setAsActiveSandbox();
-  #endif
   //printf("FF Flag ~nsJPEGDecoder\n");
   // Step 8: Release JPEG decompression object
   auto& mInfo = *p_mInfo;
@@ -705,9 +699,6 @@ nsJPEGDecoder::SpeedHistogram() const
 nsresult
 nsJPEGDecoder::InitInternal()
 {
-  #if defined(PROCESS_SANDBOX_USE_CPP_API)
-    jpegSandbox->setAsActiveSandbox();
-  #endif
   //printf("FF Flag InitInternal\n");
   mCMSMode = gfxPlatform::GetCMSMode();
   if (GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
@@ -848,8 +839,14 @@ J_COLOR_SPACE jpegJColorSpaceVerifier(J_COLOR_SPACE val)
 LexerTransition<nsJPEGDecoder::State>
 nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 {
-  #if defined(PROCESS_SANDBOX_USE_CPP_API)
-    jpegSandbox->setAsActiveSandbox();
+  #if defined(PS_SANDBOX_USE_NEW_CPP_API)
+    class ActiveRAIIWrapper{
+      JPEGProcessSandbox* s;
+      public:
+      ActiveRAIIWrapper(JPEGProcessSandbox* ps) : s(ps) { s->makeActiveSandbox(); }
+      ~ActiveRAIIWrapper() { s->makeInactiveSandbox(); }
+    };
+    ActiveRAIIWrapper procSbxActivation(rlbox_jpeg->getSandbox());
   #endif
   //printf("FF Flag ReadJPEGData\n");
   mSegment = reinterpret_cast<const JOCTET*>(aData);

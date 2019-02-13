@@ -456,6 +456,16 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
     return iStr->ReadSegments(NS_DiscardSegment, nullptr, streamLen, &n);
   }
 
+  #if defined(PS_SANDBOX_USE_NEW_CPP_API)
+    class ActiveRAIIWrapper{
+      ZProcessSandbox* s;
+      public:
+      ActiveRAIIWrapper(ZProcessSandbox* ps) : s(ps) { s->makeActiveSandbox(); }
+      ~ActiveRAIIWrapper() { s->makeInactiveSandbox(); }
+    };
+    ActiveRAIIWrapper procSbxActivation(rlbox_zlib->getSandbox());
+  #endif
+
   switch (mMode) {
   case HTTP_COMPRESS_GZIP:
     streamLen = check_header(iStr, streamLen, &rv);

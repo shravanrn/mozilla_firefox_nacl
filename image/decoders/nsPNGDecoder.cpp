@@ -1003,6 +1003,15 @@ nsPNGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 LexerTransition<nsPNGDecoder::State>
 nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
 {
+  #if defined(PS_SANDBOX_USE_NEW_CPP_API)
+    class ActiveRAIIWrapper{
+      PNGProcessSandbox* ss;
+      public:
+      ActiveRAIIWrapper(PNGProcessSandbox* ps) : ss(ps) { ss->makeActiveSandbox(); }
+      ~ActiveRAIIWrapper() { ss->makeInactiveSandbox(); }
+    };
+    ActiveRAIIWrapper procSbxActivation(rlbox_png->getSandbox());
+  #endif
   // If we were waiting until after returning from a yield to call
   // CreateFrame(), call it now.
   if (mNextFrameInfo) {

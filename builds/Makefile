@@ -297,10 +297,12 @@ run64_nacl:
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 run64_ps:
+	-pkill -f ProcessSandbox_otherside
 	$(CP) ../mozconfig64_ps ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 run64_pscpp:
+	-pkill -f ProcessSandbox_otherside
 	$(CP) ../mozconfig64_process_cpp ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
@@ -321,6 +323,7 @@ run64_newnaclcppdebug:
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 run64_newpscppdebug:
+	-pkill -f ProcessSandbox_otherside
 	$(CP) ../mozconfig64_new_ps_cpp_debug ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
@@ -365,14 +368,17 @@ run64_naclcppdebug:
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 run64_psdebug:
+	-pkill -f ProcessSandbox_otherside
 	$(CP) ../mozconfig64_debug_ps ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 run64_pscppdebug:
+	-pkill -f ProcessSandbox_otherside
 	$(CP) ../mozconfig64_process_cpp_debug ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 run64_psasan:
+	-pkill -f ProcessSandbox_otherside
 	$(CP) ../mozconfig64_asan_ps ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
