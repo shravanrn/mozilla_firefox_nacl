@@ -169,8 +169,8 @@ new_ps64_cpp: inithasrun
 	$(CP) ../image/decoders/moz_copy_new_ps_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_new_ps_cpp ../mozconfig
-	$(CP) ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
-	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
+	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
+	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
 	$(CP) ../netwerk/streamconv/converters/moz_new_ps.build ../netwerk/streamconv/converters/moz.build
 	cd .. && ./mach build
 
@@ -316,7 +316,7 @@ run64_pscpp:
 	$(CP) ../mozconfig64_process_cpp ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
-run64_psnaclcpp:
+run64_newpscpp:
 	-pkill -f ProcessSandbox_otherside
 	$(CP) ../mozconfig64_new_ps_cpp ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html

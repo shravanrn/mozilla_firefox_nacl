@@ -23,7 +23,7 @@ if [[ ! -z "$2" ]]; then
 		exit 1
 	fi
 fi
-FFVersions=("static" "static_buffcopy" "nonnacl" "nacl" "ps" "nacl_cpp" "process_cpp")
+FFVersions=("new_nacl_cpp", "new_ps_cpp")
 
 for i in ${FFVersions[@]}; do
 	if [[ ! -d "firefox_${Pl}bit_optdebug_${i}" ]]; then
@@ -109,7 +109,7 @@ function runTest(){
 	rm -f ./talos_output.txt
 	#sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 	sleep 5
-	taskset -c 3 ./mach talos-test --activeTests $2 2>&1 | tee ./talos_output.txt
+	taskset -c 1 ./mach talos-test --activeTests $2 2>&1 | tee ./talos_output.txt
 	cat ./testing/mozharness/build/local.json >> "$1"
 	echo -e "\n" >> "$1"
 	writeTimingLinesToOutput "$1" "./talos_output.txt"

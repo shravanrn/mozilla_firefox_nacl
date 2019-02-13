@@ -511,7 +511,7 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
           strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
           strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
 
-          printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+          printf("Creating Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
 
           rlbox_png = RLBoxSandbox<TRLSandboxP>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
 
