@@ -32,7 +32,7 @@ build32: static32 dynamic32 nacl32 ps32 nacl32_nosimd
 
 build64: static64 static64_buffcopy dynamic64 nacl64 ps64 nacl64_cpp ps64_cpp new_nacl64_cpp new_ps64_cpp
 
-minbuild64: new_nacl64_cpp new_ps64_cpp
+minbuild64: nacl64 new_nacl64_cpp new_ps64_cpp
 
 CP=./cpIfDifferent.sh
 
@@ -165,7 +165,7 @@ new_nacl64_cpp: inithasrun
 	cd .. && ./mach build
 
 new_ps64_cpp: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_new_nacl_cpp ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_new_nacl_cpp; fi
+	if [ ! -d ../firefox_64bit_optdebug_new_ps_cpp ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_new_ps_cpp; fi
 	$(CP) ../image/decoders/moz_copy_new_ps_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_new_ps_cpp ../mozconfig

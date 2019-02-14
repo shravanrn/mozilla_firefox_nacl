@@ -1,8 +1,10 @@
 #!/bin/bash
 export MOZ_DISABLE_CONTENT_SANDBOX=1
 
-if [ -z "$1" ]; then 
-	echo "Expected argument ./runPerfTest outputfile.txt"; 
+# set -o xtrace
+
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then 
+	echo "Expected argument ./runPerfTest outputfile_img.txt outputfile_zlib.txt num_iterations [platform=32|64]"; 
 	exit 1; 
 fi
 
@@ -13,32 +15,44 @@ if [[ -f "$1" ]]; then
 	exit 1; 
 fi
 
+if [[ -f "$2" ]]; then
+	echo "$2 already exists"; 
+	exit 1; 
+fi
+
+PINCORE=1
+OUTPUTIMG=$1
+OUTPUTZLIB=$2
+ITERATIONS=$3
 Pl="64"
 
-if [[ ! -z "$2" ]]; then
-	if [[ "$2" == "32" ]]; then
+if [[ ! -z "$4" ]]; then
+	if [[ "$4" == "32" ]]; then
 		Pl="32"
 	else
-		echo "Unknown platform: $2"
+		echo "Unknown platform: $4"
 		exit 1
 	fi
 fi
-FFVersions=("new_nacl_cpp", "new_ps_cpp")
 
-for i in ${FFVersions[@]}; do
-	if [[ ! -d "firefox_${Pl}bit_optdebug_${i}" ]]; then
-		echo "Not all firefox versions found: firefox_${Pl}bit_optdebug_${i}";
+FFVersionsDir=("../../mozilla_firefox_stock/" "./" "./" "./")
+FFVersions=("static" "nacl" "new_nacl_cpp" "new_ps_cpp")
+
+if [ ${#FFVersionsDir[@]} -ne ${#FFVersions[@]} ]; then
+	echo "Versions Dir and Versions do not match";
+	exit 1;
+fi
+
+for (( i = 0; i < ${#FFVersions[@]}; i++ )); do 
+	if [[ ! -d "${FFVersionsDir[$i]}firefox_${Pl}bit_optdebug_${FFVersions[$i]}" ]]; then
+		echo "Not all firefox versions found: ${FFVersionsDir[$i]}firefox_${Pl}bit_optdebug_${FFVersions[$i]}";
 		exit 1;
 	fi
 done
 
-echo -n "Enter number of iterations:"
-read iterationsToRun
-
 echo "Starting. Make sure to "
 echo "1. Disable scaling first with. sudo cpufreq-set -c 3 --min 2200MHz --max 2200MHz"
 echo "2. Run the zlib testing server with node server.js"
-
 
 #param: outputfile
 #param: logfile
@@ -104,12 +118,15 @@ function writeTimingLinesToOutput() {
 
 # param: outputFile
 # param: testName
-function runTest(){
+# param: dir
+function runTestImg(){
+	SAVEDDIR=$PWD
+	cd $3
 	rm -f ./testing/mozharness/build/local.json
 	rm -f ./talos_output.txt
 	#sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 	sleep 5
-	taskset -c 1 ./mach talos-test --activeTests $2 2>&1 | tee ./talos_output.txt
+	taskset -c ${PINCORE} ./mach talos-test --activeTests $2 2>&1 | tee ./talos_output.txt
 	cat ./testing/mozharness/build/local.json >> "$1"
 	echo -e "\n" >> "$1"
 	writeTimingLinesToOutput "$1" "./talos_output.txt"
@@ -117,26 +134,56 @@ function runTest(){
 	cat "./talos_output.txt" >> "$1"
 	echo "\n=================================\n" >> "$1"
 	rm ./talos_output.txt
+	cd $SAVEDDIR
 }
 
-for i in `seq 1 $iterationsToRun`
+# param: outputFile
+# param: testName
+# param: dir
+function runTestZlib(){
+	SAVEDDIR=$PWD
+	cd $3
+	rm -f ./testing/mozharness/build/local.json
+	rm -f ./talos_output.txt
+	#sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
+	sleep 5
+	taskset -c ${PINCORE} ./mach talos-test --activeTests $2 2>&1 | tee ./talos_output.txt
+	cat ./testing/mozharness/build/local.json >> "$1"
+	echo -e "\n" >> "$1"
+	echo -e "\nTerminal Output\n" >> "$1"
+	cat "./talos_output.txt" >> "$1"
+	echo "\n=================================\n" >> "$1"
+	rm ./talos_output.txt
+	cd $SAVEDDIR
+}
+
+for i in `seq 1 ${ITERATIONS}`
 do
 
-	echo "Round ${i}" >> "$1"
-	echo "=========" >> "$1"
+	echo "Round ${i}" >> "${OUTPUTIMG}"
+	echo "Round ${i}" >> "${OUTPUTZLIB}"
+	echo "=========" >> "${OUTPUTIMG}"
+	echo "=========" >> "${OUTPUTZLIB}"
 
-	for j in ${FFVersions[@]}; do
+	for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
 		sleep 2
-		cp "./mozconfig${Pl}_${j}" ./mozconfig
+		cp "${FFVersionsDir[$j]}mozconfig${Pl}_${FFVersions[$j]}" ${FFVersionsDir[$j]}mozconfig
 		sleep 2
 	
-		echo -e "FFBuild-${j}\n" >> "$1"
-		runTest "$1" "jpeg_page_render"
-		echo -e "\n---------------------\n" >> "$1"
+		echo -e "FFBuild-${FFVersions[$j]}\n" >> "${OUTPUTIMG}"
+		echo -e "FFBuild-${FFVersions[$j]}\n" >> "${OUTPUTZLIB}"
+
+		runTestImg "${OUTPUTIMG}" "jpeg_page_render" "${FFVersionsDir[$j]}"
+		runTestZlib "${OUTPUTZLIB}" "zlib_page_render" "${FFVersionsDir[$j]}"
+
+		echo -e "\n---------------------\n" >> "${OUTPUTIMG}"
+		echo -e "\n---------------------\n" >> "${OUTPUTZLIB}"
 
 	done
 done
 
-echo "Output results to $1"
-cat "$1" | grep -E '(^FFBuild)|("name")|("value")|(Final JPEG_Time)|(Final PNG_Time)' | grep --invert-match "INFO -"
-
+echo "Output results to ${OUTPUTIMG}, ${OUTPUTZLIB}"
+cat "${OUTPUTIMG}" | grep -E '(^FFBuild)|("name")|("value")|(Final JPEG_Time)|(Final PNG_Time)' | grep --invert-match "INFO -"
+echo -e "\n---------------------\n"
+echo -e "\n---------------------\n"
+cat "${OUTPUTZLIB}" | grep -E '(^FFBuild)|("name")|("value")|(Final JPEG_Time)|(Final PNG_Time)' | grep --invert-match "INFO -"

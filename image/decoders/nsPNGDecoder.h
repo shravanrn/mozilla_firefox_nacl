@@ -14,6 +14,10 @@
 #include "StreamingLexer.h"
 #include "SurfacePipe.h"
 
+#include <chrono>
+#include <atomic>
+using namespace std::chrono;
+
 #ifdef NACL_SANDBOX_USE_NEW_CPP_API
   #include "RLBox_NaCl.h"
   using TRLSandboxP = RLBox_NaCl;
@@ -202,6 +206,8 @@ public:
 
   // The number of frames we've finished.
   uint32_t mNumFrames;
+
+  high_resolution_clock::time_point PngCreateTime;
 
   // libpng callbacks
   // We put these in the class so that they can access protected members.

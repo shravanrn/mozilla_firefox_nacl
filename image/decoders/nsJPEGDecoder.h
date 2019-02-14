@@ -24,6 +24,9 @@ extern "C" {
 }
 
 #include <setjmp.h>
+#include <chrono>
+#include <atomic>
+using namespace std::chrono;
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
   #include "RLBox_NaCl.h"
@@ -191,6 +194,7 @@ public:
   const Decoder::DecodeStyle mDecodeStyle;
 
   uint32_t mCMSMode;
+  high_resolution_clock::time_point JpegCreateTime;
 };
 
 } // namespace image

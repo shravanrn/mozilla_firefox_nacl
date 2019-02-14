@@ -99,9 +99,9 @@ extern "C" {
   tainted<return_argument<TFunc>, TRLSandbox>
   >::type sandbox_invoke_custom_helper_jpeg(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
-    jpegStartTimer();
+    // jpegStartTimer();
     auto ret = sandbox->invokeWithFunctionPointer(fnPtr, params...);
-    jpegEndTimer();
+    // jpegEndTimer();
     return ret;
   }
 
@@ -110,9 +110,9 @@ extern "C" {
   void
   >::type sandbox_invoke_custom_helper_jpeg(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
-    jpegStartTimer();
+    // jpegStartTimer();
     sandbox->invokeWithFunctionPointer(fnPtr, params...);
-    jpegEndTimer();
+    // jpegEndTimer();
   }
 
   template<typename TFunc, typename... TArgs>
@@ -120,9 +120,9 @@ extern "C" {
   return_argument<TFunc>
   >::type sandbox_invoke_custom_return_app_ptr_helper_jpeg(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
-    jpegStartTimer();
+    // jpegStartTimer();
     auto ret = sandbox->invokeWithFunctionPointerReturnAppPtr(fnPtr, params...);
-    jpegEndTimer();
+    // jpegEndTimer();
     return ret;
   }
 
@@ -639,7 +639,6 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
           this));
 }
 
-high_resolution_clock::time_point JpegCreateTime;
 unsigned long long invJpeg = 0;
 unsigned long long timeInJpeg = 0;
 
@@ -1500,7 +1499,8 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 
     // Step 7: Finish decompression
     timeInJpeg += duration_cast<nanoseconds>(high_resolution_clock::now() - JpegCreateTime).count();
-    printf("%10llu,JPEG_Time,%d,%10llu,%10llu,%10llu,%10llu,%10llu\n", invJpeg, getppid(), getTimeSpentInJpeg(), getInvocationsInJpegCore(), getTimeSpentInJpegCore(), timeInJpeg, getInvocationsInJpeg());
+    const unsigned long long ullz = 0;
+    printf("%10llu,JPEG_Time,%d,%10llu,%10llu,%10llu,%10llu,%10llu\n", invJpeg, getppid(), ullz, ullz, ullz, timeInJpeg, ullz);
     invJpeg++;
 
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)

@@ -203,9 +203,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   tainted<return_argument<TFunc>, TRLSandboxP>
   >::type sandbox_invoke_custom_helper_png(RLBoxSandbox<TRLSandboxP>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
-    pngStartTimer();
+    // pngStartTimer();
     auto ret = sandbox->invokeWithFunctionPointer(fnPtr, params...);
-    pngEndTimer();
+    // pngEndTimer();
     return ret;
   }
 
@@ -214,9 +214,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   void
   >::type sandbox_invoke_custom_helper_png(RLBoxSandbox<TRLSandboxP>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
-    pngStartTimer();
+    // pngStartTimer();
     sandbox->invokeWithFunctionPointer(fnPtr, params...);
-    pngEndTimer();
+    // pngEndTimer();
   }
 
   template<typename TFunc, typename... TArgs>
@@ -224,9 +224,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   return_argument<TFunc>
   >::type sandbox_invoke_custom_return_app_ptr_helper_png(RLBoxSandbox<TRLSandboxP>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
-    pngStartTimer();
+    // pngStartTimer();
     auto ret = sandbox->invokeWithFunctionPointerReturnAppPtr(fnPtr, params...);
-    pngEndTimer();
+    // pngEndTimer();
     return ret;
   }
 
@@ -569,7 +569,6 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
       #endif
 }
 
-high_resolution_clock::time_point PngCreateTime;
 unsigned long long invPng = 0;
 unsigned long long timeInPng = 0;
 
@@ -2696,8 +2695,9 @@ nsPNGDecoder::FinishInternal()
   MOZ_ASSERT(!decoder->HasError(), "Finishing up PNG but hit error!");
 
 
-  timeInPng += duration_cast<nanoseconds>(high_resolution_clock::now() - PngCreateTime).count();
-  printf("%10llu,PNG_Time,%d,%10llu,%10llu,%10llu,%10llu,%10llu\n", invPng, getppid(), getTimeSpentInPng(), getInvocationsInPngCore(), getTimeSpentInPngCore(), timeInPng, getInvocationsInPng());
+  timeInPng += duration_cast<nanoseconds>(high_resolution_clock::now() - decoder->PngCreateTime).count();
+  const unsigned long long ullz = 0;
+  printf("%10llu,PNG_Time,%d,%10llu,%10llu,%10llu,%10llu,%10llu\n", invPng, getppid(), ullz, ullz, ullz, timeInPng, ullz);
   invPng++;
 
   decoder->DoTerminate(png_ptr, TerminalState::SUCCESS);

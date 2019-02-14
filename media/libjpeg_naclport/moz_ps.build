@@ -32,7 +32,7 @@ SOURCES += [
 DEFINES['USE_SANDBOXING'] = 3
 
 # Comment out the following if you don't want to print the time spent in jpeg rendering. The value '42' below is disregarded
-DEFINES['PRINT_FUNCTION_TIMES'] = 42
+# DEFINES['PRINT_FUNCTION_TIMES'] = 42
 
 # Comment out if you don't want logging. The value '42' below is disregarded
 # DEFINES['PRINT_FUNCTION_LOGS'] = 42
