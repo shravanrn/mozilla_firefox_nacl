@@ -194,7 +194,7 @@ public:
   const Decoder::DecodeStyle mDecodeStyle;
 
   uint32_t mCMSMode;
-  high_resolution_clock::time_point JpegCreateTime;
+  RLBench JpegBench;
 };
 
 } // namespace image

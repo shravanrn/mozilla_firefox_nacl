@@ -203,9 +203,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   tainted<return_argument<TFunc>, TRLSandboxP>
   >::type sandbox_invoke_custom_helper_png(RLBoxSandbox<TRLSandboxP>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
-    // pngStartTimer();
+    // //pngStartTimer();
     auto ret = sandbox->invokeWithFunctionPointer(fnPtr, params...);
-    // pngEndTimer();
+    // //pngEndTimer();
     return ret;
   }
 
@@ -214,9 +214,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   void
   >::type sandbox_invoke_custom_helper_png(RLBoxSandbox<TRLSandboxP>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
-    // pngStartTimer();
+    // //pngStartTimer();
     sandbox->invokeWithFunctionPointer(fnPtr, params...);
-    // pngEndTimer();
+    // //pngEndTimer();
   }
 
   template<typename TFunc, typename... TArgs>
@@ -224,9 +224,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   return_argument<TFunc>
   >::type sandbox_invoke_custom_return_app_ptr_helper_png(RLBoxSandbox<TRLSandboxP>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
-    // pngStartTimer();
+    // //pngStartTimer();
     auto ret = sandbox->invokeWithFunctionPointerReturnAppPtr(fnPtr, params...);
-    // pngEndTimer();
+    // //pngEndTimer();
     return ret;
   }
 
@@ -239,9 +239,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   unverified_data<return_argument<TFunc>>
   >::type sandbox_invoke_custom_helper_png(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
   {
-    pngStartTimer();
+    //pngStartTimer();
     auto ret = sandbox_invoker_with_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
-    pngEndTimer();
+    //pngEndTimer();
     return ret;
   }
 
@@ -250,9 +250,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   void
   >::type sandbox_invoke_custom_helper_png(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
   {
-    pngStartTimer();
+    //pngStartTimer();
     sandbox_invoker_with_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
-    pngEndTimer();
+    //pngEndTimer();
   }
 
   template<typename TFunc, typename... TArgs>
@@ -260,9 +260,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   unverified_data<return_argument<TFunc>>
   >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
   {
-    pngStartTimer();
+    //pngStartTimer();
     auto ret = sandbox_invoker_with_ptr_ret_unsandboxed_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
-    pngEndTimer();
+    //pngEndTimer();
     return ret;
   }
 
@@ -271,9 +271,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   void
   >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
   {
-    pngStartTimer();
+    //pngStartTimer();
     sandbox_invoker_with_ptr_ret_unsandboxed_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
-    pngEndTimer();
+    //pngEndTimer();
   }
 
 #elif defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -285,9 +285,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   unverified_data<return_argument<TFunc>>
   >::type sandbox_invoke_custom_helper_png(PNGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
-    pngStartTimer();
+    //pngStartTimer();
     auto ret = sandbox_invoker_with_ptr(sandbox, fnPtr, nullptr, params...);
-    pngEndTimer();
+    //pngEndTimer();
     return ret;
   }
 
@@ -296,9 +296,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   void
   >::type sandbox_invoke_custom_helper_png(PNGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
-    pngStartTimer();
+    //pngStartTimer();
     sandbox_invoker_with_ptr(sandbox, fnPtr, nullptr, params...);
-    pngEndTimer();
+    //pngEndTimer();
   }
 
   template<typename TFunc, typename... TArgs>
@@ -306,9 +306,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   unverified_data<return_argument<TFunc>>
   >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(PNGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
-    pngStartTimer();
+    //pngStartTimer();
     auto ret = sandbox_invoker_with_ptr_ret_unsandboxed_ptr(sandbox, fnPtr, nullptr, params...);
-    pngEndTimer();
+    //pngEndTimer();
     return ret;
   }
 
@@ -317,9 +317,9 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
   void
   >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_png(PNGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
-    pngStartTimer();
+    //pngStartTimer();
     sandbox_invoker_with_ptr_ret_unsandboxed_ptr(sandbox, fnPtr, nullptr, params...);
-    pngEndTimer();
+    //pngEndTimer();
   }
 
 #endif
@@ -570,7 +570,6 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
 }
 
 unsigned long long invPng = 0;
-unsigned long long timeInPng = 0;
 
 nsPNGDecoder::~nsPNGDecoder()
 {
@@ -770,6 +769,7 @@ nsPNGDecoder::EndImageFrame()
 nsresult
 nsPNGDecoder::InitInternal()
 {
+  PngBench.Init();
   mCMSMode = gfxPlatform::GetCMSMode();
   if (GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
     mCMSMode = eCMSMode_Off;
@@ -997,8 +997,6 @@ nsPNGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
   #endif
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
 
-  PngCreateTime = high_resolution_clock::now();
-
   return mLexer.Lex(aIterator, aOnResume,
                     [=](State aState, const char* aData, size_t aLength) {
     switch (aState) {
@@ -1084,6 +1082,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
   // Pass the data off to libpng.
   mLastChunkLength = aLength;
   mNextTransition = Transition::ContinueUnbuffered(State::PNG_DATA);
+  PngBench.Start();
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_process_data, mPNG, mInfo,
                    sandbox_reinterpret_cast<unsigned char*>(aData_sandbox),
@@ -1097,6 +1096,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
                    reinterpret_cast<unsigned char*>(const_cast<char*>((aData_sandbox))),
                    aLength);
   #endif
+  PngBench.Stop();
 
   // Make sure that we've reached a terminal state if decoding is done.
   MOZ_ASSERT_IF(GetDecodeDone(), mNextTransition.NextStateIsTerminal());
@@ -1550,7 +1550,7 @@ nsPNGDecoder::FinishedPNGData()
 #endif
 {
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    pngEndTimer();
+    // //pngEndTimer();
     auto p_width  = rlbox_png->mallocInSandbox<png_uint_32>();
     auto p_height = rlbox_png->mallocInSandbox<png_uint_32>();
 
@@ -1635,7 +1635,7 @@ nsPNGDecoder::FinishedPNGData()
     });
 
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    pngEndTimer();
+    //pngEndTimer();
     auto p_width  = newInSandbox<png_uint_32>(pngSandbox);
     auto p_height = newInSandbox<png_uint_32>(pngSandbox);
 
@@ -1754,6 +1754,12 @@ nsPNGDecoder::FinishedPNGData()
     d_png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type,
                  &interlace_type, &compression_type, &filter_type);
   #endif
+
+  if(width < 100) {
+    decoder->PngTooSmall = true;
+  } else {
+    decoder->PngTooSmall = false;
+  }
 
   const IntRect frameRect(0, 0, width, height);
 
@@ -2192,7 +2198,7 @@ nsPNGDecoder::FinishedPNGData()
   }
 
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    pngStartTimer();
+    //pngStartTimer();
   #endif
 }
 
@@ -2274,7 +2280,7 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
    * old row and the new row.
    */
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    pngEndTimerCore();
+    //pngEndTimerCore();
     void* getProgPtrRet = sandbox_invoke_custom_return_app_ptr(rlbox_png, png_get_progressive_ptr, png_ptr);
 
     if(getProgPtrRet != pngRendererSaved)
@@ -2285,7 +2291,7 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
     nsPNGDecoder* decoder = static_cast<nsPNGDecoder*>(getProgPtrRet);
 
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    pngEndTimerCore();
+    //pngEndTimerCore();
     void* getProgPtrRet = sandbox_invoke_custom_ret_unsandboxed_ptr(pngSandbox, png_get_progressive_ptr, png_ptr);
 
     if(getProgPtrRet != pngRendererSaved)
@@ -2362,11 +2368,11 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     auto rowToWriteVer = rowToWrite.UNSAFE_Unverified_Check_Range(rlbox_png, decoder->mChannels * width);
     decoder->WriteRow(rowToWriteVer);
-    pngStartTimerCore();
+    //pngStartTimerCore();
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     auto rowToWriteVer = rowToWrite.sandbox_onlyVerifyAddressRange(decoder->mChannels * width);
     decoder->WriteRow(rowToWriteVer);
-    pngStartTimerCore();
+    //pngStartTimerCore();
   #else
     decoder->WriteRow(rowToWrite);
   #endif
@@ -2518,6 +2524,13 @@ nsPNGDecoder::FinishInternal()
   }
 #endif
 
+  if(!PngTooSmall)
+  {
+    auto diff = PngBench.JustFinish();
+    printf("Capture_Time:PNG_destroy,%llu,%llu|\n", invPng, diff);
+    invPng++;
+  }
+
   if (InFrame()) {
     EndImageFrame();
   }
@@ -2542,7 +2555,7 @@ nsPNGDecoder::FinishInternal()
 #endif
 {
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    pngEndTimer();
+    //pngEndTimer();
     void* getProgPtrRet = sandbox_invoke_custom_return_app_ptr(rlbox_png, png_get_progressive_ptr, png_ptr);
 
     if(getProgPtrRet != pngRendererSaved)
@@ -2552,7 +2565,7 @@ nsPNGDecoder::FinishInternal()
 
     nsPNGDecoder* decoder = static_cast<nsPNGDecoder*>(getProgPtrRet);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    pngEndTimer();
+    //pngEndTimer();
     void* getProgPtrRet = sandbox_invoke_custom_ret_unsandboxed_ptr(pngSandbox, png_get_progressive_ptr, png_ptr);
 
     if(getProgPtrRet != pngRendererSaved)
@@ -2641,7 +2654,7 @@ nsPNGDecoder::FinishInternal()
   decoder->DoYield(png_ptr);
 
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    pngStartTimer();
+    //pngStartTimer();
   #endif  
 }
 #endif
@@ -2666,7 +2679,7 @@ nsPNGDecoder::FinishInternal()
    * marks the image as finished.
    */
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    pngEndTimer();
+    //pngEndTimer();
     void* getProgPtrRet = sandbox_invoke_custom_return_app_ptr(rlbox_png, png_get_progressive_ptr, png_ptr);
 
     if(getProgPtrRet != pngRendererSaved)
@@ -2677,7 +2690,7 @@ nsPNGDecoder::FinishInternal()
     nsPNGDecoder* decoder = static_cast<nsPNGDecoder*>(getProgPtrRet);
 
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    pngEndTimer();
+    //pngEndTimer();
     void* getProgPtrRet = sandbox_invoke_custom_ret_unsandboxed_ptr(pngSandbox, png_get_progressive_ptr, png_ptr);
 
     if(getProgPtrRet != pngRendererSaved)
@@ -2694,16 +2707,10 @@ nsPNGDecoder::FinishInternal()
   // We shouldn't get here if we've hit an error
   MOZ_ASSERT(!decoder->HasError(), "Finishing up PNG but hit error!");
 
-
-  timeInPng += duration_cast<nanoseconds>(high_resolution_clock::now() - decoder->PngCreateTime).count();
-  const unsigned long long ullz = 0;
-  printf("%10llu,PNG_Time,%d,%10llu,%10llu,%10llu,%10llu,%10llu\n", invPng, getppid(), ullz, ullz, ullz, timeInPng, ullz);
-  invPng++;
-
   decoder->DoTerminate(png_ptr, TerminalState::SUCCESS);
 
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    pngStartTimer();
+    //pngStartTimer();
   #endif
 }
 
@@ -2716,19 +2723,19 @@ nsPNGDecoder::FinishInternal()
 #endif
 {
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    pngEndTimer();
+    //pngEndTimer();
     const char* error_msg = error_msg_unv.copyAndVerifyString(rlbox_png, [](const char* val) { return (val != nullptr && strlen(val) < 10000)? RLBox_Verify_Status::SAFE : RLBox_Verify_Status::UNSAFE; }, nullptr);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    pngEndTimer();
+    //pngEndTimer();
     const char* error_msg = error_msg_unv.sandbox_copyAndVerifyString([](const char* val) { return (val != nullptr && strlen(val) < 10000); }, nullptr);
   #endif
   MOZ_LOG(sPNGLog, LogLevel::Error, ("libpng error: %s\n", error_msg));
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(rlbox_png, png_longjmp, png_ptr, 1);
-    pngStartTimer();
+    //pngStartTimer();
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     sandbox_invoke_custom(pngSandbox, png_longjmp, png_ptr, 1);
-    pngStartTimer();
+    //pngStartTimer();
   #else
     d_png_longjmp(png_ptr, 1);
   #endif
@@ -2744,15 +2751,15 @@ nsPNGDecoder::FinishInternal()
 #endif
 {
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    pngEndTimer();
+    //pngEndTimer();
     const char* warning_msg = warning_msg_unv.copyAndVerifyString(rlbox_png, [](const char* val) { return (val != nullptr && strlen(val) < 10000)? RLBox_Verify_Status::SAFE : RLBox_Verify_Status::UNSAFE; }, nullptr);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    pngEndTimer();
+    //pngEndTimer();
     const char* warning_msg = warning_msg_unv.sandbox_copyAndVerifyString([](const char* val) { return (val != nullptr && strlen(val) < 10000); }, nullptr);
   #endif
   MOZ_LOG(sPNGLog, LogLevel::Warning, ("libpng warning: %s\n", warning_msg));
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    pngStartTimer();
+    //pngStartTimer();
   #endif
 }
 

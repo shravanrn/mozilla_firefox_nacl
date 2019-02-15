@@ -775,7 +775,22 @@ class jpeg_page_render(PageloaderTest):
     tpmanifest = '${talos}/tests/jpeg_page_render/jpeg_page_render.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 25
+    tppagecycles = 1000
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+
+@register_test()
+class png_page_render(PageloaderTest):
+    """
+    Test the time taken to render 1 png image
+    """
+    tpmanifest = '${talos}/tests/png_page_render/png_page_render.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 1000
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -790,7 +805,7 @@ class zlib_page_render(PageloaderTest):
     tpmanifest = '${talos}/tests/zlib_page_render/zlib_page_render.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 200
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000

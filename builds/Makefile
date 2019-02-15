@@ -32,7 +32,7 @@ build32: static32 dynamic32 nacl32 ps32 nacl32_nosimd
 
 build64: static64 static64_buffcopy dynamic64 nacl64 ps64 nacl64_cpp ps64_cpp new_nacl64_cpp new_ps64_cpp
 
-minbuild64: nacl64 new_nacl64_cpp new_ps64_cpp
+minbuild64: static64 static64_buffcopy nacl64 new_nacl64_cpp new_ps64_cpp
 
 CP=./cpIfDifferent.sh
 
@@ -46,7 +46,6 @@ static32: inithasrun
 	cd .. && ./mach build
 
 dynamic32: inithasrun
-	if [ ! -d ../firefox_32bit_optdebug_nonnacl ] && [ -d ../firefox_32bit_optdebug_static ]; then cp -r ../firefox_32bit_optdebug_static ../firefox_32bit_optdebug_nonnacl; fi
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig32_nonnacl ../mozconfig
@@ -56,7 +55,6 @@ dynamic32: inithasrun
 	cd .. && ./mach build
 
 nacl32: inithasrun
-	if [ ! -d ../firefox_32bit_optdebug_nacl ] && [ -d ../firefox_32bit_optdebug_static ]; then cp -r ../firefox_32bit_optdebug_static ../firefox_32bit_optdebug_nacl; fi
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig32_nacl ../mozconfig
@@ -66,7 +64,6 @@ nacl32: inithasrun
 	cd .. && ./mach build
 
 ps32: inithasrun
-	if [ ! -d ../firefox_32bit_optdebug_ps ] && [ -d ../firefox_32bit_optdebug_static ]; then cp -r ../firefox_32bit_optdebug_static ../firefox_32bit_optdebug_ps; fi
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig32_ps ../mozconfig
@@ -76,7 +73,6 @@ ps32: inithasrun
 	cd .. && ./mach build
 
 nacl32_nosimd: inithasrun
-	if [ ! -d ../firefox_32bit_optdebug_nacl_nosimd ] && [ -d ../firefox_32bit_optdebug_static ]; then cp -r ../firefox_32bit_optdebug_static ../firefox_32bit_optdebug_nacl_nosimd; fi
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig32_nacl_nosimd ../mozconfig
@@ -95,7 +91,6 @@ static64: inithasrun
 	cd .. && ./mach build
 
 static64_zlibnacl: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_static_zlib_nacl ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_static_zlib_nacl; fi
 	$(CP) ../mozconfig64_staticzlibnacl ../mozconfig
 	$(CP) ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
@@ -105,7 +100,6 @@ static64_zlibnacl: inithasrun
 	cd .. && ./mach build
 
 static64_zlibps: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_static_zlib_ps ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_static_zlib_ps; fi
 	$(CP) ../mozconfig64_staticzlibps ../mozconfig
 	$(CP) ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
@@ -115,7 +109,6 @@ static64_zlibps: inithasrun
 	cd .. && ./mach build
 
 static64_buffcopy: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_static_buffcopy ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_static_buffcopy; fi
 	$(CP) ../mozconfig64_static_buffcopy ../mozconfig
 	$(CP) ../image/decoders/moz_copy_stock.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
@@ -125,7 +118,6 @@ static64_buffcopy: inithasrun
 	cd .. && ./mach build
 
 dynamic64: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_nonnacl ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_nonnacl; fi
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_nonnacl ../mozconfig
@@ -135,7 +127,6 @@ dynamic64: inithasrun
 	cd .. && ./mach build
 
 nacl64: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_nacl ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_nacl; fi
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_nacl ../mozconfig
@@ -145,7 +136,6 @@ nacl64: inithasrun
 	cd .. && ./mach build
 
 nacl64_cpp: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_nacl_cpp ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_nacl_cpp; fi
 	$(CP) ../image/decoders/moz_copy_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_nacl_cpp ../mozconfig
@@ -155,7 +145,6 @@ nacl64_cpp: inithasrun
 	cd .. && ./mach build
 
 new_nacl64_cpp: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_new_nacl_cpp ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_new_nacl_cpp; fi
 	$(CP) ../image/decoders/moz_copy_new_nacl_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_new_nacl_cpp ../mozconfig
@@ -165,7 +154,6 @@ new_nacl64_cpp: inithasrun
 	cd .. && ./mach build
 
 new_ps64_cpp: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_new_ps_cpp ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_new_ps_cpp; fi
 	$(CP) ../image/decoders/moz_copy_new_ps_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_new_ps_cpp ../mozconfig
@@ -175,7 +163,6 @@ new_ps64_cpp: inithasrun
 	cd .. && ./mach build
 
 ps64_cpp: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_process_cpp ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_process_cpp; fi
 	$(CP) ../image/decoders/moz_copy_process_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_ps_cpp.build ../image/moz.build
 	$(CP) ../mozconfig64_process_cpp ../mozconfig
@@ -185,7 +172,6 @@ ps64_cpp: inithasrun
 	cd .. && ./mach build
 
 ps64_cpp_debug: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_process_cpp_debug ] && [ -d ../firefox_64bit_optdebug_nacl_debug ]; then cp -r ../firefox_64bit_optdebug_nacl_debug ../firefox_64bit_optdebug_process_cpp_debug; fi
 	$(CP) ../image/decoders/moz_copy_process_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_ps_cpp.build ../image/moz.build
 	$(CP) ../mozconfig64_process_cpp_debug ../mozconfig
@@ -195,7 +181,6 @@ ps64_cpp_debug: inithasrun
 	cd .. && ./mach build
 
 ps64: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_ps ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_ps; fi
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_ps ../mozconfig
@@ -205,7 +190,6 @@ ps64: inithasrun
 	cd .. && ./mach build
 
 nacl64_nosimd: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_nacl_nosimd ] && [ -d ../firefox_64bit_optdebug_static ]; then cp -r ../firefox_64bit_optdebug_static ../firefox_64bit_optdebug_nacl_nosimd; fi
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_nacl_nosimd ../mozconfig
@@ -233,7 +217,6 @@ nacl64_dbg: inithasrun
 	cd .. && ./mach build
 
 nacl64_cpp_dbg: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_nacl_cpp_debug ] && [ -d ../firefox_64bit_optdebug_nacl_debug ]; then cp -r ../firefox_64bit_optdebug_nacl_debug ../firefox_64bit_optdebug_nacl_cpp_debug; fi
 	$(CP) ../image/decoders/moz_copy_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_nacl_cpp_debug ../mozconfig
@@ -243,7 +226,6 @@ nacl64_cpp_dbg: inithasrun
 	cd .. && ./mach build
 
 new_nacl64_cpp_dbg: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_new_nacl_cpp_debug ] && [ -d ../firefox_64bit_optdebug_nacl_debug ]; then cp -r ../firefox_64bit_optdebug_nacl_debug ../firefox_64bit_optdebug_new_nacl_cpp_debug; fi
 	$(CP) ../image/decoders/moz_copy_new_nacl_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_new_nacl_cpp_debug ../mozconfig
@@ -253,7 +235,6 @@ new_nacl64_cpp_dbg: inithasrun
 	cd .. && ./mach build
 
 new_ps64_cpp_dbg: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_new_ps_cpp_debug ] && [ -d ../firefox_64bit_optdebug_nacl_debug ]; then cp -r ../firefox_64bit_optdebug_nacl_debug ../firefox_64bit_optdebug_new_ps_cpp_debug; fi
 	$(CP) ../image/decoders/moz_copy_new_ps_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_new_ps_cpp_debug ../mozconfig
@@ -263,7 +244,6 @@ new_ps64_cpp_dbg: inithasrun
 	cd .. && ./mach build
 
 ps64_dbg: inithasrun
-	if [ ! -d ../firefox_64bit_optdebug_ps_debug ] && [ -d ../firefox_64bit_optdebug_process_cpp_debug ]; then cp -r ../firefox_64bit_optdebug_process_cpp_debug ../firefox_64bit_optdebug_ps_debug; fi
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_default.build ../image/moz.build
 	$(CP) ../mozconfig64_debug_ps ../mozconfig

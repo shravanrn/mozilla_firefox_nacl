@@ -62,6 +62,68 @@ using namespace std::chrono;
   #include "pnglib_structs_for_cpp_api.h"
 #endif
 
+struct RLBench
+{
+  bool InUse = false;
+  bool StartCalled = false;
+  unsigned long long ElapsedTime = 0;
+  high_resolution_clock::time_point StartTime;
+
+  inline void Init()
+  {
+    if(InUse == true) {
+      printf("!!!!!!!Bench already in use!!!!!!!!!!\n");
+      abort();
+    }
+    InUse = true;
+    StartCalled = false;
+    ElapsedTime = 0;
+  }
+
+  inline void Start()
+  {
+    if(StartCalled) {
+      printf("!!!!!!!Start already called!!!!!!!!!!\n");
+      abort();
+    }
+    StartCalled = true;
+    StartTime = high_resolution_clock::now();
+  }
+
+  inline void StartIfNeeded()
+  {
+    if(!StartCalled) {
+      StartCalled = true;
+      StartTime = high_resolution_clock::now();
+    }
+  }
+
+  inline void Stop()
+  {
+    if(!StartCalled) {
+      printf("!!!!!!!Start not called!!!!!!!!!!\n");
+      abort();
+    }
+    StartCalled = false;
+    auto diff = duration_cast<nanoseconds>(high_resolution_clock::now() - StartTime).count();
+    ElapsedTime += diff;
+  }
+
+  inline unsigned long long JustFinish()
+  {
+    auto ret = ElapsedTime;
+    ElapsedTime = 0;
+    InUse = false;
+    return ret;
+  }
+
+  inline unsigned long long StopAndFinish()
+  {
+    Stop();
+    return JustFinish();
+  }
+};
+
 namespace mozilla {
 namespace image {
 
@@ -207,7 +269,8 @@ public:
   // The number of frames we've finished.
   uint32_t mNumFrames;
 
-  high_resolution_clock::time_point PngCreateTime;
+  RLBench PngBench;
+  bool PngTooSmall;
 
   // libpng callbacks
   // We put these in the class so that they can access protected members.

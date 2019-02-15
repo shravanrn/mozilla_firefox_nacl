@@ -99,9 +99,9 @@ extern "C" {
   tainted<return_argument<TFunc>, TRLSandbox>
   >::type sandbox_invoke_custom_helper_jpeg(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
-    // jpegStartTimer();
+    // //jpegStartTimer();
     auto ret = sandbox->invokeWithFunctionPointer(fnPtr, params...);
-    // jpegEndTimer();
+    // //jpegEndTimer();
     return ret;
   }
 
@@ -110,9 +110,9 @@ extern "C" {
   void
   >::type sandbox_invoke_custom_helper_jpeg(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
-    // jpegStartTimer();
+    // //jpegStartTimer();
     sandbox->invokeWithFunctionPointer(fnPtr, params...);
-    // jpegEndTimer();
+    // //jpegEndTimer();
   }
 
   template<typename TFunc, typename... TArgs>
@@ -120,9 +120,9 @@ extern "C" {
   return_argument<TFunc>
   >::type sandbox_invoke_custom_return_app_ptr_helper_jpeg(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
-    // jpegStartTimer();
+    // //jpegStartTimer();
     auto ret = sandbox->invokeWithFunctionPointerReturnAppPtr(fnPtr, params...);
-    // jpegEndTimer();
+    // //jpegEndTimer();
     return ret;
   }
 
@@ -138,9 +138,9 @@ extern "C" {
   unverified_data<return_argument<TFunc>>
   >::type sandbox_invoke_custom_helper_jpeg(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
   {
-    jpegStartTimer();
+    //jpegStartTimer();
     auto ret = sandbox_invoker_with_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
-    jpegEndTimer();
+    //jpegEndTimer();
     return ret;
   }
 
@@ -149,9 +149,9 @@ extern "C" {
   void
   >::type sandbox_invoke_custom_helper_jpeg(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
   {
-    jpegStartTimer();
+    //jpegStartTimer();
     sandbox_invoker_with_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
-    jpegEndTimer();
+    //jpegEndTimer();
   }
 
   template<typename TFunc, typename... TArgs>
@@ -159,9 +159,9 @@ extern "C" {
   unverified_data<return_argument<TFunc>>
   >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_jpeg(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
   {
-    jpegStartTimer();
+    //jpegStartTimer();
     auto ret = sandbox_invoker_with_ptr_ret_unsandboxed_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
-    jpegEndTimer();
+    //jpegEndTimer();
     return ret;
   }
 
@@ -170,9 +170,9 @@ extern "C" {
   void
   >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_jpeg(NaClSandbox* sandbox, void* fnPtr, TArgs... params)
   {
-    jpegStartTimer();
+    //jpegStartTimer();
     sandbox_invoker_with_ptr_ret_unsandboxed_ptr<TFunc>(sandbox, fnPtr, nullptr, params...);
-    jpegEndTimer();
+    //jpegEndTimer();
   }
 #endif
 
@@ -187,9 +187,9 @@ extern "C" {
   unverified_data<return_argument<TFunc>>
   >::type sandbox_invoke_custom_helper_jpeg(JPEGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
-    jpegStartTimer();
+    //jpegStartTimer();
     auto ret = sandbox_invoker_with_ptr(sandbox, fnPtr, nullptr, params...);
-    jpegEndTimer();
+    //jpegEndTimer();
     return ret;
   }
 
@@ -198,9 +198,9 @@ extern "C" {
   void
   >::type sandbox_invoke_custom_helper_jpeg(JPEGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
-    jpegStartTimer();
+    //jpegStartTimer();
     sandbox_invoker_with_ptr(sandbox, fnPtr, nullptr, params...);
-    jpegEndTimer();
+    //jpegEndTimer();
   }
 
   template<typename TFunc, typename... TArgs>
@@ -208,9 +208,9 @@ extern "C" {
   unverified_data<return_argument<TFunc>>
   >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_jpeg(JPEGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
-    jpegStartTimer();
+    //jpegStartTimer();
     auto ret = sandbox_invoker_with_ptr_ret_unsandboxed_ptr(sandbox, fnPtr, nullptr, params...);
-    jpegEndTimer();
+    //jpegEndTimer();
     return ret;
   }
 
@@ -219,9 +219,9 @@ extern "C" {
   void
   >::type sandbox_invoke_custom_ret_unsandboxed_ptr_helper_jpeg(JPEGProcessSandbox* sandbox, TFunc fnPtr, TArgs... params)
   {
-    jpegStartTimer();
+    //jpegStartTimer();
     sandbox_invoker_with_ptr_ret_unsandboxed_ptr(sandbox, fnPtr, nullptr, params...);
-    jpegEndTimer();
+    //jpegEndTimer();
   }
 #endif
 
@@ -627,6 +627,8 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
 
   mCMSMode = 0;
 
+  JpegBench.Init();
+
   #if(USE_SANDBOXING_BUFFERS != 0)
     s_mSegment = nullptr;
     s_mSegmentLen = 0;
@@ -710,7 +712,6 @@ nsJPEGDecoder::SpeedHistogram() const
 nsresult
 nsJPEGDecoder::InitInternal()
 {
-  //printf("FF Flag InitInternal\n");
   mCMSMode = gfxPlatform::GetCMSMode();
   if (GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
     mCMSMode = eCMSMode_Off;
@@ -982,6 +983,8 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
         return Transition::TerminateSuccess();
       }
 
+      JpegBench.Start();
+
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         auto jpeg_color_space = mInfo.jpeg_color_space.copyAndVerify(jpegJColorSpaceVerifier);
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -1194,7 +1197,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 
     // FIXME -- Should reset dct_method and dither mode
     // for final pass of progressive JPEG
-
+    JpegBench.StartIfNeeded();
     mInfo.dct_method =  JDCT_ISLOW;
     mInfo.dither_mode = JDITHER_FS;
     mInfo.do_fancy_upsampling = TRUE;
@@ -1202,16 +1205,16 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
     mInfo.do_block_smoothing = TRUE;
 
     // Step 5: Start decompressor
-    JpegCreateTime = high_resolution_clock::now();
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       if (sandbox_invoke_custom(rlbox_jpeg, jpeg_start_decompress, &mInfo).UNSAFE_Unverified() == FALSE)
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       //returning a bool, no validation needed
       if (sandbox_invoke_custom(jpegSandbox, jpeg_start_decompress, &mInfo).UNSAFE_noVerify() == FALSE)
     #else
-      if (d_jpeg_start_decompress(&mInfo) == FALSE) 
+      if (jpeg_start_decompress(&mInfo) == FALSE) 
     #endif
     {
+      JpegBench.Stop();
       MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
              ("} (I/O suspension after jpeg_start_decompress())"));
       return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
@@ -1251,9 +1254,11 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
         m_output_height_shadow = mInfo.output_height;
       #endif
       bool suspend;
+      JpegBench.StartIfNeeded();
       OutputScanlines(&suspend);
 
       if (suspend) {
+        JpegBench.Stop();
         MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
                ("} (I/O suspension after OutputScanlines() - SEQUENTIAL)"));
         return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
@@ -1283,6 +1288,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
       LOG_SCOPE((mozilla::LogModule*)sJPEGLog,
                 "nsJPEGDecoder::Write -- JPEG_DECOMPRESS_PROGRESSIVE case");
 
+      JpegBench.StartIfNeeded();
       int status;
       do {
         #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
@@ -1377,6 +1383,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
             if (!d_jpeg_start_output(&mInfo, scan))
           #endif
           {
+            JpegBench.Stop();
             MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
                    ("} (I/O suspension after jpeg_start_output() -"
                     " PROGRESSIVE)"));
@@ -1413,6 +1420,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
             // jpeg_start_output() multiple times for the same scan
             mInfo.output_scanline = 0xffffff;
           }
+          JpegBench.Stop();
           MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
                  ("} (I/O suspension after OutputScanlines() - PROGRESSIVE)"));
           return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
@@ -1436,6 +1444,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
             if (!d_jpeg_finish_output(&mInfo)) 
           #endif
           {
+            JpegBench.Stop();
             MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
                    ("} (I/O suspension after jpeg_finish_output() -"
                     " PROGRESSIVE)"));
@@ -1497,11 +1506,8 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
     LOG_SCOPE((mozilla::LogModule*)sJPEGLog, "nsJPEGDecoder::ProcessData -- entering"
                             " JPEG_DONE case");
 
+    JpegBench.StartIfNeeded();
     // Step 7: Finish decompression
-    timeInJpeg += duration_cast<nanoseconds>(high_resolution_clock::now() - JpegCreateTime).count();
-    const unsigned long long ullz = 0;
-    printf("%10llu,JPEG_Time,%d,%10llu,%10llu,%10llu,%10llu,%10llu\n", invJpeg, getppid(), ullz, ullz, ullz, timeInJpeg, ullz);
-    invJpeg++;
 
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       if (sandbox_invoke_custom(rlbox_jpeg, jpeg_finish_decompress, &mInfo).UNSAFE_Unverified() == FALSE)
@@ -1509,9 +1515,10 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
       //boolean ret - no validation
       if (sandbox_invoke_custom(jpegSandbox, jpeg_finish_decompress, &mInfo).UNSAFE_noVerify() == FALSE)
     #else
-      if (d_jpeg_finish_decompress(&mInfo) == FALSE) 
+      if (jpeg_finish_decompress(&mInfo) == FALSE) 
     #endif
     {
+      JpegBench.Stop();
       MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
              ("} (I/O suspension after jpeg_finish_decompress() - DONE)"));
       return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
@@ -1793,15 +1800,15 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
         JDIMENSION readScanLinesRet;
         #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-          jpegStartTimerCore();
+          //jpegStartTimerCore();
           readScanLinesRet = sandbox_invoke_custom(rlbox_jpeg, jpeg_read_scanlines, &mInfo, pBufferSys, 1).copyAndVerify(readScanLinesVerif);
-          jpegEndTimerCore();
+          //jpegEndTimerCore();
           void* pBufferSysMemCpyTarget = (*pBufferSys).UNSAFE_Unverified();
           memcpy((void *)imageRow, pBufferSysMemCpyTarget, row_stride);
         #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-          jpegStartTimerCore();
+          //jpegStartTimerCore();
           readScanLinesRet = sandbox_invoke_custom(jpegSandbox, jpeg_read_scanlines, &mInfo, pBufferSys, 1).sandbox_copyAndVerify(readScanLinesVerif);
-          jpegEndTimerCore();
+          //jpegEndTimerCore();
           void* pBufferSysMemCpyTarget = (*pBufferSys).sandbox_onlyVerifyAddress();
           memcpy((void *)imageRow, pBufferSysMemCpyTarget, row_stride);
         #else
@@ -1835,15 +1842,15 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       // Request one scanline.  Returns 0 or 1 scanlines.
       // if (jpeg_read_scanlines(&mInfo, &sampleRow, 1) != 1) {
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-          jpegStartTimerCore();
+          //jpegStartTimerCore();
           JDIMENSION readScanLinesRet2 = sandbox_invoke_custom(rlbox_jpeg, jpeg_read_scanlines, &mInfo, pBufferSys, 1).copyAndVerify(readScanLinesVerif);
-          jpegEndTimerCore();
+          //jpegEndTimerCore();
           void* pBufferSysMemCpyTarget2 = (*pBufferSys).UNSAFE_Unverified();
           memcpy((void *)sampleRow, pBufferSysMemCpyTarget2, row_stride);
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-          jpegStartTimerCore();
+          //jpegStartTimerCore();
           JDIMENSION readScanLinesRet2 = sandbox_invoke_custom(jpegSandbox, jpeg_read_scanlines, &mInfo, pBufferSys, 1).sandbox_copyAndVerify(readScanLinesVerif);
-          jpegEndTimerCore();
+          //jpegEndTimerCore();
           void* pBufferSysMemCpyTarget2 = (*pBufferSys).sandbox_onlyVerifyAddress();
           memcpy((void *)sampleRow, pBufferSysMemCpyTarget2, row_stride);
       #else
@@ -1852,7 +1859,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
           void* pBufferSysMemCpyTarget2 = (void *)getUnsandboxedJpegPtr((uintptr_t)*pBufferSys);
           memcpy((void *)sampleRow, pBufferSysMemCpyTarget2, row_stride);
         #else
-          JDIMENSION readScanLinesRet2 = d_jpeg_read_scanlines(&mInfo, &sampleRow, 1);
+          JDIMENSION readScanLinesRet2 = jpeg_read_scanlines(&mInfo, &sampleRow, 1);
         #endif
       #endif
 
@@ -2105,14 +2112,14 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   METHODDEF(void) init_source (RLBoxSandbox<TRLSandbox>* sandbox, tainted<j_decompress_ptr, TRLSandbox> jd)
   {
-    jpegEndTimer();
-    jpegStartTimer();
+    //jpegEndTimer();
+    //jpegStartTimer();
   }
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   METHODDEF(void) init_source (unverified_data<j_decompress_ptr> jd)
   {
-    jpegEndTimer();
-    jpegStartTimer();
+    //jpegEndTimer();
+    //jpegStartTimer();
   }
 #else
   METHODDEF(void) init_source (j_decompress_ptr jd)
@@ -2135,11 +2142,11 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   METHODDEF(void) skip_input_data (RLBoxSandbox<TRLSandbox>* sandbox, tainted<j_decompress_ptr, TRLSandbox> jd, tainted<long, TRLSandbox> unv_num_bytes)
   {
-    jpegEndTimer();
+    //jpegEndTimer();
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   METHODDEF(void) skip_input_data (unverified_data<j_decompress_ptr> jd, unverified_data<long> unv_num_bytes)
   {
-    jpegEndTimer();
+    //jpegEndTimer();
 #else
   METHODDEF(void) skip_input_data (j_decompress_ptr jd, long num_bytes)
   {
@@ -2219,7 +2226,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     #endif
   }
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  jpegStartTimer();
+  //jpegStartTimer();
   #endif
 }
 
@@ -2275,11 +2282,11 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   METHODDEF(boolean) fill_input_buffer (RLBoxSandbox<TRLSandbox>* sandbox, tainted<j_decompress_ptr, TRLSandbox> jd)
   {
-    jpegEndTimer();
+    //jpegEndTimer();
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   METHODDEF(boolean) fill_input_buffer (unverified_data<j_decompress_ptr> jd)
   {
-    jpegEndTimer();
+    //jpegEndTimer();
 #else
   METHODDEF(boolean) fill_input_buffer (j_decompress_ptr jd)
   {
@@ -2484,7 +2491,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
   decoder->mBackBufferLen = (size_t)new_backtrack_buflen;
   decoder->mReading = true;
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  jpegStartTimer();
+  //jpegStartTimer();
   #endif
   return false;
 }
@@ -2505,7 +2512,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 #endif
 {
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    jpegEndTimer();
+    //jpegEndTimer();
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     nsJPEGDecoder* decoder = (nsJPEGDecoder*) jd->client_data.copyAndVerifyAppPtr(rlbox_jpeg, [](void* val){
     #else
@@ -2522,6 +2529,10 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     nsJPEGDecoder* decoder = (nsJPEGDecoder*)(jd->client_data);
   #endif
 
+  auto diff = decoder->JpegBench.StopAndFinish();
+  printf("Capture_Time:JPEG_destroy,%llu,%llu|\n", invJpeg, diff);
+  invJpeg++;
+
   // This function shouldn't be called if we ran into an error we didn't
   // recover from.
   MOZ_ASSERT(decoder->mState != JPEG_ERROR,
@@ -2529,7 +2540,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
 
   // Notify using a helper method to get around protectedness issues.
   decoder->NotifyDone();
-  jpegStartTimer();
+  //jpegStartTimer();
 }
 
 } // namespace image
