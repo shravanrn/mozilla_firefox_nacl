@@ -73,7 +73,7 @@ struct RLBench
   {
     if(InUse == true) {
       printf("!!!!!!!Bench already in use!!!!!!!!!!\n");
-      abort();
+      // abort();
     }
     InUse = true;
     StartCalled = false;
@@ -84,7 +84,7 @@ struct RLBench
   {
     if(StartCalled) {
       printf("!!!!!!!Start already called!!!!!!!!!!\n");
-      abort();
+      // abort();
     }
     StartCalled = true;
     StartTime = high_resolution_clock::now();
@@ -102,7 +102,7 @@ struct RLBench
   {
     if(!StartCalled) {
       printf("!!!!!!!Start not called!!!!!!!!!!\n");
-      abort();
+      // abort();
     }
     StartCalled = false;
     auto diff = duration_cast<nanoseconds>(high_resolution_clock::now() - StartTime).count();

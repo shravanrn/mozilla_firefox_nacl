@@ -133,6 +133,10 @@ private:
 public:
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    RLBoxSandbox<TRLSandbox>* rlbox_jpeg;
+    std::once_flag rlbox_jpeg_init;
+    static std::atomic<unsigned> num_sandboxes_active;
+    void init_rlbox();  // constructs sandbox
     tainted<struct jpeg_decompress_struct*, TRLSandbox> p_mInfo;
     tainted<struct jpeg_source_mgr*, TRLSandbox> p_mSourceMgr;
     tainted<decoder_error_mgr*, TRLSandbox> p_mErr;
