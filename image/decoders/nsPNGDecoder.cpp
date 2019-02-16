@@ -496,6 +496,8 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
  , mFrameIsHidden(false)
  , mDisablePremultipliedAlpha(false)
  , mNumFrames(0)
+ , PngMaybeTooSmall(true)
+ , PngSbxActivated(false)
 {
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         std::call_once(rlbox_png_init, [](){
@@ -612,6 +614,10 @@ nsPNGDecoder::~nsPNGDecoder()
     #else
       freeInPngSandbox(interlacebuf);
     #endif
+  }
+  if (PngSbxActivated){
+    (rlbox_png->getSandbox())->makeInactiveSandbox();
+    PngSbxActivated = false;
   }
   if (mInProfile) {
     qcms_profile_release(mInProfile);
@@ -1013,13 +1019,13 @@ LexerTransition<nsPNGDecoder::State>
 nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
 {
   #if defined(PS_SANDBOX_USE_NEW_CPP_API)
-    class ActiveRAIIWrapper{
-      PNGProcessSandbox* ss;
-      public:
-      ActiveRAIIWrapper(PNGProcessSandbox* ps) : ss(ps) { ss->makeActiveSandbox(); }
-      ~ActiveRAIIWrapper() { ss->makeInactiveSandbox(); }
-    };
-    ActiveRAIIWrapper procSbxActivation(rlbox_png->getSandbox());
+    // class ActiveRAIIWrapper{
+    //   PNGProcessSandbox* ss;
+    //   public:
+    //   ActiveRAIIWrapper(PNGProcessSandbox* ps) : ss(ps) { if (ss != nullptr) { ss->makeActiveSandbox(); }}
+    //   ~ActiveRAIIWrapper() { if (ss != nullptr) { ss->makeInactiveSandbox(); } }
+    // };
+    // ActiveRAIIWrapper procSbxActivation(IsMetadataDecode()? nullptr : rlbox_png->getSandbox());
   #endif
   // If we were waiting until after returning from a yield to call
   // CreateFrame(), call it now.
@@ -1756,9 +1762,22 @@ nsPNGDecoder::FinishedPNGData()
   #endif
 
   if(width < 100) {
-    decoder->PngTooSmall = true;
+    decoder->PngMaybeTooSmall = true;
   } else {
-    decoder->PngTooSmall = false;
+    decoder->PngMaybeTooSmall = false;
+    #if defined(PS_SANDBOX_USE_NEW_CPP_API)
+      // class ActiveRAIIWrapper{
+      //   PNGProcessSandbox* ss;
+      //   public:
+      //   ActiveRAIIWrapper(PNGProcessSandbox* ps) : ss(ps) { if (ss != nullptr) { ss->makeActiveSandbox(); }}
+      //   ~ActiveRAIIWrapper() { if (ss != nullptr) { ss->makeInactiveSandbox(); } }
+      // };
+      // ActiveRAIIWrapper procSbxActivation(IsMetadataDecode()? nullptr : );
+      if (!decoder->IsMetadataDecode()){
+        (rlbox_png->getSandbox())->makeActiveSandbox();
+        decoder->PngSbxActivated = true;
+      }
+    #endif
   }
 
   const IntRect frameRect(0, 0, width, height);
@@ -2524,7 +2543,7 @@ nsPNGDecoder::FinishInternal()
   }
 #endif
 
-  if(!PngTooSmall)
+  if(!PngMaybeTooSmall)
   {
     auto diff = PngBench.JustFinish();
     printf("Capture_Time:PNG_destroy,%llu,%llu|\n", invPng, diff);

@@ -270,7 +270,8 @@ public:
   uint32_t mNumFrames;
 
   RLBench PngBench;
-  bool PngTooSmall;
+  bool PngMaybeTooSmall;
+  bool PngSbxActivated;
 
   // libpng callbacks
   // We put these in the class so that they can access protected members.
