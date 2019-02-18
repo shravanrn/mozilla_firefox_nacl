@@ -30,6 +30,9 @@ extern "C" {
 #include "iccjpeg.h"
 }
 
+#include <sys/types.h>
+#include <unistd.h>
+
 #if MOZ_BIG_ENDIAN
 #define MOZ_JCS_EXT_NATIVE_ENDIAN_XRGB JCS_EXT_XRGB
 #else
@@ -70,7 +73,8 @@ METHODDEF(void) my_error_exit (j_common_ptr cinfo);
 #define MAX_JPEG_MARKER_LENGTH  (((uint32_t)1 << 16) - 1)
 
 nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
-                             Decoder::DecodeStyle aDecodeStyle)
+                             Decoder::DecodeStyle aDecodeStyle,
+                             RasterImage* aImageExtra)
  : Decoder(aImage)
  , mLexer(Transition::ToUnbuffered(State::FINISHED_JPEG_DATA,
                                    State::JPEG_DATA,
@@ -78,6 +82,9 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
           Transition::TerminateSuccess())
  , mDecodeStyle(aDecodeStyle)
 {
+  mImageString = getImageURIString(aImage != nullptr? aImage : aImageExtra);
+  mhostString = getHostStringFromImage(aImage != nullptr? aImage : aImageExtra);
+
   mState = JPEG_HEADER;
   mReading = true;
   mImageData = nullptr;
@@ -98,10 +105,14 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
 
   mCMSMode = 0;
 
+  JpegBench.Init();
+
   MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
          ("nsJPEGDecoder::nsJPEGDecoder: Creating JPEG decoder %p",
           this));
 }
+
+unsigned long long invJpeg = 0;
 
 nsJPEGDecoder::~nsJPEGDecoder()
 {
@@ -255,6 +266,8 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
       if (IsMetadataDecode()) {
         return Transition::TerminateSuccess();
       }
+
+      JpegBench.Start();
 
       // We're doing a full decode.
       if (mCMSMode != eCMSMode_Off &&
@@ -419,7 +432,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 
     // FIXME -- Should reset dct_method and dither mode
     // for final pass of progressive JPEG
-
+    JpegBench.StartIfNeeded();
     mInfo.dct_method =  JDCT_ISLOW;
     mInfo.dither_mode = JDITHER_FS;
     mInfo.do_fancy_upsampling = TRUE;
@@ -428,8 +441,9 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 
     // Step 5: Start decompressor
     if (jpeg_start_decompress(&mInfo) == FALSE) {
+      JpegBench.Stop();
       MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
-             ("} (I/O suspension after jpeg_start_decompress())"));
+            ("} (I/O suspension after jpeg_start_decompress())"));
       return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
     }
 
@@ -445,9 +459,11 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
                               "JPEG_DECOMPRESS_SEQUENTIAL case");
 
       bool suspend;
+      JpegBench.StartIfNeeded();
       OutputScanlines(&suspend);
 
       if (suspend) {
+        JpegBench.Stop();
         MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
                ("} (I/O suspension after OutputScanlines() - SEQUENTIAL)"));
         return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
@@ -466,6 +482,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
       LOG_SCOPE((mozilla::LogModule*)sJPEGLog,
                 "nsJPEGDecoder::Write -- JPEG_DECOMPRESS_PROGRESSIVE case");
 
+      JpegBench.StartIfNeeded();
       int status;
       do {
         status = jpeg_consume_input(&mInfo);
@@ -485,6 +502,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
             scan--;
 
           if (!jpeg_start_output(&mInfo, scan)) {
+            JpegBench.Stop();
             MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
                    ("} (I/O suspension after jpeg_start_output() -"
                     " PROGRESSIVE)"));
@@ -505,6 +523,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
             // jpeg_start_output() multiple times for the same scan
             mInfo.output_scanline = 0xffffff;
           }
+          JpegBench.Stop();
           MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
                  ("} (I/O suspension after OutputScanlines() - PROGRESSIVE)"));
           return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
@@ -512,6 +531,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 
         if (mInfo.output_scanline == mInfo.output_height) {
           if (!jpeg_finish_output(&mInfo)) {
+            JpegBench.Stop();
             MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
                    ("} (I/O suspension after jpeg_finish_output() -"
                     " PROGRESSIVE)"));
@@ -538,9 +558,10 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
     LOG_SCOPE((mozilla::LogModule*)sJPEGLog, "nsJPEGDecoder::ProcessData -- entering"
                             " JPEG_DONE case");
 
+    JpegBench.StartIfNeeded();
     // Step 7: Finish decompression
-
     if (jpeg_finish_decompress(&mInfo) == FALSE) {
+      JpegBench.Stop();
       MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
              ("} (I/O suspension after jpeg_finish_decompress() - DONE)"));
       return Transition::ContinueUnbuffered(State::JPEG_DATA); // I/O suspension
@@ -942,6 +963,20 @@ term_source (j_decompress_ptr jd)
 {
   nsJPEGDecoder* decoder = (nsJPEGDecoder*)(jd->client_data);
 
+  auto diff = decoder->JpegBench.StopAndFinish();
+  std::string tag = "JPEG_destroy(" + decoder->mImageString + ")";
+  // std::string tag = "JPEG_destroy";
+  // {
+  //   //http://host61.total70.scaling.localhost:1337/img.jpeg
+  //   std::string::size_type endPos = decoder->mhostString.find(".scaling.localhost:1337");
+  //   if (endPos != std::string::npos) {
+  //     std::string::size_type startPos = decoder->mhostString.find("total");
+  //     std::string i(decoder->mhostString.substr(startPos, endPos - startPos));
+  //     tag += "scaling(" + i + ")";
+  //   } 
+  // }
+  printf("Capture_Time:%s,%llu,%llu|\n", tag.c_str(), invJpeg, diff);  invJpeg++;
+  
   // This function shouldn't be called if we ran into an error we didn't
   // recover from.
   MOZ_ASSERT(decoder->mState != JPEG_ERROR,

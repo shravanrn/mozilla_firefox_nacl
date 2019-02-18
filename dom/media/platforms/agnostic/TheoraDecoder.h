@@ -10,6 +10,9 @@
 #include "ogg/ogg.h"
 #include "theora/theoradec.h"
 #include <stdint.h>
+#include <chrono>
+#include <atomic>
+using namespace std::chrono;
 
 namespace mozilla {
 
@@ -35,6 +38,11 @@ public:
 private:
   ~TheoraDecoder();
   nsresult DoDecodeHeader(const unsigned char* aData, size_t aLength);
+
+  std::atomic_ullong theoraDecodeInvocations{0};
+  std::atomic_ullong timeBetweenTheoraDecode{0};
+  std::atomic_ullong timeSpentInTheoraDecode{0};
+  std::atomic_ullong previousTheoraDecodeCall;
 
   RefPtr<DecodePromise> ProcessDecode(MediaRawData* aSample);
 

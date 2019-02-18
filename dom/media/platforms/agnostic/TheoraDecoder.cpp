@@ -56,6 +56,13 @@ TheoraDecoder::~TheoraDecoder()
   th_setup_free(mTheoraSetupInfo);
   th_comment_clear(&mTheoraComment);
   th_info_clear(&mTheoraInfo);
+
+  if (theoraDecodeInvocations > 5) {
+    double decode_frame_rate = ((double)1000000000)*theoraDecodeInvocations/timeBetweenTheoraDecode;
+    double max_single_thread_decode_frame_rate = ((double)1000000000)*theoraDecodeInvocations/timeSpentInTheoraDecode;
+    printf("Capture_Time:THEORA_decode_frame_rate,0,%lf|\n", decode_frame_rate);
+    printf("Capture_Time:THEORA_max_single_thread_decode_frame_rate,0,%lf|\n", max_single_thread_decode_frame_rate);
+  }
 }
 
 RefPtr<ShutdownPromise>
@@ -140,6 +147,14 @@ RefPtr<MediaDataDecoder::DecodePromise>
 TheoraDecoder::ProcessDecode(MediaRawData* aSample)
 {
   MOZ_ASSERT(mTaskQueue->IsCurrentThreadIn());
+  auto now = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+  if (theoraDecodeInvocations != 0)
+  {
+    timeBetweenTheoraDecode += now - previousTheoraDecodeCall.load();
+  }
+
+  previousTheoraDecodeCall = now;
+  theoraDecodeInvocations++;
 
   const unsigned char* aData = aSample->Data();
   size_t aLength = aSample->Size();
@@ -175,6 +190,9 @@ TheoraDecoder::ProcessDecode(MediaRawData* aSample)
     b.mPlanes[2].mHeight = mTheoraInfo.frame_height >> vdec;
     b.mPlanes[2].mWidth = mTheoraInfo.frame_width >> hdec;
     b.mPlanes[2].mOffset = b.mPlanes[2].mSkip = 0;
+
+    auto after_decode_time = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+    timeSpentInTheoraDecode += after_decode_time - now;
 
     IntRect pictureArea(mTheoraInfo.pic_x, mTheoraInfo.pic_y,
                         mTheoraInfo.pic_width, mTheoraInfo.pic_height);

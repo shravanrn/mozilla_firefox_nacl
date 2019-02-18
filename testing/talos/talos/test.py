@@ -244,7 +244,7 @@ class PageloaderTest(Test):
             'tpscrolltest', 'xperf_counters', 'timeout', 'shutdown', 'responsiveness',
             'profile_path', 'xperf_providers', 'xperf_user_providers', 'xperf_stackwalk',
             'filters', 'preferences', 'extensions', 'setup', 'cleanup',
-            'lower_is_better', 'alert_threshold', 'unit', 'webextensions']
+            'lower_is_better', 'alert_threshold', 'unit', 'webextensions', 'tpdelay']
 
 
 class QuantumPageloadTest(PageloaderTest):
@@ -766,6 +766,357 @@ class tsvgr_opacity(PageloaderTest):
     gecko_profile_entries = 10000000
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
+
+@register_test()
+class jpeg_page_render(PageloaderTest):
+    """
+    Test the time taken to render 1 jpeg image
+    """
+    tpmanifest = '${talos}/tests/jpeg_page_render/jpeg_page_render.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 4000
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class jpeg_perf(PageloaderTest):
+    """
+    Test the time taken to render jpeg images of different quality
+    """
+    tpmanifest = '${talos}/tests/jpeg_perf/tests.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 4000
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    timeout = 720000
+
+
+@register_test()
+class png_perf(PageloaderTest):
+    """
+    Test the time taken to render png images of different quality
+    """
+    tpmanifest = '${talos}/tests/png_perf/tests.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 4000
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    timeout = 720000
+
+@register_test()
+class png_page_render(PageloaderTest):
+    """
+    Test the time taken to render 1 png image
+    """
+    tpmanifest = '${talos}/tests/png_page_render/png_page_render.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 4000
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class zlib_page_render(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/zlib_page_render/zlib_page_render.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 1000
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_1(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 4000
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 1000
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_1_1(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_1.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 2000
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 1000
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_1_2(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_2.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 1300
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 1000
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_1_3(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_3.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 800
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 3000
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_1_4(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_4.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 550
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 3000
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_1_5(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_5.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 250
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 3000
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_1_6(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_6.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 250
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 3000
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_2(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 2
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_2.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 50
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 3000
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_3(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 3
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_3.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 50
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 5000
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_4(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 4
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_4.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 50
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 9000
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_5(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 5
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_5.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 50
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 9000
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_6(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 6
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_6.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 50
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 9000
+    timeout = 72000
+
+@register_test()
+class jpeg_scaling_7(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 7
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_7.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 50
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 9000
+    timeout = 72000
+
+@register_test()
+class jpeg_page_render_25(PageloaderTest):
+    """
+    Test the time taken to render 25 jpeg image
+    """
+    tpmanifest = '${talos}/tests/jpeg_page_render/jpeg_page_render_25.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 25
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class jpeg_page_render_50(PageloaderTest):
+    """
+    Test the time taken to render 50 jpeg image
+    """
+    tpmanifest = '${talos}/tests/jpeg_page_render/jpeg_page_render_50.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 25
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class theora_perf(PageloaderTest):
+    """
+    Test the frame rate delay in rendering a 1080p 60fps ogv
+    """
+    tpmanifest = '${talos}/tests/theora_perf/tests.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 5
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    # filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    filters = filter.mean.prepare()
+    unit = 'ms'
+    timeout = 72000
 
 
 @register_test()

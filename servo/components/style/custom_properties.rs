@@ -14,7 +14,7 @@ use properties::{CSSWideKeyword, DeclaredValue};
 use selector_map::{PrecomputedHashSet, PrecomputedHashMap};
 use selectors::parser::SelectorParseError;
 use servo_arc::Arc;
-use std::ascii::AsciiExt;
+#[allow(deprecated, unused_imports)] use std::ascii::AsciiExt;
 use std::borrow::{Borrow, Cow};
 use std::fmt;
 use std::hash::Hash;

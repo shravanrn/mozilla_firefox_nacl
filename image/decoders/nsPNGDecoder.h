@@ -13,8 +13,130 @@
 #include "StreamingLexer.h"
 #include "SurfacePipe.h"
 
+#include <chrono>
+#include <atomic>
+using namespace std::chrono;
+
+struct RLBench
+{
+  bool InUse = false;
+  bool StartCalled = false;
+  unsigned long long ElapsedTime = 0;
+  high_resolution_clock::time_point StartTime;
+
+  inline void Init()
+  {
+    if(InUse == true) {
+      printf("!!!!!!!Bench already in use!!!!!!!!!!\n");
+      abort();
+    }
+    InUse = true;
+    StartCalled = false;
+    ElapsedTime = 0;
+  }
+
+  inline void Start()
+  {
+    if(StartCalled) {
+      printf("!!!!!!!Start already called!!!!!!!!!!\n");
+      abort();
+    }
+    StartCalled = true;
+    StartTime = high_resolution_clock::now();
+  }
+
+  inline void StartIfNeeded()
+  {
+    if(!StartCalled) {
+      StartCalled = true;
+      StartTime = high_resolution_clock::now();
+    }
+  }
+
+  inline void Stop()
+  {
+    if(!StartCalled) {
+      printf("!!!!!!!Start not called!!!!!!!!!!\n");
+      abort();
+    }
+    StartCalled = false;
+    auto diff = duration_cast<nanoseconds>(high_resolution_clock::now() - StartTime).count();
+    ElapsedTime += diff;
+  }
+
+  inline unsigned long long JustFinish()
+  {
+    auto ret = ElapsedTime;
+    ElapsedTime = 0;
+    InUse = false;
+    return ret;
+  }
+
+  inline unsigned long long StopAndFinish()
+  {
+    Stop();
+    return JustFinish();
+  }
+};
+
 namespace mozilla {
 namespace image {
+
+inline std::string getImageURIString(RasterImage* aImage)
+{
+  ImageURL* imageURI = nullptr;
+
+  //Try to retrieve the image URI from the ImageDecoder request
+  if(aImage != nullptr) { 
+    imageURI = aImage->GetURI();
+  }
+
+  //if still null bail out - empty string causes the use of a temporary sandbox
+  if(imageURI == nullptr) { return ""; }
+
+  nsCString spec;
+  imageURI->GetSpec(spec);
+  std::string ret = spec.get();
+  return ret;
+}
+
+inline std::string getHostStringFromImage(RasterImage* aImage)
+{
+  ImageURL* imageURI = nullptr;
+
+  //Try to retrieve the image URI from the ImageDecoder request
+  if(aImage != nullptr) { 
+    imageURI = aImage->GetURI();
+  }
+
+  //if still null bail out - empty string causes the use of a temporary sandbox
+  if(imageURI == nullptr) { return ""; }
+
+  //if a normal scheme like https, construct the origin
+  {
+    nsCString scheme;
+    nsresult rv;
+    rv = imageURI->GetScheme(scheme);
+    if(NS_FAILED(rv)){
+      return "";
+    }
+    nsCString host;
+    rv = imageURI->GetHost(host);
+    if(NS_FAILED(rv)){
+      return "";
+    }
+    std::string hostStr = scheme.get();
+    hostStr += "://";
+    hostStr += host.get();
+    int port = imageURI->GetPort();
+    if(port != -1) {
+      hostStr += ":";
+      hostStr += std::to_string(port);
+    }
+    return hostStr;
+  }
+}
+
 class RasterImage;
 
 class nsPNGDecoder : public Decoder
@@ -37,7 +159,7 @@ private:
   friend class DecoderFactory;
 
   // Decoders should only be instantiated via DecoderFactory.
-  explicit nsPNGDecoder(RasterImage* aImage);
+  explicit nsPNGDecoder(RasterImage* aImage, RasterImage* aImageExtra);
 
   /// The information necessary to create a frame.
   struct FrameInfo
@@ -99,6 +221,7 @@ private:
   size_t mLastChunkLength;
 
 public:
+  std::string mImageString;
   png_structp mPNG;
   png_infop mInfo;
   nsIntRect mFrameRect;
@@ -134,6 +257,9 @@ public:
 
   // The number of frames we've finished.
   uint32_t mNumFrames;
+
+  RLBench PngBench;
+  bool PngTooSmall;
 
   // libpng callbacks
   // We put these in the class so that they can access protected members.

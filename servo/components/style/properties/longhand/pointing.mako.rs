@@ -90,7 +90,7 @@
     impl Parse for computed_value::Keyword {
         fn parse<'i, 't>(_context: &ParserContext, input: &mut Parser<'i, 't>)
                          -> Result<computed_value::Keyword, ParseError<'i>> {
-            use std::ascii::AsciiExt;
+            #[allow(deprecated, unused_imports)] use std::ascii::AsciiExt;
             use style_traits::cursor::Cursor;
             let ident = input.expect_ident()?;
             if ident.eq_ignore_ascii_case("auto") {

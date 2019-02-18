@@ -24,6 +24,11 @@ extern "C" {
 }
 
 #include <setjmp.h>
+#include <chrono>
+#include <atomic>
+#include <string>
+
+using namespace std::chrono;
 
 namespace mozilla {
 namespace image {
@@ -70,7 +75,7 @@ private:
   friend class DecoderFactory;
 
   // Decoders should only be instantiated via DecoderFactory.
-  nsJPEGDecoder(RasterImage* aImage, Decoder::DecodeStyle aDecodeStyle);
+  nsJPEGDecoder(RasterImage* aImage, Decoder::DecodeStyle aDecodeStyle, RasterImage* aImageExtra);
 
   enum class State
   {
@@ -84,6 +89,9 @@ private:
   StreamingLexer<State> mLexer;
 
 public:
+  std::string mImageString;
+  std::string mhostString;
+
   struct jpeg_decompress_struct mInfo;
   struct jpeg_source_mgr mSourceMgr;
   decoder_error_mgr mErr;
@@ -110,6 +118,7 @@ public:
   const Decoder::DecodeStyle mDecodeStyle;
 
   uint32_t mCMSMode;
+  RLBench JpegBench;
 };
 
 } // namespace image
