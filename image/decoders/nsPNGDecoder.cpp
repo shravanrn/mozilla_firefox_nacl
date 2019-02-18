@@ -1002,9 +1002,6 @@ nsPNGDecoder::InitInternal()
 LexerResult
 nsPNGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    pngRendererSaved = this;
-  #endif
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
 
   return mLexer.Lex(aIterator, aOnResume,
@@ -1022,14 +1019,8 @@ nsPNGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 LexerTransition<nsPNGDecoder::State>
 nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
 {
-  #if defined(PS_SANDBOX_USE_NEW_CPP_API)
-    // class ActiveRAIIWrapper{
-    //   PNGProcessSandbox* ss;
-    //   public:
-    //   ActiveRAIIWrapper(PNGProcessSandbox* ps) : ss(ps) { if (ss != nullptr) { ss->makeActiveSandbox(); }}
-    //   ~ActiveRAIIWrapper() { if (ss != nullptr) { ss->makeInactiveSandbox(); } }
-    // };
-    // ActiveRAIIWrapper procSbxActivation(IsMetadataDecode()? nullptr : rlbox_png->getSandbox());
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    pngRendererSaved = this;
   #endif
   // If we were waiting until after returning from a yield to call
   // CreateFrame(), call it now.
