@@ -6,6 +6,10 @@
 #if !defined(VorbisDecoder_h_)
 #define VorbisDecoder_h_
 
+#include <chrono>
+#include <atomic>
+using namespace std::chrono;
+
 #include "AudioConverter.h"
 #include "PlatformDecoderModule.h"
 #include "mozilla/Maybe.h"
@@ -39,6 +43,13 @@ public:
   static const AudioConfig::Channel* VorbisLayout(uint32_t aChannels);
 
 private:
+
+  std::atomic_ullong vorbisDecodeInvocations{0};
+  std::atomic_ullong timeBetweenVorbisDecode{0};
+  std::atomic_ullong timeSpentInVorbisDecode{0};
+  std::atomic_ullong previousVorbisDecodeCall;
+  std::atomic_ullong bitsProcessedByVorbis{0};
+
   nsresult DecodeHeader(const unsigned char* aData, size_t aLength);
   RefPtr<DecodePromise> ProcessDecode(MediaRawData* aSample);
 

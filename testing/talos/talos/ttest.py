@@ -139,6 +139,8 @@ class TTest(object):
             LOG.info("Using mitmproxy so setting MOZ_DISABLE_NONLOCAL_CONNECTIONS to 0")
             setup.env['MOZ_DISABLE_NONLOCAL_CONNECTIONS'] = '0'
 
+        setup.env['MOZ_DISABLE_NONLOCAL_CONNECTIONS'] = '0'
+
         # instantiate an object to hold test results
         test_results = results.TestResults(
             test_config,

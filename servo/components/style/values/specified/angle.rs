@@ -6,7 +6,7 @@
 
 use cssparser::{Parser, Token, BasicParseError};
 use parser::{ParserContext, Parse};
-use std::ascii::AsciiExt;
+#[allow(deprecated, unused_imports)] use std::ascii::AsciiExt;
 use std::fmt;
 use style_traits::{ToCss, ParseError};
 use values::CSSFloat;

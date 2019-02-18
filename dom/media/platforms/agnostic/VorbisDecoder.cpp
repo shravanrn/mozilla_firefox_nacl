@@ -51,6 +51,13 @@ VorbisDataDecoder::~VorbisDataDecoder()
   vorbis_dsp_clear(&mVorbisDsp);
   vorbis_info_clear(&mVorbisInfo);
   vorbis_comment_clear(&mVorbisComment);
+
+  if (vorbisDecodeInvocations > 5) {
+    double decode_bit_rate = ((double)8000000000)*bitsProcessedByVorbis/(timeBetweenVorbisDecode * 1024);
+    double max_single_thread_decode_bit_rate = ((double)8000000000)*bitsProcessedByVorbis/(timeSpentInVorbisDecode * 1024);
+    printf("Capture_Time:Vorbis_decode_bit_rate,0,%lf|\n", decode_bit_rate);
+    printf("Capture_Time:Vorbis_max_single_thread_decode_bit_rate,0,%lf|\n", max_single_thread_decode_bit_rate);
+  }
 }
 
 RefPtr<ShutdownPromise>
@@ -151,10 +158,21 @@ VorbisDataDecoder::Decode(MediaRawData* aSample)
 RefPtr<MediaDataDecoder::DecodePromise>
 VorbisDataDecoder::ProcessDecode(MediaRawData* aSample)
 {
+  size_t aLength = aSample->Size();
+
+  auto now = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+  if (vorbisDecodeInvocations != 0)
+  {
+    timeBetweenVorbisDecode += now - previousVorbisDecodeCall.load();
+  }
+
+  previousVorbisDecodeCall = now;
+  vorbisDecodeInvocations++;
+  bitsProcessedByVorbis += aLength;
+
   MOZ_ASSERT(mTaskQueue->IsCurrentThreadIn());
 
   const unsigned char* aData = aSample->Data();
-  size_t aLength = aSample->Size();
   int64_t aOffset = aSample->mOffset;
   auto aTstampUsecs = aSample->mTime;
   int64_t aTotalFrames = 0;
@@ -265,6 +283,10 @@ VorbisDataDecoder::ProcessDecode(MediaRawData* aSample)
 
     frames = vorbis_synthesis_pcmout(&mVorbisDsp, &pcm);
   }
+
+  auto after_decode_time = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+  timeSpentInVorbisDecode += after_decode_time - now;
+
   return DecodePromise::CreateAndResolve(Move(results), __func__);
 }
 

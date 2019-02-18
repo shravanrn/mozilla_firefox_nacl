@@ -73,13 +73,14 @@ DecoderFactory::GetDecoderType(const char* aMimeType)
 /* static */ already_AddRefed<Decoder>
 DecoderFactory::GetDecoder(DecoderType aType,
                            RasterImage* aImage,
-                           bool aIsRedecode)
+                           bool aIsRedecode,
+                           RasterImage* aImageExtra)
 {
   RefPtr<Decoder> decoder;
 
   switch (aType) {
     case DecoderType::PNG:
-      decoder = new nsPNGDecoder(aImage);
+      decoder = new nsPNGDecoder(aImage, aImageExtra);
       break;
     case DecoderType::GIF:
       decoder = new nsGIFDecoder2(aImage);
@@ -89,7 +90,8 @@ DecoderFactory::GetDecoder(DecoderType aType,
       // a progressive decode.
       decoder = new nsJPEGDecoder(aImage,
                                   aIsRedecode ? Decoder::SEQUENTIAL
-                                              : Decoder::PROGRESSIVE);
+                                              : Decoder::PROGRESSIVE,
+                                  aImageExtra);
       break;
     case DecoderType::BMP:
       decoder = new nsBMPDecoder(aImage);
@@ -123,7 +125,7 @@ DecoderFactory::CreateDecoder(DecoderType aType,
   // Create an anonymous decoder. Interaction with the SurfaceCache and the
   // owning RasterImage will be mediated by DecodedSurfaceProvider.
   RefPtr<Decoder> decoder =
-    GetDecoder(aType, nullptr, bool(aDecoderFlags & DecoderFlags::IS_REDECODE));
+    GetDecoder(aType, nullptr, bool(aDecoderFlags & DecoderFlags::IS_REDECODE), aImage);
   MOZ_ASSERT(decoder, "Should have a decoder now");
 
   // Initialize the decoder.
@@ -177,7 +179,7 @@ DecoderFactory::CreateAnimationDecoder(DecoderType aType,
 
   // Create an anonymous decoder. Interaction with the SurfaceCache and the
   // owning RasterImage will be mediated by AnimationSurfaceProvider.
-  RefPtr<Decoder> decoder = GetDecoder(aType, nullptr, /* aIsRedecode = */ true);
+  RefPtr<Decoder> decoder = GetDecoder(aType, nullptr, /* aIsRedecode = */ true, aImage);
   MOZ_ASSERT(decoder, "Should have a decoder now");
 
   // Initialize the decoder.
@@ -220,7 +222,7 @@ DecoderFactory::CreateMetadataDecoder(DecoderType aType,
   }
 
   RefPtr<Decoder> decoder =
-    GetDecoder(aType, aImage, /* aIsRedecode = */ false);
+    GetDecoder(aType, aImage, /* aIsRedecode = */ false, aImage);
   MOZ_ASSERT(decoder, "Should have a decoder now");
 
   // Initialize the decoder.
@@ -254,7 +256,7 @@ DecoderFactory::CreateDecoderForICOResource(DecoderType aType,
 
     case DecoderType::PNG:
       MOZ_ASSERT(!aDataOffset);
-      decoder = new nsPNGDecoder(aICODecoder->GetImageMaybeNull());
+      decoder = new nsPNGDecoder(aICODecoder->GetImageMaybeNull(),aICODecoder->GetImageMaybeNull());
       break;
 
     default:
@@ -295,7 +297,7 @@ DecoderFactory::CreateAnonymousDecoder(DecoderType aType,
   }
 
   RefPtr<Decoder> decoder =
-    GetDecoder(aType, /* aImage = */ nullptr, /* aIsRedecode = */ false);
+    GetDecoder(aType, /* aImage = */ nullptr, /* aIsRedecode = */ false, nullptr);
   MOZ_ASSERT(decoder, "Should have a decoder now");
 
   // Initialize the decoder.
@@ -337,7 +339,7 @@ DecoderFactory::CreateAnonymousMetadataDecoder(DecoderType aType,
   }
 
   RefPtr<Decoder> decoder =
-    GetDecoder(aType, /* aImage = */ nullptr, /* aIsRedecode = */ false);
+    GetDecoder(aType, /* aImage = */ nullptr, /* aIsRedecode = */ false, nullptr);
   MOZ_ASSERT(decoder, "Should have a decoder now");
 
   // Initialize the decoder.

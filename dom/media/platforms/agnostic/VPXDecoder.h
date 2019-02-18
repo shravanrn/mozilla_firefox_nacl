@@ -10,6 +10,10 @@
 #include "mozilla/Span.h"
 
 #include <stdint.h>
+#include <chrono>
+#include <atomic>
+using namespace std::chrono;
+
 #define VPX_DONT_DEFINE_STDINT_TYPES
 #include "vpx/vp8dx.h"
 #include "vpx/vpx_codec.h"
@@ -53,6 +57,12 @@ public:
   static gfx::IntSize GetFrameSize(Span<const uint8_t> aBuffer, Codec aCodec);
 
 private:
+
+  std::atomic_ullong vpxDecodeInvocations{0};
+  std::atomic_ullong timeBetweenVpxDecode{0};
+  std::atomic_ullong timeSpentInVpxDecode{0};
+  std::atomic_ullong previousVpxDecodeCall;
+
   ~VPXDecoder();
   RefPtr<DecodePromise> ProcessDecode(MediaRawData* aSample);
   MediaResult DecodeAlpha(vpx_image_t** aImgAlpha, const MediaRawData* aSample);

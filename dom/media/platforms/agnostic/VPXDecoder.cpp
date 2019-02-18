@@ -80,6 +80,12 @@ VPXDecoder::VPXDecoder(const CreateDecoderParams& aParams)
 VPXDecoder::~VPXDecoder()
 {
   MOZ_COUNT_DTOR(VPXDecoder);
+  if (vpxDecodeInvocations > 5) {
+    double decode_frame_rate = ((double)1000000000)*vpxDecodeInvocations/timeBetweenVpxDecode;
+    double max_single_thread_decode_frame_rate = ((double)1000000000)*vpxDecodeInvocations/timeSpentInVpxDecode;
+    printf("Capture_Time:VPX_decode_frame_rate,0,%lf|\n", decode_frame_rate);
+    printf("Capture_Time:VPX_max_single_thread_decode_frame_rate,0,%lf|\n", max_single_thread_decode_frame_rate);
+  }
 }
 
 RefPtr<ShutdownPromise>
@@ -121,6 +127,15 @@ VPXDecoder::Flush()
 RefPtr<MediaDataDecoder::DecodePromise>
 VPXDecoder::ProcessDecode(MediaRawData* aSample)
 {
+  auto now = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+  if (vpxDecodeInvocations != 0)
+  {
+    timeBetweenVpxDecode += now - previousVpxDecodeCall.load();
+  }
+
+  previousVpxDecodeCall = now;
+  vpxDecodeInvocations++;
+
   MOZ_ASSERT(mTaskQueue->IsCurrentThreadIn());
 
 #if defined(DEBUG)
@@ -238,6 +253,10 @@ VPXDecoder::ProcessDecode(MediaRawData* aSample)
     }
     results.AppendElement(Move(v));
   }
+
+  auto after_decode_time = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+  timeSpentInVpxDecode += after_decode_time - now;
+
   return DecodePromise::CreateAndResolve(Move(results), __func__);
 }
 

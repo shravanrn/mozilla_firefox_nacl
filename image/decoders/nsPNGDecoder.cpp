@@ -26,6 +26,9 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/Telemetry.h"
 
+#include <sys/types.h>
+#include <unistd.h>
+
 using namespace mozilla::gfx;
 
 using std::min;
@@ -101,7 +104,7 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo(png_structp aPNG, png_infop aInfo)
 const uint8_t
 nsPNGDecoder::pngSignatureBytes[] = { 137, 80, 78, 71, 13, 10, 26, 10 };
 
-nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
+nsPNGDecoder::nsPNGDecoder(RasterImage* aImage, RasterImage* aImageExtra)
  : Decoder(aImage)
  , mLexer(Transition::ToUnbuffered(State::FINISHED_PNG_DATA,
                                    State::PNG_DATA,
@@ -122,7 +125,11 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
  , mFrameIsHidden(false)
  , mDisablePremultipliedAlpha(false)
  , mNumFrames(0)
-{ }
+{
+  mImageString = getImageURIString(aImage != nullptr? aImage : aImageExtra);
+}
+
+unsigned long long invPng = 0;
 
 nsPNGDecoder::~nsPNGDecoder()
 {
@@ -271,6 +278,7 @@ nsPNGDecoder::EndImageFrame()
 nsresult
 nsPNGDecoder::InitInternal()
 {
+  PngBench.Init();
   mCMSMode = gfxPlatform::GetCMSMode();
   if (GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
     mCMSMode = eCMSMode_Off;
@@ -401,9 +409,11 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
   // Pass the data off to libpng.
   mLastChunkLength = aLength;
   mNextTransition = Transition::ContinueUnbuffered(State::PNG_DATA);
+  PngBench.Start();
   png_process_data(mPNG, mInfo,
                    reinterpret_cast<unsigned char*>(const_cast<char*>((aData))),
                    aLength);
+  PngBench.Stop();
 
   // Make sure that we've reached a terminal state if decoding is done.
   MOZ_ASSERT_IF(GetDecodeDone(), mNextTransition.NextStateIsTerminal());
@@ -566,6 +576,12 @@ nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr)
   // Always decode to 24-bit RGB or 32-bit RGBA
   png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type,
                &interlace_type, &compression_type, &filter_type);
+
+  if(width < 100) {
+    decoder->PngTooSmall = true;
+  } else {
+    decoder->PngTooSmall = false;
+  }
 
   const IntRect frameRect(0, 0, width, height);
 
@@ -974,6 +990,14 @@ nsPNGDecoder::FinishInternal()
     loop_count = num_plays - 1;
   }
 #endif
+
+  if(!PngTooSmall)
+  {
+    auto diff = PngBench.JustFinish();
+    std::string tag = "PNG_destroy(" + mImageString + ")";
+    printf("Capture_Time:%s,%llu,%llu|\n", tag.c_str(), invPng, diff);
+    invPng++;
+  }
 
   if (InFrame()) {
     EndImageFrame();
