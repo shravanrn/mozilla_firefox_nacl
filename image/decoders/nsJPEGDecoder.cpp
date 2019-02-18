@@ -819,9 +819,6 @@ nsJPEGDecoder::FinishInternal()
 LexerResult
 nsJPEGDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
-  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  jpegRendererSaved = this;
-  #endif
   //printf("FF Flag DoDecode\n");
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
 
@@ -851,6 +848,9 @@ J_COLOR_SPACE jpegJColorSpaceVerifier(J_COLOR_SPACE val)
 LexerTransition<nsJPEGDecoder::State>
 nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 {
+  #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  jpegRendererSaved = this;
+  #endif
   #if defined(PS_SANDBOX_USE_NEW_CPP_API)
     class ActiveRAIIWrapper{
       JPEGProcessSandbox* s;
