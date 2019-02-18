@@ -497,7 +497,9 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
  , mDisablePremultipliedAlpha(false)
  , mNumFrames(0)
  , PngMaybeTooSmall(true)
+  #if defined(PS_SANDBOX_USE_NEW_CPP_API)
  , PngSbxActivated(false)
+  #endif
 {
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         std::call_once(rlbox_png_init, [](){
@@ -615,10 +617,12 @@ nsPNGDecoder::~nsPNGDecoder()
       freeInPngSandbox(interlacebuf);
     #endif
   }
+  #if defined(PS_SANDBOX_USE_NEW_CPP_API)
   if (PngSbxActivated){
     (rlbox_png->getSandbox())->makeInactiveSandbox();
     PngSbxActivated = false;
   }
+  #endif
   if (mInProfile) {
     qcms_profile_release(mInProfile);
 

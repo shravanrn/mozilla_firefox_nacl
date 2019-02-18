@@ -271,7 +271,9 @@ public:
 
   RLBench PngBench;
   bool PngMaybeTooSmall;
+  #if defined(PS_SANDBOX_USE_NEW_CPP_API)
   bool PngSbxActivated;
+  #endif
 
   // libpng callbacks
   // We put these in the class so that they can access protected members.
