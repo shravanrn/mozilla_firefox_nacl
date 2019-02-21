@@ -225,11 +225,39 @@ extern "C" {
   }
 #endif
 
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  sandbox_callback_helper<void(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_init_source;
+  sandbox_callback_helper<boolean(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_fill_input_buffer;
+  sandbox_callback_helper<void(j_decompress_ptr jd, long num_bytes), TRLSandbox> cpp_cb_jpeg_skip_input_data;
+  sandbox_callback_helper<void(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_term_source;
+  sandbox_callback_helper<void(j_common_ptr cinfo), TRLSandbox> cpp_cb_jpeg_my_error_exit;
+  tainted<boolean(*)(j_decompress_ptr, int), TRLSandbox> cpp_resync_to_restart;
+#elif defined(NACL_SANDBOX_USE_CPP_API)
+  sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_init_source;
+  sandbox_callback_helper<boolean(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_fill_input_buffer;
+  sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd, unverified_data<long> num_bytes)>* cpp_cb_jpeg_skip_input_data;
+  sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_term_source;
+  sandbox_callback_helper<void(unverified_data<j_common_ptr> cinfo)>* cpp_cb_jpeg_my_error_exit;
+  sandbox_function_helper<boolean(j_decompress_ptr, int)> cpp_resync_to_restart;
+#elif defined(PROCESS_SANDBOX_USE_CPP_API)
+  sandbox_callback_helper<JPEGProcessSandbox, void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_init_source;
+  sandbox_callback_helper<JPEGProcessSandbox, boolean(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_fill_input_buffer;
+  sandbox_callback_helper<JPEGProcessSandbox, void(unverified_data<j_decompress_ptr> jd, unverified_data<long> num_bytes)>* cpp_cb_jpeg_skip_input_data;
+  sandbox_callback_helper<JPEGProcessSandbox, void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_term_source;
+  sandbox_callback_helper<JPEGProcessSandbox, void(unverified_data<j_common_ptr> cinfo)>* cpp_cb_jpeg_my_error_exit;
+  sandbox_function_helper<boolean(j_decompress_ptr, int)> cpp_resync_to_restart;
+#endif
+
 void SandboxOnFirefoxExiting_JPEGDecoder()
 {
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     if(rlbox_jpeg != nullptr)
     {
+      cpp_cb_jpeg_init_source.unregister();
+      cpp_cb_jpeg_fill_input_buffer.unregister();
+      cpp_cb_jpeg_skip_input_data.unregister();
+      cpp_cb_jpeg_term_source.unregister();
+      cpp_cb_jpeg_my_error_exit.unregister();
       rlbox_jpeg->destroySandbox();
       free(rlbox_jpeg);
       rlbox_jpeg = nullptr;
@@ -477,29 +505,6 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
 
     return profile;
 }
-
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  sandbox_callback_helper<void(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_init_source;
-  sandbox_callback_helper<boolean(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_fill_input_buffer;
-  sandbox_callback_helper<void(j_decompress_ptr jd, long num_bytes), TRLSandbox> cpp_cb_jpeg_skip_input_data;
-  sandbox_callback_helper<void(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_term_source;
-  sandbox_callback_helper<void(j_common_ptr cinfo), TRLSandbox> cpp_cb_jpeg_my_error_exit;
-  tainted<boolean(*)(j_decompress_ptr, int), TRLSandbox> cpp_resync_to_restart;
-#elif defined(NACL_SANDBOX_USE_CPP_API)
-  sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_init_source;
-  sandbox_callback_helper<boolean(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_fill_input_buffer;
-  sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd, unverified_data<long> num_bytes)>* cpp_cb_jpeg_skip_input_data;
-  sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_term_source;
-  sandbox_callback_helper<void(unverified_data<j_common_ptr> cinfo)>* cpp_cb_jpeg_my_error_exit;
-  sandbox_function_helper<boolean(j_decompress_ptr, int)> cpp_resync_to_restart;
-#elif defined(PROCESS_SANDBOX_USE_CPP_API)
-  sandbox_callback_helper<JPEGProcessSandbox, void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_init_source;
-  sandbox_callback_helper<JPEGProcessSandbox, boolean(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_fill_input_buffer;
-  sandbox_callback_helper<JPEGProcessSandbox, void(unverified_data<j_decompress_ptr> jd, unverified_data<long> num_bytes)>* cpp_cb_jpeg_skip_input_data;
-  sandbox_callback_helper<JPEGProcessSandbox, void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_term_source;
-  sandbox_callback_helper<JPEGProcessSandbox, void(unverified_data<j_common_ptr> cinfo)>* cpp_cb_jpeg_my_error_exit;
-  sandbox_function_helper<boolean(j_decompress_ptr, int)> cpp_resync_to_restart;
-#endif
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   METHODDEF(void) init_source (RLBoxSandbox<TRLSandbox>* sandbox, tainted<j_decompress_ptr, TRLSandbox> jd);
@@ -1211,7 +1216,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
       //returning a bool, no validation needed
       if (sandbox_invoke_custom(jpegSandbox, jpeg_start_decompress, &mInfo).UNSAFE_noVerify() == FALSE)
     #else
-      if (jpeg_start_decompress(&mInfo) == FALSE) 
+      if (d_jpeg_start_decompress(&mInfo) == FALSE) 
     #endif
     {
       JpegBench.Stop();
@@ -1515,7 +1520,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
       //boolean ret - no validation
       if (sandbox_invoke_custom(jpegSandbox, jpeg_finish_decompress, &mInfo).UNSAFE_noVerify() == FALSE)
     #else
-      if (jpeg_finish_decompress(&mInfo) == FALSE) 
+      if (d_jpeg_finish_decompress(&mInfo) == FALSE) 
     #endif
     {
       JpegBench.Stop();

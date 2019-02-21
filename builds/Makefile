@@ -39,7 +39,7 @@ CP=./cpIfDifferent.sh
 static32: inithasrun
 	$(CP) ../mozconfig32_static ../mozconfig
 	$(CP) ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_nocopy.build ../image/moz.build
 	$(CP) ../media/libjpeg_naclport/moz_static_32.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static_32.build ../media/libpng_naclport/moz.build
 	$(CP) ../netwerk/streamconv/converters/moz_static.build ../netwerk/streamconv/converters/moz.build
@@ -47,7 +47,7 @@ static32: inithasrun
 
 dynamic32: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../mozconfig32_nonnacl ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nonnacl_32.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nonnacl_32.build ../media/libpng_naclport/moz.build
@@ -56,7 +56,7 @@ dynamic32: inithasrun
 
 nacl32: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../mozconfig32_nacl ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl_32.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl_32.build ../media/libpng_naclport/moz.build
@@ -65,7 +65,7 @@ nacl32: inithasrun
 
 ps32: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../mozconfig32_ps ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps_32.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps_32.build ../media/libpng_naclport/moz.build
@@ -74,7 +74,7 @@ ps32: inithasrun
 
 nacl32_nosimd: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../mozconfig32_nacl_nosimd ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl_nosimd_32.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
@@ -84,7 +84,7 @@ nacl32_nosimd: inithasrun
 static64: inithasrun
 	$(CP) ../mozconfig64_static ../mozconfig
 	$(CP) ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_nocopy.build ../image/moz.build
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
 	$(CP) ../netwerk/streamconv/converters/moz_static.build ../netwerk/streamconv/converters/moz.build
@@ -93,7 +93,7 @@ static64: inithasrun
 static64_zlibnacl: inithasrun
 	$(CP) ../mozconfig64_staticzlibnacl ../mozconfig
 	$(CP) ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_nocopy.build ../image/moz.build
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
 	$(CP) ../netwerk/streamconv/converters/moz_nacl.build ../netwerk/streamconv/converters/moz.build
@@ -102,7 +102,7 @@ static64_zlibnacl: inithasrun
 static64_zlibps: inithasrun
 	$(CP) ../mozconfig64_staticzlibps ../mozconfig
 	$(CP) ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_nocopy.build ../image/moz.build
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
 	$(CP) ../netwerk/streamconv/converters/moz_ps.build ../netwerk/streamconv/converters/moz.build
@@ -110,8 +110,8 @@ static64_zlibps: inithasrun
 
 static64_buffcopy: inithasrun
 	$(CP) ../mozconfig64_static_buffcopy ../mozconfig
-	$(CP) ../image/decoders/moz_copy_stock.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
 	$(CP) ../netwerk/streamconv/converters/moz_static_buffcopy.build ../netwerk/streamconv/converters/moz.build
@@ -119,7 +119,7 @@ static64_buffcopy: inithasrun
 
 dynamic64: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../mozconfig64_nonnacl ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nonnacl.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nonnacl.build ../media/libpng_naclport/moz.build
@@ -128,7 +128,7 @@ dynamic64: inithasrun
 
 nacl64: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../mozconfig64_nacl ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
@@ -136,8 +136,8 @@ nacl64: inithasrun
 	cd .. && ./mach build
 
 nacl64_cpp: inithasrun
-	$(CP) ../image/decoders/moz_copy_cpp.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/decoders/moz_copy_nacl_cpp.build ../image/decoders/moz.build
+	$(CP) ../image/moz_copy_nacl_cpp.build ../image/moz.build
 	$(CP) ../mozconfig64_nacl_cpp ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
@@ -146,7 +146,7 @@ nacl64_cpp: inithasrun
 
 new_nacl64_cpp: inithasrun
 	$(CP) ../image/decoders/moz_copy_new_nacl_cpp.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy_new_nacl_cpp.build ../image/moz.build
 	$(CP) ../mozconfig64_new_nacl_cpp ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
@@ -155,7 +155,7 @@ new_nacl64_cpp: inithasrun
 
 new_ps64_cpp: inithasrun
 	$(CP) ../image/decoders/moz_copy_new_ps_cpp.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy_new_ps_cpp.build ../image/moz.build
 	$(CP) ../mozconfig64_new_ps_cpp ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -164,7 +164,7 @@ new_ps64_cpp: inithasrun
 
 ps64_cpp: inithasrun
 	$(CP) ../image/decoders/moz_copy_process_cpp.build ../image/decoders/moz.build
-	$(CP) ../image/moz_ps_cpp.build ../image/moz.build
+	$(CP) ../image/moz_copy_process_cpp.build ../image/moz.build
 	$(CP) ../mozconfig64_process_cpp ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -173,7 +173,7 @@ ps64_cpp: inithasrun
 
 ps64_cpp_debug: inithasrun
 	$(CP) ../image/decoders/moz_copy_process_cpp.build ../image/decoders/moz.build
-	$(CP) ../image/moz_ps_cpp.build ../image/moz.build
+	$(CP) ../image/moz_copy_process_cpp.build ../image/moz.build
 	$(CP) ../mozconfig64_process_cpp_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -182,7 +182,7 @@ ps64_cpp_debug: inithasrun
 
 ps64: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../mozconfig64_ps ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -191,7 +191,7 @@ ps64: inithasrun
 
 nacl64_nosimd: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../mozconfig64_nacl_nosimd ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl_nosimd.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
@@ -200,7 +200,7 @@ nacl64_nosimd: inithasrun
 
 dynamic64_dbg: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../mozconfig64_nonnacl_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nonnacl_debug.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nonnacl_debug.build ../media/libpng_naclport/moz.build
@@ -209,7 +209,7 @@ dynamic64_dbg: inithasrun
 
 nacl64_dbg: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../mozconfig64_nacl_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl_debug.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl_debug.build ../media/libpng_naclport/moz.build
@@ -217,8 +217,8 @@ nacl64_dbg: inithasrun
 	cd .. && ./mach build
 
 nacl64_cpp_dbg: inithasrun
-	$(CP) ../image/decoders/moz_copy_cpp.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/decoders/moz_copy_nacl_cpp.build ../image/decoders/moz.build
+	$(CP) ../image/moz_copy_nacl_cpp.build ../image/moz.build
 	$(CP) ../mozconfig64_nacl_cpp_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl_debug.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl_debug.build ../media/libpng_naclport/moz.build
@@ -227,7 +227,7 @@ nacl64_cpp_dbg: inithasrun
 
 new_nacl64_cpp_dbg: inithasrun
 	$(CP) ../image/decoders/moz_copy_new_nacl_cpp.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy_new_nacl_cpp.build ../image/moz.build
 	$(CP) ../mozconfig64_new_nacl_cpp_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl_debug.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl_debug.build ../media/libpng_naclport/moz.build
@@ -236,7 +236,7 @@ new_nacl64_cpp_dbg: inithasrun
 
 new_ps64_cpp_dbg: inithasrun
 	$(CP) ../image/decoders/moz_copy_new_ps_cpp.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy_new_ps_cpp.build ../image/moz.build
 	$(CP) ../mozconfig64_new_ps_cpp_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -245,7 +245,7 @@ new_ps64_cpp_dbg: inithasrun
 
 ps64_dbg: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../mozconfig64_debug_ps ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -254,7 +254,7 @@ ps64_dbg: inithasrun
 
 ps64_asan: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../mozconfig64_asan_ps ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -263,7 +263,7 @@ ps64_asan: inithasrun
 
 wasm64_debug: inithasrun
 	$(CP) ../image/decoders/moz_copy_wasm.build ../image/decoders/moz.build
-	$(CP) ../image/moz_default.build ../image/moz.build
+	$(CP) ../image/moz_copy_wasm.build ../image/moz.build
 	$(CP) ../mozconfig64_wasm_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build

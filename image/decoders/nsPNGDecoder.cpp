@@ -329,6 +329,13 @@ extern "C" void SandboxOnFirefoxExiting_PNGDecoder()
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     if(rlbox_png != nullptr)
     {
+      cpp_cb_png_error_fn.unregister();
+      cpp_cb_png_warn_fn.unregister();
+      cpp_cb_png_progressive_info_fn.unregister();
+      cpp_cb_png_progressive_row_fn.unregister();
+      cpp_cb_png_progressive_end_fn.unregister();
+      cpp_cb_png_progressive_frame_info_fn.unregister();
+      cpp_cb_longjmp_fn.unregister();
       rlbox_png->destroySandbox();
       free(rlbox_png);
       rlbox_png = nullptr;

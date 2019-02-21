@@ -91,11 +91,29 @@ UNIFIED_SOURCES += [
 if CONFIG['MOZ_ENABLE_SKIA']:
     UNIFIED_SOURCES += [ 'Downscaler.cpp']
 
+# Pick from one of the values below
+#
+# Don't copy sandbox data to intermediate buffers
+# DEFINES['USE_SANDBOXING_BUFFERS'] = 0
+#
+# Copy sandbox data to intermediate buffers
+DEFINES['USE_SANDBOXING_BUFFERS'] = 1
+
+# Comment out the following if you want to use the CPP api of NaClSandbox. The value '42' below is disregarded
+DEFINES['NACL_SANDBOX_USE_CPP_API'] = 42
+# DEFINES['PROCESS_SANDBOX_USE_CPP_API'] = 42
+
+# Comment out the following if you want to use the CPP api of ProcessSandbox. The value '42' below is disregarded
+# DEFINES['NACL_SANDBOX_USE_NEW_CPP_API'] = 42
+# DEFINES['WASM_SANDBOX_USE_CPP_API'] = 42
+# DEFINES['PS_SANDBOX_USE_NEW_CPP_API'] = 42
+
 include('/ipc/chromium/chromium-config.mozbuild')
 
 FINAL_LIBRARY = 'xul'
 
 LOCAL_INCLUDES += [
+    '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
     # Because SVGDocumentWrapper.cpp includes "mozilla/dom/SVGSVGElement.h"
     '/dom/base',
     '/dom/svg',

@@ -28,6 +28,10 @@ extern "C" {
 #include <atomic>
 using namespace std::chrono;
 
+#if !defined(USE_SANDBOXING_BUFFERS)
+  #error "No build option defined. File nsJPEGDecoder.h is being included from an unexpected location"
+#endif
+
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
   #include "RLBox_NaCl.h"
   using TRLSandbox = RLBox_NaCl;
