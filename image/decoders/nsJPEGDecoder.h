@@ -137,6 +137,15 @@ private:
 public:
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    std::once_flag rlbox_jpeg_init;
+    RLBoxSandbox<TRLSandbox>* rlbox_jpeg;
+    void init_rlbox();
+    sandbox_callback_helper<void(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_init_source;
+    sandbox_callback_helper<boolean(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_fill_input_buffer;
+    sandbox_callback_helper<void(j_decompress_ptr jd, long num_bytes), TRLSandbox> cpp_cb_jpeg_skip_input_data;
+    sandbox_callback_helper<void(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_term_source;
+    sandbox_callback_helper<void(j_common_ptr cinfo), TRLSandbox> cpp_cb_jpeg_my_error_exit;
+    tainted<boolean(*)(j_decompress_ptr, int), TRLSandbox> cpp_resync_to_restart;
     tainted<struct jpeg_decompress_struct*, TRLSandbox> p_mInfo;
     tainted<struct jpeg_source_mgr*, TRLSandbox> p_mSourceMgr;
     tainted<decoder_error_mgr*, TRLSandbox> p_mErr;

@@ -76,7 +76,6 @@ extern "C" {
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   using namespace mozilla::image;
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    std::once_flag rlbox_jpeg_init;
     rlbox_load_library_api(jpeglib, TRLSandbox)
   #else
     sandbox_nacl_load_library_api(jpeglib)
@@ -88,8 +87,6 @@ extern "C" {
 #endif
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  RLBoxSandbox<TRLSandbox>* rlbox_jpeg = nullptr;
-
   #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_jpeg(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName, false), ##__VA_ARGS__)
   #define sandbox_invoke_custom_return_app_ptr(sandbox, fnName, ...) sandbox_invoke_custom_return_app_ptr_helper_jpeg(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName, false), ##__VA_ARGS__)
   #define sandbox_invoke_custom_with_ptr(sandbox, fnPtr, ...) sandbox_invoke_custom_helper_jpeg(sandbox, fnPtr, ##__VA_ARGS__)
@@ -226,12 +223,12 @@ extern "C" {
 #endif
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  sandbox_callback_helper<void(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_init_source;
-  sandbox_callback_helper<boolean(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_fill_input_buffer;
-  sandbox_callback_helper<void(j_decompress_ptr jd, long num_bytes), TRLSandbox> cpp_cb_jpeg_skip_input_data;
-  sandbox_callback_helper<void(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_term_source;
-  sandbox_callback_helper<void(j_common_ptr cinfo), TRLSandbox> cpp_cb_jpeg_my_error_exit;
-  tainted<boolean(*)(j_decompress_ptr, int), TRLSandbox> cpp_resync_to_restart;
+  // sandbox_callback_helper<void(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_init_source;
+  // sandbox_callback_helper<boolean(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_fill_input_buffer;
+  // sandbox_callback_helper<void(j_decompress_ptr jd, long num_bytes), TRLSandbox> cpp_cb_jpeg_skip_input_data;
+  // sandbox_callback_helper<void(j_decompress_ptr jd), TRLSandbox> cpp_cb_jpeg_term_source;
+  // sandbox_callback_helper<void(j_common_ptr cinfo), TRLSandbox> cpp_cb_jpeg_my_error_exit;
+  // tainted<boolean(*)(j_decompress_ptr, int), TRLSandbox> cpp_resync_to_restart;
 #elif defined(NACL_SANDBOX_USE_CPP_API)
   sandbox_callback_helper<void(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_init_source;
   sandbox_callback_helper<boolean(unverified_data<j_decompress_ptr> jd)>* cpp_cb_jpeg_fill_input_buffer;
@@ -251,17 +248,17 @@ extern "C" {
 void SandboxOnFirefoxExiting_JPEGDecoder()
 {
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    if(rlbox_jpeg != nullptr)
-    {
-      cpp_cb_jpeg_init_source.unregister();
-      cpp_cb_jpeg_fill_input_buffer.unregister();
-      cpp_cb_jpeg_skip_input_data.unregister();
-      cpp_cb_jpeg_term_source.unregister();
-      cpp_cb_jpeg_my_error_exit.unregister();
-      rlbox_jpeg->destroySandbox();
-      free(rlbox_jpeg);
-      rlbox_jpeg = nullptr;
-    }
+    // if(rlbox_jpeg != nullptr)
+    // {
+    //   cpp_cb_jpeg_init_source.unregister();
+    //   cpp_cb_jpeg_fill_input_buffer.unregister();
+    //   cpp_cb_jpeg_skip_input_data.unregister();
+    //   cpp_cb_jpeg_term_source.unregister();
+    //   cpp_cb_jpeg_my_error_exit.unregister();
+    //   rlbox_jpeg->destroySandbox();
+    //   free(rlbox_jpeg);
+    //   rlbox_jpeg = nullptr;
+    // }
   #endif
 }
 
@@ -286,7 +283,7 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
 #define MAX_DATA_BYTES_IN_MARKER  (MAX_BYTES_IN_MARKER - ICC_OVERHEAD_LEN)
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  static boolean marker_is_icc_cpp (tainted<jpeg_saved_marker_ptr, TRLSandbox> marker)
+  static boolean marker_is_icc_cpp (RLBoxSandbox<TRLSandbox>* rlbox_jpeg, tainted<jpeg_saved_marker_ptr, TRLSandbox> marker)
   {
     JOCTET data[12] = { 0 };
     JOCTET* dataCopy = marker->data.copyAndVerifyArray(rlbox_jpeg, [](JOCTET* arr){ return RLBox_Verify_Status::SAFE; }, 12, (JOCTET*) data);
@@ -332,7 +329,7 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
 
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  boolean read_icc_profile_cpp (tainted<j_decompress_ptr, TRLSandbox> cinfo, JOCTET** icc_data_ptr, unsigned int* icc_data_len)
+  boolean read_icc_profile_cpp (RLBoxSandbox<TRLSandbox>* rlbox_jpeg, tainted<j_decompress_ptr, TRLSandbox> cinfo, JOCTET** icc_data_ptr, unsigned int* icc_data_len)
   #else
   boolean read_icc_profile_cpp (unverified_data<j_decompress_ptr> cinfo, JOCTET** icc_data_ptr, unsigned int* icc_data_len)
   #endif
@@ -366,7 +363,13 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
     unsigned int currSeqNum= 0;
     for (marker = cinfo->marker_list; marker != nullptr; marker = marker->next) {
 
-      if (marker_is_icc_cpp(marker)) {
+      if (
+        #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+          marker_is_icc_cpp(rlbox_jpeg, marker)
+        #else
+          marker_is_icc_cpp(marker)
+        #endif
+      ) {
         #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         tainted<JOCTET *, TRLSandbox> data = marker->data;
         //data13 read twice so read it once so it doesn't change after one read
@@ -442,7 +445,13 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
       unverified_data<JOCTET *> data = marker->data;
       #endif
   
-      if (marker_is_icc_cpp(marker)) {
+      if (
+        #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+          marker_is_icc_cpp(rlbox_jpeg, marker)
+        #else
+          marker_is_icc_cpp(marker)
+        #endif
+      ) {
         JOCTET* dst_ptr;
         unsigned int length;
         seq_no = data_seq[currSeqNum];
@@ -482,7 +491,7 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
 #endif
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  static qcms_profile* GetICCProfile(tainted<struct jpeg_decompress_struct *, TRLSandbox> info)
+  static qcms_profile* GetICCProfile(RLBoxSandbox<TRLSandbox>* rlbox_jpeg, tainted<struct jpeg_decompress_struct *, TRLSandbox> info)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   static qcms_profile* GetICCProfile(unverified_data<struct jpeg_decompress_struct *> info)
 #else
@@ -494,7 +503,7 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
     qcms_profile* profile = nullptr;
 
     #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-      if (read_icc_profile_cpp(info, &profilebuf, &profileLength)) 
+      if (read_icc_profile_cpp(rlbox_jpeg, info, &profilebuf, &profileLength)) 
     #else
       if (read_icc_profile(info, &profilebuf, &profileLength)) 
     #endif
@@ -529,19 +538,11 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
 // Normal JFIF markers can't have more bytes than this.
 #define MAX_JPEG_MARKER_LENGTH  (((uint32_t)1 << 16) - 1)
 
-nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
-                             Decoder::DecodeStyle aDecodeStyle)
- : Decoder(aImage)
- , mLexer(Transition::ToUnbuffered(State::FINISHED_JPEG_DATA,
-                                   State::JPEG_DATA,
-                                   SIZE_MAX),
-          Transition::TerminateSuccess())
- , mDecodeStyle(aDecodeStyle)
-{
-  //printf("FF Flag nsJPEGDecoder\n");
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
 
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    std::call_once(rlbox_jpeg_init, [](){
+  void nsJPEGDecoder::init_rlbox()
+  {
+    std::call_once(rlbox_jpeg_init, [this](){
       char SandboxingCodeRootFolder[1024];
       getSandboxingFolder(SandboxingCodeRootFolder);
 
@@ -570,6 +571,23 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
       cpp_resync_to_restart = sandbox_function(rlbox_jpeg, jpeg_resync_to_restart);
       cpp_cb_jpeg_my_error_exit = rlbox_jpeg->createCallback(my_error_exit);
     });
+  }
+
+#endif
+
+nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
+                             Decoder::DecodeStyle aDecodeStyle)
+ : Decoder(aImage)
+ , mLexer(Transition::ToUnbuffered(State::FINISHED_JPEG_DATA,
+                                   State::JPEG_DATA,
+                                   SIZE_MAX),
+          Transition::TerminateSuccess())
+ , mDecodeStyle(aDecodeStyle)
+{
+  //printf("FF Flag nsJPEGDecoder\n");
+
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    init_rlbox();
     p_mInfo = rlbox_jpeg->mallocInSandbox<jpeg_decompress_struct>();
     p_mErr = rlbox_jpeg->mallocInSandbox<decoder_error_mgr>();
     p_mSourceMgr = rlbox_jpeg->mallocInSandbox<jpeg_source_mgr>();
@@ -702,6 +720,17 @@ nsJPEGDecoder::~nsJPEGDecoder()
     }
   #endif
   //printf("FF Flag ~nsJPEGDecoder Done\n");
+
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    cpp_cb_jpeg_init_source.unregister();
+    cpp_cb_jpeg_fill_input_buffer.unregister();
+    cpp_cb_jpeg_skip_input_data.unregister();
+    cpp_cb_jpeg_term_source.unregister();
+    cpp_cb_jpeg_my_error_exit.unregister();
+    rlbox_jpeg->destroySandbox();
+    free(rlbox_jpeg);
+    rlbox_jpeg = nullptr;
+  #endif
 
   MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
          ("nsJPEGDecoder::~nsJPEGDecoder: Destroying JPEG decoder %p",
@@ -1000,7 +1029,11 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
 
       // We're doing a full decode.
       if (mCMSMode != eCMSMode_Off &&
-        (mInProfile = GetICCProfile(p_mInfo)) != nullptr) {
+        #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+          (mInProfile = GetICCProfile(rlbox_jpeg, p_mInfo)) != nullptr) {
+        #else
+          (mInProfile = GetICCProfile(p_mInfo)) != nullptr) {
+        #endif
         uint32_t profileSpace = qcms_profile_get_color_space(mInProfile);
         bool mismatch = false;
 
@@ -1975,14 +2008,16 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
                         ? NS_ERROR_OUT_OF_MEMORY
                         : NS_ERROR_FAILURE;
 
-      nsJPEGDecoder* decoder = (nsJPEGDecoder*) cinfo->client_data.copyAndVerifyAppPtr(rlbox_jpeg, [](void* val){
-        if(val != jpegRendererSaved)
-        {
-          printf("Sbox - bad nsJPEGDecoder pointer returned\n");
-          abort();
-        }
-        return val;
-      });
+      nsJPEGDecoder* decoder = (nsJPEGDecoder*) jpegRendererSaved;
+      auto rlbox_jpeg = decoder->rlbox_jpeg;
+      // cinfo->client_data.copyAndVerifyAppPtr(rlbox_jpeg, [](void* val){
+      //   if(val != jpegRendererSaved)
+      //   {
+      //     printf("Sbox - bad nsJPEGDecoder pointer returned\n");
+      //     abort();
+      //   }
+      //   return val;
+      // });
 
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       //CPP_TODO - should we have a safe casting function??
@@ -2164,14 +2199,16 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       return val;
     });
 
-    nsJPEGDecoder* decoder = (nsJPEGDecoder*) jd->client_data.copyAndVerifyAppPtr(rlbox_jpeg, [](void* val){
-      if(val != jpegRendererSaved)
-      {
-        printf("Sbox - bad nsJPEGDecoder pointer returned\n");
-        abort();
-      }
-      return val;
-    });
+    nsJPEGDecoder* decoder = (nsJPEGDecoder*) jpegRendererSaved;
+      auto rlbox_jpeg = decoder->rlbox_jpeg;
+    //   jd->client_data.copyAndVerifyAppPtr(rlbox_jpeg, [](void* val){
+    //   if(val != jpegRendererSaved)
+    //   {
+    //     printf("Sbox - bad nsJPEGDecoder pointer returned\n");
+    //     abort();
+    //   }
+    //   return val;
+    // });
 
     //bytes_in buffer is only used to set fields on an unverified data structure only
     //hence no verification is necessary
@@ -2248,7 +2285,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
         suspension is desired.
 */
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  void ensureBufferLength(tainted<JOCTET*, TRLSandbox>& currBuff, uint32_t& currLen, uint32_t newLen)
+  void ensureBufferLength(RLBoxSandbox<TRLSandbox>* rlbox_jpeg, tainted<JOCTET*, TRLSandbox>& currBuff, uint32_t& currLen, uint32_t newLen)
 #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
   void ensureBufferLength(unverified_data<JOCTET*>& currBuff, uint32_t& currLen, uint32_t newLen)
 #else
@@ -2299,11 +2336,12 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     tainted<jpeg_source_mgr*, TRLSandbox> src = jd->src;
-    nsJPEGDecoder* decoder = (nsJPEGDecoder*) jd->client_data.copyAndVerifyAppPtr(rlbox_jpeg, [](void* val){
+    nsJPEGDecoder* decoder = (nsJPEGDecoder*) jpegRendererSaved;
+      auto rlbox_jpeg = decoder->rlbox_jpeg;
+      // jd->client_data.copyAndVerifyAppPtr(rlbox_jpeg, [](void* val){
     #else
     unverified_data<jpeg_source_mgr*> src = jd->src;
     nsJPEGDecoder* decoder = (nsJPEGDecoder*) jd->client_data.sandbox_copyAndVerifyUnsandboxedPointer([](void* val){
-    #endif
       if(val != jpegRendererSaved)
       {
         printf("Sbox - bad nsJPEGDecoder pointer returned\n");
@@ -2311,6 +2349,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       }
       return val;
     });
+    #endif
   #else
     struct jpeg_source_mgr* src = (struct jpeg_source_mgr*) getUnsandboxedJpegPtr((uintptr_t)jd->src);
     nsJPEGDecoder* decoder = (nsJPEGDecoder*)(jd->client_data);
@@ -2352,7 +2391,11 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     #endif
 
     #if(USE_SANDBOXING_BUFFERS != 0)
-      ensureBufferLength(decoder->s_mSegment, decoder->s_mSegmentLen, new_buflen);
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+        ensureBufferLength(rlbox_jpeg, decoder->s_mSegment, decoder->s_mSegmentLen, new_buflen);
+      #else
+        ensureBufferLength(decoder->s_mSegment, decoder->s_mSegmentLen, new_buflen);
+      #endif
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       memcpy(decoder->s_mSegment.UNSAFE_Unverified(), new_buffer, new_buflen);
       #else
@@ -2474,7 +2517,11 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
   #if(USE_SANDBOXING_BUFFERS != 0)
     JOCTET* new_input_byte_val = decoder->mBackBuffer + decoder->mBackBufferLen -
                          decoder->mBackBufferUnreadLen;
-    ensureBufferLength(decoder->s_mBackBuffer, decoder->s_mBackBufferLen, bytes_in_buffer);
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+      ensureBufferLength(rlbox_jpeg, decoder->s_mBackBuffer, decoder->s_mBackBufferLen, bytes_in_buffer);
+    #else
+      ensureBufferLength(decoder->s_mBackBuffer, decoder->s_mBackBufferLen, bytes_in_buffer);
+    #endif
     auto new_backBuffer = decoder->s_mBackBuffer;
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     memcpy(new_backBuffer.UNSAFE_Unverified(), new_input_byte_val, bytes_in_buffer);
@@ -2519,10 +2566,10 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     //jpegEndTimer();
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    nsJPEGDecoder* decoder = (nsJPEGDecoder*) jd->client_data.copyAndVerifyAppPtr(rlbox_jpeg, [](void* val){
+    nsJPEGDecoder* decoder = (nsJPEGDecoder*) jpegRendererSaved;
+      // jd->client_data.copyAndVerifyAppPtr(rlbox_jpeg, [](void* val){
     #else
     nsJPEGDecoder* decoder = (nsJPEGDecoder*) jd->client_data.sandbox_copyAndVerifyUnsandboxedPointer([](void* val){
-    #endif
       if(val != jpegRendererSaved)
       {
         printf("Sbox - bad nsJPEGDecoder pointer returned\n");
@@ -2530,6 +2577,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       }
       return val;
     });
+    #endif
   #else
     nsJPEGDecoder* decoder = (nsJPEGDecoder*)(jd->client_data);
   #endif
