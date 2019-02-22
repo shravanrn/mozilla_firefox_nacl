@@ -46,6 +46,12 @@ public:
 
     aRv = aURI->GetRef(mRef);
     NS_ENSURE_SUCCESS_VOID(aRv);
+
+    aRv = aURI->GetHost(mHost);
+    // NS_ENSURE_SUCCESS_VOID(aRv);
+    // if (NS_FAILED(aRv)) {
+    //   abort();
+    // } 
   }
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ImageURL)
@@ -97,6 +103,12 @@ public:
     return NS_OK;
   }
 
+  nsresult GetHost(nsACString& result)
+  {
+    result = mHost;
+    return NS_OK;
+  }
+
   already_AddRefed<nsIURI> ToIURI()
   {
     nsCOMPtr<nsIURI> newURI = mURI.get();
@@ -142,6 +154,8 @@ private:
   nsAutoCString mSpec;
   nsAutoCString mScheme;
   nsAutoCString mRef;
+  nsAutoCString mHost;
+
 
   ~ImageURL() { }
 };
