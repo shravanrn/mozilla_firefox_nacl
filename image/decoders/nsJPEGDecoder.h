@@ -82,72 +82,8 @@ using namespace std::chrono;
 #include <mutex>
 #include <vector>
 
-template<typename T>
-class SandboxManager
-{
-private:
-    std::map<std::string, std::shared_ptr<T>> sandboxes;
-    std::mutex sandboxMapMutex;
-    std::vector<T*> spareSandboxes;
-public:
-    inline SandboxManager() {
-      for(int i = 0; i < 20; i++){
-        spareSandboxes.push_back(new T());
-      }
-    }
-
-    inline std::shared_ptr<T> createSandbox(std::string name) {
-      std::lock_guard<std::mutex> lock(sandboxMapMutex);
-
-      auto iter = sandboxes.find(name) ;
-      if (iter != sandboxes.end()) {
-        printf("!!!!!!!!!!!Found existing Sandbox for: %s\n", name.c_str());
-        return iter->second;
-      }
-
-      if(spareSandboxes.size() > 0) {
-        std::shared_ptr<T> ret(spareSandboxes.back());
-        spareSandboxes.pop_back();
-        printf("!!!!!!!!!!!Using prebuilt sandbox for: %s\n", name.c_str());
-        sandboxes[name] = ret;
-        return ret;
-      } else {
-        auto ret = std::make_shared<T>();
-        printf("!!!!!!!!!!!Making Sandbox for: %s\n", name.c_str());
-        sandboxes[name] = ret;
-        return ret;
-      }
-    }
-
-    inline void printCounts() {
-      for (auto it = sandboxes.begin(); it != sandboxes.end(); ++it) {
-        printf("Sandbox: %s Count: %ld\n", it->first.c_str(), it->second.use_count());
-      }
-    }
-
-    inline void deleteSandbox(std::string name) {
-      auto iter = sandboxes.find(name) ;
-      if (iter != sandboxes.end()) {
-        sandboxes.erase(iter);
-      }
-    }
-};
-
 namespace mozilla {
 namespace image {
-
-inline std::string getHostStringFromImage(RasterImage* aImage)
-{
-  if(aImage == nullptr) { return ""; }
-  ImageURL* imageURI = aImage->GetURI();
-  nsCString host;
-  nsresult rv = imageURI->GetHost(host);
-  if(NS_FAILED(rv)){
-    abort();
-  }
-  const char* hostStr = host.get();
-  return hostStr;
-}
 
 typedef struct {
     struct jpeg_error_mgr pub;  // "public" fields for IJG library
