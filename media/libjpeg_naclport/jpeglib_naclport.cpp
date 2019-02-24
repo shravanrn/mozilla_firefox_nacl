@@ -181,7 +181,7 @@ void jpegEndTimerCore()
   std::mutex jpegProcessExitMutex;
 #endif
 void SandboxOnFirefoxExitingPNG();
-void SandboxOnFirefoxExiting_JPEGDecoder();
+extern "C" void SandboxOnFirefoxExiting_JPEGDecoder();
 void SandboxOnFirefoxExiting()
 {
   #if(USE_SANDBOXING == 2 || USE_SANDBOXING == 3)

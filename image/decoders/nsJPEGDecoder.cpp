@@ -245,23 +245,6 @@ extern "C" {
   sandbox_function_helper<boolean(j_decompress_ptr, int)> cpp_resync_to_restart;
 #endif
 
-void SandboxOnFirefoxExiting_JPEGDecoder()
-{
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    // if(rlbox_jpeg != nullptr)
-    // {
-    //   cpp_cb_jpeg_init_source.unregister();
-    //   cpp_cb_jpeg_fill_input_buffer.unregister();
-    //   cpp_cb_jpeg_skip_input_data.unregister();
-    //   cpp_cb_jpeg_term_source.unregister();
-    //   cpp_cb_jpeg_my_error_exit.unregister();
-    //   rlbox_jpeg->destroySandbox();
-    //   free(rlbox_jpeg);
-    //   rlbox_jpeg = nullptr;
-    // }
-  #endif
-}
-
 #if MOZ_BIG_ENDIAN
 #define MOZ_JCS_EXT_NATIVE_ENDIAN_XRGB JCS_EXT_XRGB
 #else
@@ -595,6 +578,14 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
   static SandboxManager<JPEGSandboxResource> jpegSandboxManager;
 
 #endif
+
+extern "C" void SandboxOnFirefoxExiting_JPEGDecoder()
+{
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    jpegSandboxManager.destroyAll();
+    fflush(stdout);
+  #endif
+}
 
 nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
                              Decoder::DecodeStyle aDecodeStyle)

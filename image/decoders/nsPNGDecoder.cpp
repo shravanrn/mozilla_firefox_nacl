@@ -323,25 +323,6 @@ static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
 
 #endif
 
-extern "C" void SandboxOnFirefoxExiting_PNGDecoder()
-{
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    // if(rlbox_png != nullptr)
-    // {
-    //   cpp_cb_png_error_fn.unregister();
-    //   cpp_cb_png_warn_fn.unregister();
-    //   cpp_cb_png_progressive_info_fn.unregister();
-    //   cpp_cb_png_progressive_row_fn.unregister();
-    //   cpp_cb_png_progressive_end_fn.unregister();
-    //   cpp_cb_png_progressive_frame_info_fn.unregister();
-    //   cpp_cb_longjmp_fn.unregister();
-    //   rlbox_png->destroySandbox();
-    //   free(rlbox_png);
-    //   rlbox_png = nullptr;
-    // }
-  #endif
-}
-
 nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
  : mDispose(DisposalMethod::KEEP)
  , mBlend(BlendMethod::OVER)
@@ -535,6 +516,14 @@ void nsPNGDecoder::checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_
   static SandboxManager<PNGSandboxResource> pngSandboxManager;
 
 #endif
+
+extern "C" void SandboxOnFirefoxExiting_PNGDecoder()
+{
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    pngSandboxManager.destroyAll();
+    fflush(stdout);
+  #endif
+}
 
 // First 8 bytes of a PNG file
 const uint8_t
