@@ -84,14 +84,20 @@ public:
     inline std::shared_ptr<T> createSandbox(std::string name) {
       std::lock_guard<std::mutex> lock(sandboxMapMutex);
 
-      auto iter = sandboxes.find(name) ;
-      if (iter != sandboxes.end()) {
-        return iter->second;
-      }
+      //use a fresh temporary sandbox if we couldn't find the origin
+      if(name == "") {
+        auto ret = std::make_shared<T>();
+        return ret;
+      } else {
+        auto iter = sandboxes.find(name) ;
+        if (iter != sandboxes.end()) {
+          return iter->second;
+        }
 
-      auto ret = std::make_shared<T>();
-      sandboxes[name] = ret;
-      return ret;
+        auto ret = std::make_shared<T>();
+        sandboxes[name] = ret;
+        return ret;
+      }
     }
 
     inline void printCounts() {
