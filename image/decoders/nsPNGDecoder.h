@@ -66,6 +66,63 @@ using namespace std::chrono;
   #include "pnglib_structs_for_cpp_api.h"
 #endif
 
+#include <map>
+#include <memory>
+#include <string>
+#include <mutex>
+#include <vector>
+
+template<typename T>
+class SandboxManager
+{
+private:
+    std::map<std::string, std::shared_ptr<T>> sandboxes;
+    std::mutex sandboxMapMutex;
+    // std::vector<T*> spareSandboxes;
+public:
+    // inline SandboxManager() {
+    //   for(int i = 0; i < 20; i++){
+    //     spareSandboxes.push_back(new T());
+    //   }
+    // }
+
+    inline std::shared_ptr<T> createSandbox(std::string name) {
+      std::lock_guard<std::mutex> lock(sandboxMapMutex);
+
+      auto iter = sandboxes.find(name) ;
+      if (iter != sandboxes.end()) {
+        // printf("!!!!!!!!!!!Found existing Sandbox for: %s\n", name.c_str());
+        return iter->second;
+      }
+
+      // if(spareSandboxes.size() > 0) {
+      //   std::shared_ptr<T> ret(spareSandboxes.back());
+      //   spareSandboxes.pop_back();
+      //   printf("!!!!!!!!!!!Using prebuilt sandbox for: %s\n", name.c_str());
+      //   sandboxes[name] = ret;
+      //   return ret;
+      // } else {
+        auto ret = std::make_shared<T>();
+        // printf("!!!!!!!!!!!Making Sandbox for: %s\n", name.c_str());
+        sandboxes[name] = ret;
+        return ret;
+      // }
+    }
+
+    inline void printCounts() {
+      for (auto it = sandboxes.begin(); it != sandboxes.end(); ++it) {
+        printf("Sandbox: %s Count: %ld\n", it->first.c_str(), it->second.use_count());
+      }
+    }
+
+    inline void deleteSandbox(std::string name) {
+      auto iter = sandboxes.find(name) ;
+      if (iter != sandboxes.end()) {
+        sandboxes.erase(iter);
+      }
+    }
+};
+
 struct RLBench
 {
   bool InUse = false;
@@ -131,7 +188,23 @@ struct RLBench
 namespace mozilla {
 namespace image {
 
+inline std::string getHostStringFromImage(RasterImage* aImage)
+{
+  if(aImage == nullptr) { return ""; }
+  ImageURL* imageURI = aImage->GetURI();
+  if(imageURI == nullptr) {return ""; }
+  nsCString host;
+  nsresult rv = imageURI->GetHost(host);
+  if(NS_FAILED(rv)){
+    return "";
+  }
+  const char* hostStr = host.get();
+  return hostStr;
+}
+
 class RasterImage;
+
+class PNGSandboxResource;
 
 class nsPNGDecoder : public Decoder
 {
@@ -224,16 +297,18 @@ private:
 
 public:
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    RLBoxSandbox<TRLSandboxP>* rlbox_png = nullptr;
-    std::once_flag rlbox_png_init;
-    void init_rlbox();
-    sandbox_callback_helper<void(png_structp,png_const_charp), TRLSandboxP> cpp_cb_png_error_fn;
-    sandbox_callback_helper<void(png_structp,png_const_charp), TRLSandboxP> cpp_cb_png_warn_fn;
-    sandbox_callback_helper<void(png_structp,png_infop), TRLSandboxP> cpp_cb_png_progressive_info_fn;
-    sandbox_callback_helper<void(png_structp,png_bytep,png_uint_32,int), TRLSandboxP> cpp_cb_png_progressive_row_fn;
-    sandbox_callback_helper<void(png_structp,png_infop), TRLSandboxP> cpp_cb_png_progressive_end_fn;
-    sandbox_callback_helper<void(png_structp,png_uint_32), TRLSandboxP> cpp_cb_png_progressive_frame_info_fn;
-    sandbox_callback_helper<void(jmp_buf, int), TRLSandboxP> cpp_cb_longjmp_fn;
+    // RLBoxSandbox<TRLSandboxP>* rlbox_png = nullptr;
+    // std::once_flag rlbox_png_init;
+    // void init_rlbox();
+    // sandbox_callback_helper<void(png_structp,png_const_charp), TRLSandboxP> cpp_cb_png_error_fn;
+    // sandbox_callback_helper<void(png_structp,png_const_charp), TRLSandboxP> cpp_cb_png_warn_fn;
+    // sandbox_callback_helper<void(png_structp,png_infop), TRLSandboxP> cpp_cb_png_progressive_info_fn;
+    // sandbox_callback_helper<void(png_structp,png_bytep,png_uint_32,int), TRLSandboxP> cpp_cb_png_progressive_row_fn;
+    // sandbox_callback_helper<void(png_structp,png_infop), TRLSandboxP> cpp_cb_png_progressive_end_fn;
+    // sandbox_callback_helper<void(png_structp,png_uint_32), TRLSandboxP> cpp_cb_png_progressive_frame_info_fn;
+    // sandbox_callback_helper<void(jmp_buf, int), TRLSandboxP> cpp_cb_longjmp_fn;
+    std::shared_ptr<PNGSandboxResource> rlbox_sbx_shared;
+    PNGSandboxResource* rlbox_sbx;
     tainted<png_structp, TRLSandboxP> mPNG;
     tainted<png_infop, TRLSandboxP> mInfo;
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
