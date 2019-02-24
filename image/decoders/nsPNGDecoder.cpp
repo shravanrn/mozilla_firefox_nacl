@@ -2807,6 +2807,8 @@ nsPNGDecoder::IsValidICOResource() const
       abort();
     }
 
+    pngRendererSaved = (void*) this;
+
     sandbox_invoke_custom(rlbox_png, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).UNSAFE_Unverified();
     jumpBufferFilledIn = freshMapId();
     if (setjmp(pngJmpBuffers[jumpBufferFilledIn])) {
@@ -2845,12 +2847,14 @@ nsPNGDecoder::IsValidICOResource() const
 
       //clear the jmpBufferIndex on the way out as it is unsafe to call setjmp after this
       jumpBufferFilledIn = 0;
+      pngRendererSaved = nullptr;
       return ((png_color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
          png_color_type == PNG_COLOR_TYPE_RGB) &&
         png_bit_depth == 8);
     } else {
       //clear the jmpBufferIndex on the way out as it is unsafe to call setjmp after this
       jumpBufferFilledIn = 0;
+      pngRendererSaved = nullptr;
       return false;
     }
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
@@ -2860,6 +2864,8 @@ nsPNGDecoder::IsValidICOResource() const
       printf("nsPNGDecoder::nsPNGDecoder - jump buffer already in usein IsValidICOResource\n");
       abort();
     }
+
+    pngRendererSaved = (void*) this;
 
     sandbox_invoke_custom(pngSandbox, png_set_longjmp_fn, mPNG, cpp_cb_longjmp_fn, sizeof(jmp_buf)).sandbox_onlyVerifyAddress();
     jumpBufferFilledIn = freshMapId();
@@ -2899,12 +2905,14 @@ nsPNGDecoder::IsValidICOResource() const
 
       //clear the jmpBufferIndex on the way out as it is unsafe to call setjmp after this
       jumpBufferFilledIn = 0;
+      pngRendererSaved = nullptr;
       return ((png_color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
          png_color_type == PNG_COLOR_TYPE_RGB) &&
         png_bit_depth == 8);
     } else {
       //clear the jmpBufferIndex on the way out as it is unsafe to call setjmp after this
       jumpBufferFilledIn = 0;
+      pngRendererSaved = nullptr;
       return false;
     }
   #else
