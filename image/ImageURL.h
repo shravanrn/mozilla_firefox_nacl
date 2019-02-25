@@ -47,11 +47,7 @@ public:
     aRv = aURI->GetRef(mRef);
     NS_ENSURE_SUCCESS_VOID(aRv);
 
-    aRv = aURI->GetHost(mHost);
-    // NS_ENSURE_SUCCESS_VOID(aRv);
-    // if (NS_FAILED(aRv)) {
-    //   abort();
-    // } 
+    aURI->GetHost(mHost);
   }
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ImageURL)
