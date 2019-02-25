@@ -51,6 +51,13 @@ NS_IMPL_ISUPPORTS(imgRequest,
                   nsIInterfaceRequestor,
                   nsIAsyncVerifyRedirectCallback)
 
+thread_local void* CurrentImageRequestPrincipal = nullptr;
+
+nsIPrincipal* GetCurrentImageRequestPrincipal()
+{
+  return (nsIPrincipal*) CurrentImageRequestPrincipal;
+}
+
 imgRequest::imgRequest(imgLoader* aLoader, const ImageCacheKey& aCacheKey)
  : mLoader(aLoader)
  , mCacheKey(aCacheKey)
@@ -1185,6 +1192,7 @@ imgRequest::OnDataAvailable(nsIRequest* aRequest, nsISupports* aContext,
 
   // Notify the image that it has new data.
   if (aInStr) {
+    CurrentImageRequestPrincipal = (void*) mLoadingPrincipal;
     nsresult rv =
       image->OnImageDataAvailable(aRequest, aContext, aInStr, aOffset, aCount);
 

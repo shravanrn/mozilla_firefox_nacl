@@ -91,10 +91,12 @@ public:
       } else {
         auto iter = sandboxes.find(name) ;
         if (iter != sandboxes.end()) {
+          printf("!!!!!!!!!!!Found existing Sandbox for: %s\n", name.c_str());
           return iter->second;
         }
 
         auto ret = std::make_shared<T>();
+        printf("!!!!!!!!!!!Making Sandbox for: %s\n", name.c_str());
         sandboxes[name] = ret;
         return ret;
       }
@@ -183,21 +185,23 @@ struct RLBench
   }
 };
 
+nsIPrincipal* GetCurrentImageRequestPrincipal();
+
 namespace mozilla {
 namespace image {
 
-inline std::string getHostStringFromImage(RasterImage* aImage)
+inline std::string getHostStringFromImage()
 {
-  if(aImage == nullptr) { return ""; }
-  ImageURL* imageURI = aImage->GetURI();
-  if(imageURI == nullptr) {return ""; }
-  nsCString host;
-  nsresult rv = imageURI->GetHost(host);
-  if(NS_FAILED(rv)){
-    return "";
+  //default origin is used for things like browser chrome
+  std::string principalOrigin = "<default>";
+  auto currPrincipal = GetCurrentImageRequestPrincipal();
+  if(currPrincipal != nullptr) {
+    nsCString principalOriginB;
+    currPrincipal->GetOrigin(principalOriginB);
+    principalOrigin = principalOriginB.get();
   }
-  const char* hostStr = host.get();
-  return hostStr;
+
+  return principalOrigin;
 }
 
 class RasterImage;
