@@ -688,9 +688,9 @@ nsJPEGDecoder::~nsJPEGDecoder()
   // Step 8: Release JPEG decompression object
   auto& mInfo = *p_mInfo;
   mInfo.src = nullptr;
-  auto rlbox_jpeg = rlbox_sbx->rlbox_jpeg;
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    auto rlbox_jpeg = rlbox_sbx->rlbox_jpeg;
     sandbox_invoke_custom(rlbox_jpeg, jpeg_destroy_decompress, &mInfo);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     sandbox_invoke_custom(jpegSandbox, jpeg_destroy_decompress, &mInfo);
@@ -763,10 +763,10 @@ nsJPEGDecoder::InitInternal()
 
   auto& mInfo = *p_mInfo;
   auto& mErr = *p_mErr;
-  auto rlbox_jpeg = rlbox_sbx->rlbox_jpeg;
 
   // We set up the normal JPEG error routines, then override error_exit.
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    auto rlbox_jpeg = rlbox_sbx->rlbox_jpeg;
     mInfo.err = sandbox_invoke_custom(rlbox_jpeg, jpeg_std_error, &mErr.pub);
     mErr.pub.error_exit = rlbox_sbx->cpp_cb_jpeg_my_error_exit;
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)

@@ -408,7 +408,11 @@ nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
     mBlend = BlendMethod::OVER;
   }
 
-  mTimeout = GetNextFrameDelay(rlbox_png, aPNG, aInfo);
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    mTimeout = GetNextFrameDelay(rlbox_png, aPNG, aInfo);
+  #else
+    mTimeout = GetNextFrameDelay(aPNG, aInfo);
+  #endif
 }
 #endif
 volatile int gdb = 1;
@@ -462,7 +466,7 @@ void nsPNGDecoder::checked_longjmp(unverified_data<jmp_buf> unv_env, unverified_
 
   class PNGSandboxResource {
   public:
-    RLBoxSandbox<TRLSandbox>* rlbox_png;
+    RLBoxSandbox<TRLSandboxP>* rlbox_png;
     sandbox_callback_helper<void(png_structp,png_const_charp), TRLSandboxP> cpp_cb_png_error_fn;
     sandbox_callback_helper<void(png_structp,png_const_charp), TRLSandboxP> cpp_cb_png_warn_fn;
     sandbox_callback_helper<void(png_structp,png_infop), TRLSandboxP> cpp_cb_png_progressive_info_fn;
@@ -2002,8 +2006,13 @@ nsPNGDecoder::FinishedPNGData()
   uint32_t pIntent;
   if (decoder->mCMSMode != eCMSMode_Off) {
     intent = gfxPlatform::GetRenderingIntent();
-    decoder->mInProfile = PNGGetColorProfile(rlbox_png, png_ptr, info_ptr,
-                                             color_type, &inType, &pIntent);
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+      decoder->mInProfile = PNGGetColorProfile(rlbox_png, png_ptr, info_ptr,
+                                              color_type, &inType, &pIntent);
+    #else
+      decoder->mInProfile = PNGGetColorProfile(png_ptr, info_ptr,
+                                              color_type, &inType, &pIntent);
+    #endif
     // If we're not mandating an intent, use the one from the image.
     if (intent == uint32_t(-1)) {
       intent = pIntent;
@@ -2139,7 +2148,11 @@ nsPNGDecoder::FinishedPNGData()
   #endif
 
   if (isAnimated) {
-    int32_t rawTimeout = GetNextFrameDelay(rlbox_png, png_ptr, info_ptr);
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+      int32_t rawTimeout = GetNextFrameDelay(rlbox_png, png_ptr, info_ptr);
+    #else
+      int32_t rawTimeout = GetNextFrameDelay(png_ptr, info_ptr);
+    #endif
     decoder->PostIsAnimated(FrameTimeout::FromRawMilliseconds(rawTimeout));
 
     if (decoder->Size() != decoder->OutputSize() &&
