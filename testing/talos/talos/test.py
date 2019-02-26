@@ -244,7 +244,7 @@ class PageloaderTest(Test):
             'tpscrolltest', 'xperf_counters', 'timeout', 'shutdown', 'responsiveness',
             'profile_path', 'xperf_providers', 'xperf_user_providers', 'xperf_stackwalk',
             'filters', 'preferences', 'extensions', 'setup', 'cleanup',
-            'lower_is_better', 'alert_threshold', 'unit', 'webextensions']
+            'lower_is_better', 'alert_threshold', 'unit', 'webextensions', 'tpdelay']
 
 
 class QuantumPageloadTest(PageloaderTest):
@@ -811,6 +811,22 @@ class zlib_page_render(PageloaderTest):
     gecko_profile_entries = 10000000
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
+
+@register_test()
+class jpeg_scaling(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling.manifest'
+    tpcycles = 25
+    tploadnocache = True
+    tppagecycles = 1
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 9000
 
 @register_test()
 class jpeg_page_render_25(PageloaderTest):

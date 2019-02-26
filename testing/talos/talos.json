@@ -71,6 +71,9 @@
         "rlbox_test": {
             "tests": ["jpeg_page_render", "png_page_render", "zlib_page_render"]
         },
+        "rlbox_scaling": {
+            "tests": ["jpeg_scaling"]
+        },
         "svgr-e10s": {
             "tests": ["tsvgx", "tsvgr_opacity", "tart", "tscrollx", "tsvg_static"]
         },
