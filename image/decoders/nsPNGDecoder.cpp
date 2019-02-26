@@ -560,7 +560,7 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
   #endif
 {
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-        std::string hostString = getHostStringFromImage();
+        std::string hostString = getHostStringFromImage(aImage);
         rlbox_sbx_shared = pngSandboxManager.createSandbox(hostString);
         rlbox_sbx = rlbox_sbx_shared.get();
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)

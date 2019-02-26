@@ -599,7 +599,7 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
   //printf("FF Flag nsJPEGDecoder\n");
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    std::string hostString = getHostStringFromImage();
+    std::string hostString = getHostStringFromImage(aImage);
     rlbox_sbx_shared = jpegSandboxManager.createSandbox(hostString);
     rlbox_sbx = rlbox_sbx_shared.get();
     auto rlbox_jpeg = rlbox_sbx->rlbox_jpeg;

@@ -1195,6 +1195,7 @@ imgRequest::OnDataAvailable(nsIRequest* aRequest, nsISupports* aContext,
     CurrentImageRequestPrincipal = (void*) mLoadingPrincipal;
     nsresult rv =
       image->OnImageDataAvailable(aRequest, aContext, aInStr, aOffset, aCount);
+    CurrentImageRequestPrincipal = nullptr;
 
     if (NS_FAILED(rv)) {
       MOZ_LOG(gImgLog, LogLevel::Warning,

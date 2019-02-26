@@ -190,18 +190,64 @@ nsIPrincipal* GetCurrentImageRequestPrincipal();
 namespace mozilla {
 namespace image {
 
-inline std::string getHostStringFromImage()
+inline std::string getHostStringFromImageHelper(RasterImage* aImage)
 {
-  //default origin is used for things like browser chrome
-  std::string principalOrigin = "<default>";
-  auto currPrincipal = GetCurrentImageRequestPrincipal();
-  if(currPrincipal != nullptr) {
-    nsCString principalOriginB;
-    currPrincipal->GetOrigin(principalOriginB);
-    principalOrigin = principalOriginB.get();
+  if(aImage == nullptr) { return ""; }
+  ImageURL* imageURI = aImage->GetURI();
+  if(imageURI == nullptr) { return ""; }
+
+  {
+    nsCString scheme;
+    nsresult rv = imageURI->GetScheme(scheme);
+    if(NS_SUCCEEDED(rv)){
+      if(strcmp(scheme.get(), "file") == 0) {
+        return "file::";
+      } else if(strcmp(scheme.get(), "data") == 0) {
+        auto currPrincipal = GetCurrentImageRequestPrincipal();
+        if(currPrincipal == nullptr) {
+          return "";
+        }
+        nsCString principalOriginB;
+        currPrincipal->GetOrigin(principalOriginB);
+        return principalOriginB.get();
+      }
+    }
   }
 
-  return principalOrigin;
+  {
+    nsCString host;
+    nsresult rv = imageURI->GetHost(host);
+    if(NS_FAILED(rv)){
+      return "";
+    }
+    std::string hostStr = host.get();
+    hostStr += ":";
+    hostStr += std::to_string(imageURI->GetPort());
+    return hostStr;
+  }
+}
+
+inline std::string getHostStringFromImage(RasterImage* aImage)
+{
+  std::string ret = getHostStringFromImageHelper(aImage);
+  if (ret == "") {
+    bool isAImageNull = aImage == nullptr;
+    bool isAImageURINull = aImage == nullptr || (aImage->GetURI() == nullptr);
+    std::string uri = "<null>";
+    if (aImage != nullptr) {
+      nsCString spec(aImage->GetURIString());
+      uri = spec.get();
+    }
+    std::string principal = "<null>";
+    auto currPrincipal = GetCurrentImageRequestPrincipal();
+    if(currPrincipal != nullptr) {
+      nsCString principalOriginB;
+      currPrincipal->GetOrigin(principalOriginB);
+      principal = principalOriginB.get();
+    }
+    printf("!!!!!!!!!!!!No host found: isAImageNull:%d, isAImageURINull:%d, principal:%s, URI:%s\n", isAImageNull, isAImageURINull, principal.c_str(), uri.c_str());
+  }
+  return ret;
 }
 
 class RasterImage;

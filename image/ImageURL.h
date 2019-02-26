@@ -46,6 +46,9 @@ public:
 
     aRv = aURI->GetRef(mRef);
     NS_ENSURE_SUCCESS_VOID(aRv);
+
+    aURI->GetHost(mHost);
+    aURI->GetPort(&mPort);
   }
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ImageURL)
@@ -97,6 +100,17 @@ public:
     return NS_OK;
   }
 
+  nsresult GetHost(nsACString& result)
+  {
+    result = mHost;
+    return NS_OK;
+  }
+
+  int32_t GetPort()
+  {
+    return mPort;
+  }
+
   already_AddRefed<nsIURI> ToIURI()
   {
     nsCOMPtr<nsIURI> newURI = mURI.get();
@@ -142,6 +156,9 @@ private:
   nsAutoCString mSpec;
   nsAutoCString mScheme;
   nsAutoCString mRef;
+  nsAutoCString mHost;
+  int32_t mPort;
+
 
   ~ImageURL() { }
 };
