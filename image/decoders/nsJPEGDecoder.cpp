@@ -740,7 +740,9 @@ nsJPEGDecoder::~nsJPEGDecoder()
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     std::time_t now = std::time(nullptr);
-    (rlbox_jpeg->getSandbox())->logPerfDataToCSV("ps_handshakes_jpeg_" std::ctime(&now));
+    char* filename[100];
+    sprintf(filename, "ps_handshakes_jpeg_%s", std::ctime(&now));
+    (rlbox_jpeg->getSandbox())->logPerfDataToCSV(filename);
     rlbox_sbx_shared = nullptr;
     rlbox_sbx = nullptr;
   #endif

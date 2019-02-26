@@ -660,7 +660,9 @@ nsPNGDecoder::~nsPNGDecoder()
     PngSbxActivated = false;
   }
   std::time_t now = std::time(nullptr);
-  (rlbox_png->getSandbox())->logPerfDataToCSV("ps_handshakes_png_" std::ctime(&now));
+  char* filename[100];
+  sprintf(filename, "ps_handshakes_png_%s", std::ctime(&now));
+  (rlbox_png->getSandbox())->logPerfDataToCSV(filename);
   #endif
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
