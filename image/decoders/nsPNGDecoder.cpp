@@ -661,7 +661,7 @@ nsPNGDecoder::~nsPNGDecoder()
   }
   std::time_t now = std::time(nullptr);
   char filename[100];
-  sprintf(filename, "ps_handshakes_png_%s", std::ctime(&now));
+  sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/ps_handshakes_png_%s", std::ctime(&now));
   (rlbox_png->getSandbox())->logPerfDataToCSV(filename);
   #endif
 
