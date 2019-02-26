@@ -660,6 +660,7 @@ nsPNGDecoder::~nsPNGDecoder()
     PngSbxActivated = false;
   }
   static std::atomic<int> count(0);
+  char filename[100];
   sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/ps_handshakes_png_%d", count.load());
   count++;
   (rlbox_png->getSandbox())->logPerfDataToCSV(filename);
