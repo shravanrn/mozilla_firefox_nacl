@@ -186,23 +186,43 @@ struct RLBench
 };
 
 nsIPrincipal* GetCurrentImageRequestPrincipal();
+imgRequest* GetCurrentImageRequestObject();
 
 namespace mozilla {
 namespace image {
 
 inline std::string getHostStringFromImageHelper(RasterImage* aImage)
 {
-  if(aImage == nullptr) { return ""; }
-  ImageURL* imageURI = aImage->GetURI();
+  ImageURL* imageURI = nullptr;
+
+  //Try to retrieve the image URI from the ImageDecoder request
+  if(aImage != nullptr) { 
+    imageURI = aImage->GetURI();
+  }
+
+  //imageURI from the ImageDecoder is null for many requests
+  //Instead, use the most recent image request
+  if(imageURI == nullptr) { 
+    imgRequest* currRequest = GetCurrentImageRequestObject();
+    if(currRequest != nullptr) {
+      currRequest->GetURI(&imageURI);
+    }
+  }
+
+  //if still null bail out - empty string causes the use of a temporary sandbox
   if(imageURI == nullptr) { return ""; }
 
+  //check for special schemas like file or data
   {
     nsCString scheme;
     nsresult rv = imageURI->GetScheme(scheme);
     if(NS_SUCCEEDED(rv)){
+      //just put all file URI's into a new sandbox for "file::"
       if(strcmp(scheme.get(), "file") == 0) {
         return "file::";
-      } else if(strcmp(scheme.get(), "data") == 0) {
+      }
+      //for data URI's use the origin from the page - aka principal
+      else if(strcmp(scheme.get(), "data") == 0) {
         auto currPrincipal = GetCurrentImageRequestPrincipal();
         if(currPrincipal == nullptr) {
           return "";
@@ -214,15 +234,27 @@ inline std::string getHostStringFromImageHelper(RasterImage* aImage)
     }
   }
 
+  //if a normal scheme like https, construct the origin
   {
-    nsCString host;
-    nsresult rv = imageURI->GetHost(host);
+    nsCString scheme;
+    nsresult rv;
+    rv = imageURI->GetScheme(scheme);
     if(NS_FAILED(rv)){
       return "";
     }
-    std::string hostStr = host.get();
-    hostStr += ":";
-    hostStr += std::to_string(imageURI->GetPort());
+    nsCString host;
+    rv = imageURI->GetHost(host);
+    if(NS_FAILED(rv)){
+      return "";
+    }
+    std::string hostStr = scheme.get();
+    hostStr += "://";
+    hostStr += host.get();
+    int port = imageURI->GetPort();
+    if(port != -1) {
+      hostStr += ":";
+      hostStr += std::to_string(port);
+    }
     return hostStr;
   }
 }
@@ -230,6 +262,7 @@ inline std::string getHostStringFromImageHelper(RasterImage* aImage)
 inline std::string getHostStringFromImage(RasterImage* aImage)
 {
   std::string ret = getHostStringFromImageHelper(aImage);
+  //sanity checks
   if (ret == "") {
     bool isAImageNull = aImage == nullptr;
     bool isAImageURINull = aImage == nullptr || (aImage->GetURI() == nullptr);
@@ -245,7 +278,29 @@ inline std::string getHostStringFromImage(RasterImage* aImage)
       currPrincipal->GetOrigin(principalOriginB);
       principal = principalOriginB.get();
     }
-    printf("!!!!!!!!!!!!No host found: isAImageNull:%d, isAImageURINull:%d, principal:%s, URI:%s\n", isAImageNull, isAImageURINull, principal.c_str(), uri.c_str());
+    std::string request = "<null>";
+    imgRequest* currRequest = GetCurrentImageRequestObject();
+    if(currRequest != nullptr) {
+      ImageURL* imageURI;
+      currRequest->GetURI(&imageURI);
+      if(imageURI != nullptr) {
+        nsCString specString;
+        imageURI->GetSpec(specString);
+        request = specString.get();
+      }
+    }
+    printf("!!!!!!!!!!!!No host found: isAImageNull: %d, isAImageURINull: %d, principal: %s, URI: %s, request: %s\n", isAImageNull, isAImageURINull, principal.c_str(), uri.c_str(), request.c_str());
+  } else {
+    std::string principal;
+    auto currPrincipal = GetCurrentImageRequestPrincipal();
+    if(currPrincipal == nullptr) {
+      principal = "";
+    } else {
+      nsCString principalOriginB;
+      currPrincipal->GetOrigin(principalOriginB);
+      principal = principalOriginB.get();
+    }
+    printf("!!!!!!!!!!!!Host found: %s, principal: %s\n", ret.c_str(), principal.c_str());
   }
   return ret;
 }
