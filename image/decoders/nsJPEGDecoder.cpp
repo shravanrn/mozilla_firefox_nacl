@@ -9,7 +9,7 @@
 #include "nsJPEGDecoder.h"
 
 #include <cstdint>
-#include <ctime>
+#include <atomic>
 
 #include "imgFrame.h"
 #include "Orientation.h"
@@ -739,9 +739,10 @@ nsJPEGDecoder::~nsJPEGDecoder()
   //printf("FF Flag ~nsJPEGDecoder Done\n");
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    std::time_t now = std::time(nullptr);
     char filename[100];
-    sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/ps_handshakes_jpeg_%s", std::ctime(&now));
+    static std::atomic<int> count(0);
+    sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/ps_handshakes_jpeg_%d", count.load());
+    count++;
     (rlbox_jpeg->getSandbox())->logPerfDataToCSV(filename);
     rlbox_sbx_shared = nullptr;
     rlbox_sbx = nullptr;

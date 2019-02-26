@@ -27,7 +27,7 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/Telemetry.h"
 using namespace mozilla::gfx;
-#include <ctime>
+#include <atomic>
 
 using std::min;
 
@@ -659,9 +659,9 @@ nsPNGDecoder::~nsPNGDecoder()
     (rlbox_png->getSandbox())->makeInactiveSandbox();
     PngSbxActivated = false;
   }
-  std::time_t now = std::time(nullptr);
-  char filename[100];
-  sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/ps_handshakes_png_%s", std::ctime(&now));
+  static std::atomic<int> count(0);
+  sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/ps_handshakes_png_%d", count.load());
+  count++;
   (rlbox_png->getSandbox())->logPerfDataToCSV(filename);
   #endif
 
