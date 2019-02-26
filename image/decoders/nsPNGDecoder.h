@@ -191,7 +191,7 @@ imgRequest* GetCurrentImageRequestObject();
 namespace mozilla {
 namespace image {
 
-inline std::string getHostStringFromImageHelper(RasterImage* aImage)
+inline std::string getHostStringFromImage(RasterImage* aImage)
 {
   ImageURL* imageURI = nullptr;
 
@@ -257,52 +257,6 @@ inline std::string getHostStringFromImageHelper(RasterImage* aImage)
     }
     return hostStr;
   }
-}
-
-inline std::string getHostStringFromImage(RasterImage* aImage)
-{
-  std::string ret = getHostStringFromImageHelper(aImage);
-  //sanity checks
-  if (ret == "") {
-    bool isAImageNull = aImage == nullptr;
-    bool isAImageURINull = aImage == nullptr || (aImage->GetURI() == nullptr);
-    std::string uri = "<null>";
-    if (aImage != nullptr) {
-      nsCString spec(aImage->GetURIString());
-      uri = spec.get();
-    }
-    std::string principal = "<null>";
-    auto currPrincipal = GetCurrentImageRequestPrincipal();
-    if(currPrincipal != nullptr) {
-      nsCString principalOriginB;
-      currPrincipal->GetOrigin(principalOriginB);
-      principal = principalOriginB.get();
-    }
-    std::string request = "<null>";
-    imgRequest* currRequest = GetCurrentImageRequestObject();
-    if(currRequest != nullptr) {
-      ImageURL* imageURI;
-      currRequest->GetURI(&imageURI);
-      if(imageURI != nullptr) {
-        nsCString specString;
-        imageURI->GetSpec(specString);
-        request = specString.get();
-      }
-    }
-    printf("!!!!!!!!!!!!No host found: isAImageNull: %d, isAImageURINull: %d, principal: %s, URI: %s, request: %s\n", isAImageNull, isAImageURINull, principal.c_str(), uri.c_str(), request.c_str());
-  } else {
-    std::string principal;
-    auto currPrincipal = GetCurrentImageRequestPrincipal();
-    if(currPrincipal == nullptr) {
-      principal = "";
-    } else {
-      nsCString principalOriginB;
-      currPrincipal->GetOrigin(principalOriginB);
-      principal = principalOriginB.get();
-    }
-    printf("!!!!!!!!!!!!Host found: %s, principal: %s\n", ret.c_str(), principal.c_str());
-  }
-  return ret;
 }
 
 class RasterImage;
