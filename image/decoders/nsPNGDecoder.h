@@ -317,6 +317,7 @@ private:
   // Convenience methods to make interacting with StreamingLexer from inside
   // a libpng callback easier.
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    bool onRendererThread;
     void DoTerminate(tainted<png_structp, TRLSandboxP> aPNGStruct, TerminalState aState);
     void DoYield(tainted<png_structp, TRLSandboxP> aPNGStruct);  
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)

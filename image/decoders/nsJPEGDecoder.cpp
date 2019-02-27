@@ -595,6 +595,7 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
                                    State::JPEG_DATA,
                                    SIZE_MAX),
           Transition::TerminateSuccess())
+ , onRendererThread(false)
  , mDecodeStyle(aDecodeStyle)
 {
   //printf("FF Flag nsJPEGDecoder\n");
@@ -739,10 +740,12 @@ nsJPEGDecoder::~nsJPEGDecoder()
   //printf("FF Flag ~nsJPEGDecoder Done\n");
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    char filename[100];
-    static std::atomic<int> count(0);
-    sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/jpeg_ps_handshakes_%d.csv", count.load());
-    count++;
+    if(onRendererThread) {
+      char filename[100];
+      static std::atomic<int> count(1);
+      sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/jpeg_ps_handshakes_%d.csv", count.load());
+      count++;
+    }
     (rlbox_jpeg->getSandbox())->logPerfDataToCSV(filename);
     rlbox_sbx_shared = nullptr;
     rlbox_sbx = nullptr;
@@ -1035,6 +1038,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
         return Transition::TerminateSuccess();
       }
 
+      onRendererThread = true;
       JpegBench.Start();
 
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)

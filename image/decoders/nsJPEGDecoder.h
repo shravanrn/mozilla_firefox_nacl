@@ -156,6 +156,7 @@ public:
     // tainted<boolean(*)(j_decompress_ptr, int), TRLSandbox> cpp_resync_to_restart;
     std::shared_ptr<JPEGSandboxResource> rlbox_sbx_shared;
     JPEGSandboxResource* rlbox_sbx;
+    bool onRendererThread;
     tainted<struct jpeg_decompress_struct*, TRLSandbox> p_mInfo;
     tainted<struct jpeg_source_mgr*, TRLSandbox> p_mSourceMgr;
     tainted<decoder_error_mgr*, TRLSandbox> p_mErr;

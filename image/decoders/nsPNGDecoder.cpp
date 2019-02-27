@@ -536,6 +536,7 @@ nsPNGDecoder::pngSignatureBytes[] = { 137, 80, 78, 71, 13, 10, 26, 10 };
 
 nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
  : Decoder(aImage)
+ , onRendererThread(false)
  , mLexer(Transition::ToUnbuffered(State::FINISHED_PNG_DATA,
                                    State::PNG_DATA,
                                    SIZE_MAX),
@@ -659,11 +660,13 @@ nsPNGDecoder::~nsPNGDecoder()
     (rlbox_png->getSandbox())->makeInactiveSandbox();
     PngSbxActivated = false;
   }
-  static std::atomic<int> count(0);
-  char filename[100];
-  sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/png_ps_handshakes_%d.csv", count.load());
-  count++;
-  (rlbox_png->getSandbox())->logPerfDataToCSV(filename);
+  if(onRendererThread) {
+    static std::atomic<int> count(1);
+    char filename[100];
+    sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/png_ps_handshakes_%d.csv", count.load());
+    count++;
+    (rlbox_png->getSandbox())->logPerfDataToCSV(filename);
+  }
   #endif
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
@@ -2586,6 +2589,8 @@ nsPNGDecoder::FinishInternal()
   if (IsMetadataDecode()) {
     return NS_OK;
   }
+
+  onRendererThread = true;
 
   int32_t loop_count = 0;
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
