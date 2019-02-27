@@ -745,8 +745,8 @@ nsJPEGDecoder::~nsJPEGDecoder()
       static std::atomic<int> count(1);
       sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/jpeg_ps_handshakes_%d.csv", count.load());
       count++;
+      (rlbox_jpeg->getSandbox())->logPerfDataToCSV(filename);
     }
-    (rlbox_jpeg->getSandbox())->logPerfDataToCSV(filename);
     rlbox_sbx_shared = nullptr;
     rlbox_sbx = nullptr;
   #endif
