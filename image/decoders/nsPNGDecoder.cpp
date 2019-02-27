@@ -663,7 +663,7 @@ nsPNGDecoder::~nsPNGDecoder()
   if(onRendererThread) {
     static std::atomic<int> count(1);
     char filename[100];
-    sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/png_ps_handshakes_%d.csv", count.load());
+    sprintf(filename, "/home/cdisselk/LibrarySandboxing/csv/png_ps_handshakes_%d.csv", count.load());
     count++;
     (rlbox_png->getSandbox())->logPerfDataToCSV(filename);
   }
