@@ -741,7 +741,7 @@ nsJPEGDecoder::~nsJPEGDecoder()
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     char filename[100];
     static std::atomic<int> count(0);
-    sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/ps_handshakes_jpeg_%d", count.load());
+    sprintf(filename, "/home/cdisselk/LibrarySandboxing/csvs/jpeg_ps_handshakes_%d.csv", count.load());
     count++;
     (rlbox_jpeg->getSandbox())->logPerfDataToCSV(filename);
     rlbox_sbx_shared = nullptr;
