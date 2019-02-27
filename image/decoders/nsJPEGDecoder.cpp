@@ -743,8 +743,8 @@ nsJPEGDecoder::~nsJPEGDecoder()
     if(onRendererThread) {
       char filename[100];
       static std::atomic<int> count(1);
-      sprintf(filename, "/home/cdisselk/LibrarySandboxing/csv/jpeg_ps_handshakes_%d.csv", count.load());
-      count++;
+      int val = count++;
+      sprintf(filename, "/home/cdisselk/LibrarySandboxing/csv/jpeg_ps_handshakes_%d.csv", val);
       (rlbox_jpeg->getSandbox())->logPerfDataToCSV(filename);
     }
     rlbox_sbx_shared = nullptr;
