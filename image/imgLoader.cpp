@@ -68,13 +68,6 @@ using namespace mozilla::net;
 
 MOZ_DEFINE_MALLOC_SIZE_OF(ImagesMallocSizeOf)
 
-thread_local void* CurrentImageRequestObject = nullptr;
-
-imgRequest* GetCurrentImageRequestObject()
-{
-  return (imgRequest*) CurrentImageRequestObject;
-}
-
 class imgMemoryReporter final : public nsIMemoryReporter
 {
   ~imgMemoryReporter() = default;
@@ -526,9 +519,7 @@ NewRequestAndEntry(bool aForcePrincipalCheckForCacheEntry, imgLoader* aLoader,
                    const ImageCacheKey& aKey,
                    imgRequest** aRequest, imgCacheEntry** aEntry)
 {
-  auto tempRequest = new imgRequest(aLoader, aKey);
-  CurrentImageRequestObject = tempRequest;
-  RefPtr<imgRequest> request = tempRequest;
+  RefPtr<imgRequest> request = new imgRequest(aLoader, aKey);
   RefPtr<imgCacheEntry> entry =
     new imgCacheEntry(aLoader, request, aForcePrincipalCheckForCacheEntry);
   aLoader->AddToUncachedImages(request);

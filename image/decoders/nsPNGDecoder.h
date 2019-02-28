@@ -186,7 +186,6 @@ struct RLBench
 };
 
 nsIPrincipal* GetCurrentImageRequestPrincipal();
-imgRequest* GetCurrentImageRequestObject();
 
 namespace mozilla {
 namespace image {
@@ -198,15 +197,6 @@ inline std::string getHostStringFromImage(RasterImage* aImage)
   //Try to retrieve the image URI from the ImageDecoder request
   if(aImage != nullptr) { 
     imageURI = aImage->GetURI();
-  }
-
-  //imageURI from the ImageDecoder is null for many requests
-  //Instead, use the most recent image request
-  if(imageURI == nullptr) { 
-    imgRequest* currRequest = GetCurrentImageRequestObject();
-    if(currRequest != nullptr) {
-      currRequest->GetURI(&imageURI);
-    }
   }
 
   //if still null bail out - empty string causes the use of a temporary sandbox
@@ -283,7 +273,7 @@ private:
   friend class DecoderFactory;
 
   // Decoders should only be instantiated via DecoderFactory.
-  explicit nsPNGDecoder(RasterImage* aImage);
+  explicit nsPNGDecoder(RasterImage* aImage, RasterImage* aImageExtra);
 
   /// The information necessary to create a frame.
   struct FrameInfo
