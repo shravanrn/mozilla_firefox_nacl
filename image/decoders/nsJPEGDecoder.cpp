@@ -2599,10 +2599,11 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
   auto diff = decoder->JpegBench.StopAndFinish();
   std::string tag = "JPEG_destroy";
   {
+    //http://host61.total70.scaling.localhost:1337/img.jpeg
     std::string::size_type endPos = decoder->mhostString.find(".scaling.localhost:1337");
     if (endPos != std::string::npos) {
-      std::string::size_type startPos = decoder->mhostString.find(".total") + strlen(".total");
-      std::string i(decoder->mhostString.substr(startPos, decoder->mhostString.size() - endPos - startPos));
+      std::string::size_type startPos = decoder->mhostString.find("total");
+      std::string i(decoder->mhostString.substr(startPos, endPos - startPos));
       tag += "scaling(" + i + ")";
     } 
   }
