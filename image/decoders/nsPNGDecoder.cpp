@@ -662,10 +662,11 @@ nsPNGDecoder::~nsPNGDecoder()
   }
   if(onRendererThread) {
     static std::atomic<int> count(1);
-    char filename[100];
+    char handshakesFilename[100], mallocsFilename[100];
     int val = count++;
-    sprintf(filename, "/home/cdisselk/LibrarySandboxing/csv/png_ps_handshakes_%d.csv", val);
-    (rlbox_png->getSandbox())->logPerfDataToCSV(filename);
+    sprintf(handshakesFilename, "/home/cdisselk/LibrarySandboxing/csv/png_ps_handshakes_%d.csv", val);
+    sprintf(mallocsFilename, "/home/cdisselk/LibrarySandboxing/csv/png_ps_mallocs_%d.csv", val);
+    (rlbox_png->getSandbox())->logPerfDataToCSV(handshakesFilename, mallocsFilename);
   }
   #endif
 

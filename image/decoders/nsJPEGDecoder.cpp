@@ -742,11 +742,12 @@ nsJPEGDecoder::~nsJPEGDecoder()
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     if(onRendererThread) {
-      char filename[100];
+      char handshakesFilename[100], mallocsFilename[100];
       static std::atomic<int> count(1);
       int val = count++;
-      sprintf(filename, "/home/cdisselk/LibrarySandboxing/csv/jpeg_ps_handshakes_%d.csv", val);
-      (rlbox_jpeg->getSandbox())->logPerfDataToCSV(filename);
+      sprintf(handshakesFilename, "/home/cdisselk/LibrarySandboxing/csv/jpeg_ps_handshakes_%d.csv", val);
+      sprintf(mallocsFilename, "/home/cdisselk/LibrarySandboxing/csv/jpeg_ps_mallocs_%d.csv", val);
+      (rlbox_jpeg->getSandbox())->logPerfDataToCSV(handshakesFilename, mallocsFilename);
     }
     rlbox_sbx_shared = nullptr;
     rlbox_sbx = nullptr;
