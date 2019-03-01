@@ -589,7 +589,8 @@ extern "C" void SandboxOnFirefoxExiting_JPEGDecoder()
 }
 
 nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
-                             Decoder::DecodeStyle aDecodeStyle)
+                             Decoder::DecodeStyle aDecodeStyle,
+                             RasterImage* aImageExtra)
  : Decoder(aImage)
  , mLexer(Transition::ToUnbuffered(State::FINISHED_JPEG_DATA,
                                    State::JPEG_DATA,
@@ -600,9 +601,9 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
 {
   //printf("FF Flag nsJPEGDecoder\n");
 
+  mhostString = getHostStringFromImage(aImage != nullptr? aImage : aImageExtra);
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    std::string hostString = getHostStringFromImage(aImage);
-    rlbox_sbx_shared = jpegSandboxManager.createSandbox(hostString);
+    rlbox_sbx_shared = jpegSandboxManager.createSandbox(mhostString);
     rlbox_sbx = rlbox_sbx_shared.get();
     auto rlbox_jpeg = rlbox_sbx->rlbox_jpeg;
     p_mInfo = rlbox_jpeg->mallocInSandbox<jpeg_decompress_struct>();
@@ -2606,7 +2607,17 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
   #endif
 
   auto diff = decoder->JpegBench.StopAndFinish();
-  printf("Capture_Time:JPEG_destroy,%llu,%llu|\n", invJpeg, diff);
+  std::string tag = "JPEG_destroy";
+  {
+    //http://host61.total70.scaling.localhost:1337/img.jpeg
+    std::string::size_type endPos = decoder->mhostString.find(".scaling.localhost:1337");
+    if (endPos != std::string::npos) {
+      std::string::size_type startPos = decoder->mhostString.find("total");
+      std::string i(decoder->mhostString.substr(startPos, endPos - startPos));
+      tag += "scaling(" + i + ")";
+    } 
+  }
+  printf("Capture_Time:%s,%llu,%llu|\n", tag.c_str(), invJpeg, diff);
   invJpeg++;
 
   // This function shouldn't be called if we ran into an error we didn't

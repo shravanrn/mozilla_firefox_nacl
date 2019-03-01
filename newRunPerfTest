@@ -28,9 +28,9 @@ if [[ ! -z "$4" ]]; then
 	fi
 fi
 
-FFVersionsDir=("../../mozilla_firefox_stock/" "./" "./" "./" "./" "./")
-FFVersionsSuffix=("_stock" "" "" "" "" "")
-FFVersions=("static" "static" "static_buffcopy" "nacl" "new_nacl_cpp" "new_ps_cpp")
+FFVersionsDir=("../../mozilla_firefox_stock/" "./" "./" "./" "./")
+FFVersionsSuffix=("_stock" "" "" "" "")
+FFVersions=("static" "static_buffcopy" "nacl" "new_nacl_cpp" "new_ps_cpp")
 
 if [ ${#FFVersionsDir[@]} -ne ${#FFVersions[@]} ]; then
 	echo "Versions Dir and Versions do not match";
@@ -61,6 +61,8 @@ function runTest(){
 	sleep 2
 	taskset -c ${PINCORE} ./mach talos-test --suite rlbox_test 2>&1 | tee "$1_terminal_output.txt"
 	sleep 2
+	taskset -c ${PINCORE} ./mach talos-test --suite rlbox_scaling 2>&1 | tee "$1_scaling_terminal_output.txt"
+	sleep 2
 	mv ./testing/mozharness/build/local.json "$1_page_render.json"
 }
 
@@ -78,4 +80,5 @@ sleep 2
 
 for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
 	./newAnalyzePerf.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_output.txt" 2>&1 >> "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_analysis.txt"
+	./newAnalyzePerf.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_scaling_terminal_output.txt" 2>&1 >> "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_scaling_terminal_analysis.txt"
 done

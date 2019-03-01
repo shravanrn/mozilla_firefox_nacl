@@ -129,7 +129,7 @@ private:
   friend class DecoderFactory;
 
   // Decoders should only be instantiated via DecoderFactory.
-  nsJPEGDecoder(RasterImage* aImage, Decoder::DecodeStyle aDecodeStyle);
+  nsJPEGDecoder(RasterImage* aImage, Decoder::DecodeStyle aDecodeStyle, RasterImage* aImageExtra);
 
   enum class State
   {
@@ -144,6 +144,7 @@ private:
 
 public:
 
+  std::string mhostString;
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     // std::once_flag rlbox_jpeg_init;
     // RLBoxSandbox<TRLSandbox>* rlbox_jpeg;

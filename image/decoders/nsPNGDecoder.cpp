@@ -534,7 +534,7 @@ extern "C" void SandboxOnFirefoxExiting_PNGDecoder()
 const uint8_t
 nsPNGDecoder::pngSignatureBytes[] = { 137, 80, 78, 71, 13, 10, 26, 10 };
 
-nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
+nsPNGDecoder::nsPNGDecoder(RasterImage* aImage, RasterImage* aImageExtra)
  : Decoder(aImage)
  , onRendererThread(false)
  , mLexer(Transition::ToUnbuffered(State::FINISHED_PNG_DATA,
@@ -562,7 +562,7 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
   #endif
 {
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-        std::string hostString = getHostStringFromImage(aImage);
+        std::string hostString = getHostStringFromImage(aImage != nullptr? aImage : aImageExtra);
         rlbox_sbx_shared = pngSandboxManager.createSandbox(hostString);
         rlbox_sbx = rlbox_sbx_shared.get();
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
