@@ -655,7 +655,9 @@ nsPNGDecoder::~nsPNGDecoder()
   }
   #if defined(PS_SANDBOX_USE_NEW_CPP_API)
   if (PngSbxActivated){
+    #if !defined(PS_SANDBOX_DONT_USE_SPIN)
     (rlbox_png->getSandbox())->makeInactiveSandbox();
+    #endif
     PngSbxActivated = false;
   }
   #endif
@@ -1822,7 +1824,9 @@ nsPNGDecoder::FinishedPNGData()
       // };
       // ActiveRAIIWrapper procSbxActivation(IsMetadataDecode()? nullptr : );
       if (!decoder->IsMetadataDecode()){
+        #if !defined(PS_SANDBOX_DONT_USE_SPIN)
         (rlbox_png->getSandbox())->makeActiveSandbox();
+        #endif
         decoder->PngSbxActivated = true;
       }
     #endif

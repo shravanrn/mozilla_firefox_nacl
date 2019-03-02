@@ -905,7 +905,9 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
       ActiveRAIIWrapper(JPEGProcessSandbox* ps) : s(ps) { s->makeActiveSandbox(); }
       ~ActiveRAIIWrapper() { s->makeInactiveSandbox(); }
     };
+    #if !defined(PS_SANDBOX_DONT_USE_SPIN)
     ActiveRAIIWrapper procSbxActivation(rlbox_jpeg->getSandbox());
+    #endif
   #endif
   //printf("FF Flag ReadJPEGData\n");
   mSegment = reinterpret_cast<const JOCTET*>(aData);

@@ -28,9 +28,9 @@ if [[ ! -z "$4" ]]; then
 	fi
 fi
 
-FFVersionsDir=("../../mozilla_firefox_stock/" "./" "./" "./" "./")
-FFVersionsSuffix=("_stock" "" "" "" "")
-FFVersions=("static" "static_buffcopy" "nacl" "new_nacl_cpp" "new_ps_cpp")
+FFVersionsDir=("../../mozilla_firefox_stock/" "./" "./" "./" "./" "./")
+FFVersionsSuffix=("_stock" "" "" "" "" "")
+FFVersions=("static" "static_buffcopy" "nacl" "new_nacl_cpp" "new_ps_cpp" "new_ps_cpp_mutex")
 
 if [ ${#FFVersionsDir[@]} -ne ${#FFVersions[@]} ]; then
 	echo "Versions Dir and Versions do not match";
@@ -71,7 +71,7 @@ SAVEDDIR=$PWD
 for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
 	cd ${FFVersionsDir[$j]}
 	cp "mozconfig${Pl}_${FFVersions[$j]}" mozconfig
-
+	-pkill -f ProcessSandbox_otherside
 	runTest "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}"
 	cd $SAVEDDIR
 done
