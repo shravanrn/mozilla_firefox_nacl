@@ -71,7 +71,7 @@ SAVEDDIR=$PWD
 for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
 	cd ${FFVersionsDir[$j]}
 	cp "mozconfig${Pl}_${FFVersions[$j]}" mozconfig
-	-pkill -f ProcessSandbox_otherside
+	pkill -f ProcessSandbox_otherside
 	runTest "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}"
 	cd $SAVEDDIR
 done

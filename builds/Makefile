@@ -310,6 +310,11 @@ run64_newpscpp:
 	$(CP) ../mozconfig64_new_ps_cpp ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
+run64_newpscppmutex:
+	-pkill -f ProcessSandbox_otherside
+	$(CP) ../mozconfig64_new_ps_cpp_mutex ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png$
+
 run64_nacl_nosimd:
 	$(CP) ../mozconfig64_nacl_nosimd ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
