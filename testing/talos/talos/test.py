@@ -775,7 +775,7 @@ class jpeg_page_render(PageloaderTest):
     tpmanifest = '${talos}/tests/jpeg_page_render/jpeg_page_render.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 1000
+    tppagecycles = 5000
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -790,7 +790,7 @@ class png_page_render(PageloaderTest):
     tpmanifest = '${talos}/tests/png_page_render/png_page_render.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 1000
+    tppagecycles = 5000
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -805,7 +805,7 @@ class zlib_page_render(PageloaderTest):
     tpmanifest = '${talos}/tests/zlib_page_render/zlib_page_render.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 200
+    tppagecycles = 1000
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -820,7 +820,39 @@ class jpeg_scaling_1(PageloaderTest):
     tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 25
+    tppagecycles = 250
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 3000
+
+
+class jpeg_scaling_1_1(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_1.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 250
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 3000
+
+
+class jpeg_scaling_1_2(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_2.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 250
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -836,7 +868,7 @@ class jpeg_scaling_2(PageloaderTest):
     tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_2.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 25
+    tppagecycles = 50
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -852,7 +884,7 @@ class jpeg_scaling_3(PageloaderTest):
     tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_3.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 25
+    tppagecycles = 50
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -868,7 +900,7 @@ class jpeg_scaling_4(PageloaderTest):
     tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_4.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 25
+    tppagecycles = 50
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -884,7 +916,7 @@ class jpeg_scaling_5(PageloaderTest):
     tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_5.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 25
+    tppagecycles = 50
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -900,7 +932,7 @@ class jpeg_scaling_6(PageloaderTest):
     tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_6.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 25
+    tppagecycles = 50
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -916,7 +948,7 @@ class jpeg_scaling_7(PageloaderTest):
     tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_7.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 25
+    tppagecycles = 50
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000

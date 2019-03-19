@@ -72,7 +72,7 @@
             "tests": ["jpeg_page_render", "png_page_render", "zlib_page_render"]
         },
         "rlbox_scaling": {
-            "tests": ["jpeg_scaling_1", "jpeg_scaling_2", "jpeg_scaling_3", "jpeg_scaling_4", "jpeg_scaling_5", "jpeg_scaling_6", "jpeg_scaling_7"]
+            "tests": ["jpeg_scaling_1", "jpeg_scaling_1_1", "jpeg_scaling_1_2", "jpeg_scaling_2", "jpeg_scaling_3", "jpeg_scaling_4", "jpeg_scaling_5", "jpeg_scaling_6", "jpeg_scaling_7"]
         },
         "svgr-e10s": {
             "tests": ["tsvgx", "tsvgr_opacity", "tart", "tscrollx", "tsvg_static"]
