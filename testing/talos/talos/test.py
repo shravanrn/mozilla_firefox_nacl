@@ -775,7 +775,7 @@ class jpeg_page_render(PageloaderTest):
     tpmanifest = '${talos}/tests/jpeg_page_render/jpeg_page_render.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 5000
+    tppagecycles = 4000
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -790,7 +790,7 @@ class png_page_render(PageloaderTest):
     tpmanifest = '${talos}/tests/png_page_render/png_page_render.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 5000
+    tppagecycles = 4000
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -820,7 +820,55 @@ class jpeg_scaling_1(PageloaderTest):
     tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 250
+    tppagecycles = 4000
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 1000
+
+@register_test()
+class jpeg_scaling_1_1(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_1.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 2000
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 1000
+
+@register_test()
+class jpeg_scaling_1_2(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_2.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 1300
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 1000
+
+@register_test()
+class jpeg_scaling_1_3(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_3.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 800
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -828,12 +876,28 @@ class jpeg_scaling_1(PageloaderTest):
     unit = 'ms'
     tpdelay = 3000
 
-
-class jpeg_scaling_1_1(PageloaderTest):
+@register_test()
+class jpeg_scaling_1_4(PageloaderTest):
     """
     Test the scaling of sandbox creation of jpeg 1
     """
-    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_1.manifest'
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_4.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 550
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    tpdelay = 3000
+
+@register_test()
+class jpeg_scaling_1_5(PageloaderTest):
+    """
+    Test the scaling of sandbox creation of jpeg 1
+    """
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_5.manifest'
     tpcycles = 1
     tploadnocache = True
     tppagecycles = 250
@@ -844,12 +908,12 @@ class jpeg_scaling_1_1(PageloaderTest):
     unit = 'ms'
     tpdelay = 3000
 
-
-class jpeg_scaling_1_2(PageloaderTest):
+@register_test()
+class jpeg_scaling_1_6(PageloaderTest):
     """
     Test the scaling of sandbox creation of jpeg 1
     """
-    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_2.manifest'
+    tpmanifest = '${talos}/tests/jpeg_scaling/jpeg_scaling_1_6.manifest'
     tpcycles = 1
     tploadnocache = True
     tppagecycles = 250
