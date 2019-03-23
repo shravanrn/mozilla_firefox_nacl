@@ -781,6 +781,7 @@ class jpeg_page_render(PageloaderTest):
     gecko_profile_entries = 10000000
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
+    timeout = 72000
 
 @register_test()
 class png_page_render(PageloaderTest):
@@ -796,6 +797,7 @@ class png_page_render(PageloaderTest):
     gecko_profile_entries = 10000000
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
+    timeout = 72000
 
 @register_test()
 class zlib_page_render(PageloaderTest):
@@ -811,6 +813,7 @@ class zlib_page_render(PageloaderTest):
     gecko_profile_entries = 10000000
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_1(PageloaderTest):
@@ -827,6 +830,7 @@ class jpeg_scaling_1(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 1000
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_1_1(PageloaderTest):
@@ -843,6 +847,7 @@ class jpeg_scaling_1_1(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 1000
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_1_2(PageloaderTest):
@@ -859,6 +864,7 @@ class jpeg_scaling_1_2(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 1000
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_1_3(PageloaderTest):
@@ -875,6 +881,7 @@ class jpeg_scaling_1_3(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 3000
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_1_4(PageloaderTest):
@@ -891,6 +898,7 @@ class jpeg_scaling_1_4(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 3000
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_1_5(PageloaderTest):
@@ -907,6 +915,7 @@ class jpeg_scaling_1_5(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 3000
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_1_6(PageloaderTest):
@@ -923,6 +932,7 @@ class jpeg_scaling_1_6(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 3000
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_2(PageloaderTest):
@@ -939,6 +949,7 @@ class jpeg_scaling_2(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 3000
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_3(PageloaderTest):
@@ -955,6 +966,7 @@ class jpeg_scaling_3(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 5000
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_4(PageloaderTest):
@@ -971,6 +983,7 @@ class jpeg_scaling_4(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 9000
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_5(PageloaderTest):
@@ -987,6 +1000,7 @@ class jpeg_scaling_5(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 9000
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_6(PageloaderTest):
@@ -1003,6 +1017,7 @@ class jpeg_scaling_6(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 9000
+    timeout = 72000
 
 @register_test()
 class jpeg_scaling_7(PageloaderTest):
@@ -1019,6 +1034,7 @@ class jpeg_scaling_7(PageloaderTest):
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
     tpdelay = 9000
+    timeout = 72000
 
 @register_test()
 class jpeg_page_render_25(PageloaderTest):
@@ -1034,6 +1050,7 @@ class jpeg_page_render_25(PageloaderTest):
     gecko_profile_entries = 10000000
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
+    timeout = 72000
 
 @register_test()
 class jpeg_page_render_50(PageloaderTest):
@@ -1049,6 +1066,7 @@ class jpeg_page_render_50(PageloaderTest):
     gecko_profile_entries = 10000000
     filters = filter.ignore_first.prepare(5) + filter.median.prepare()
     unit = 'ms'
+    timeout = 72000
 
 @register_test()
 class tscrollx(PageloaderTest):
