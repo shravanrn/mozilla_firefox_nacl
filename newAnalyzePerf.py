@@ -28,18 +28,18 @@ def addTestValue(s, group, val):
     s.timings[group].append(float(val))
 
 def handle_line(line, s):
-	if "Capture_Time:" in line:
-		fragment = line.split('Capture_Time:')[1].split('|')[0]
-		group = fragment.split(',')[0]
-		index = fragment.split(',')[1]
-		val = fragment.split(',')[2]
-		addTestValue(s, group, val)
+    if "Capture_Time:" in line:
+        fragment = line.split('Capture_Time:')[1].split('|')[0]
+        group = fragment.split(',')[0]
+        index = fragment.split(',')[1]
+        val = fragment.split(',')[2]
+        addTestValue(s, group, val)
 
-	return s
+    return s
 
 
 def average(list):
-	return float(sum(list))/len(list)
+    return float(sum(list))/len(list)
 
 
 def median(list):
@@ -52,24 +52,35 @@ def median(list):
             return sum(sorted(list)[n//2-1:n//2+1])/2.0
 
 def print_final_results(s):
-	for group, times in s.timings.items():
-		print("Group: " + group)
+    print('{ "data" : [')
+    first = True
+    for group, times in s.timings.items():
+        if first:
+            first = False
+        else:
+            print(',')
+        print("{")
 
-		print("Times: " + str(times))
-		timeList = times[5:] #filter first 5
-		print("Filtered Times: " + str(timeList))
+        print('  "Group": "' + group + '",')
 
-		avg = average(timeList)
-		print("Average: " + str("{0:,.2f}".format(avg)))
+        print('  "Times": ' + str(times) + ",")
+        timeList = times[5:] #filter first 5
+        print('  "Filtered Times": ' + str(timeList) + ",")
 
-		variance = list(map(lambda x: (x - avg)**2, timeList))
-		stdDev = math.sqrt(average(variance))
-		print("StdDev: " + str("{0:,.2f}".format(stdDev)))
+        avg = average(timeList)
+        print('  "Average": "' + str("{0:,.2f}".format(avg)) + '",')
 
-		m = median(timeList)
-		print("Median: " + str("{0:,.2f}".format(m)))
+        variance = list(map(lambda x: (x - avg)**2, timeList))
+        stdDev = math.sqrt(average(variance))
+        print('  "StdDev": "' + str("{0:,.2f}".format(stdDev)) + '",')
 
-		print()
+        m = median(timeList)
+        print('  "Median": "' + str("{0:,.2f}".format(m)) + '"')
+
+        print("}")
+
+    print("]}")
+
 
 def main():
     if len(sys.argv) < 2:

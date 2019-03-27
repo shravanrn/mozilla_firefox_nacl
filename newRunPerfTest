@@ -16,7 +16,6 @@ fi
 OUTPUTPATH=$(cd "$(dirname "$1")"; pwd)/$(basename "$1")
 mkdir -p ${OUTPUTPATH}
 cd "$(dirname "$0")"
-PINCORE=1
 Pl="64"
 
 if [[ ! -z "$4" ]]; then
@@ -31,6 +30,9 @@ fi
 FFVersionsDir=("../../mozilla_firefox_stock/" "./" "./" "./" "./" "./")
 FFVersionsSuffix=("_stock" "" "" "" "" "")
 FFVersions=("static" "static_buffcopy" "nacl" "new_nacl_cpp" "new_ps_cpp" "new_ps_cpp_mutex")
+#Process tests are pinned to one core, process sandbox launches on the other core
+FFPinCores=("1" "1" "1" "1" "1" "1")
+
 
 if [ ${#FFVersionsDir[@]} -ne ${#FFVersions[@]} ]; then
 	echo "Versions Dir and Versions do not match";
@@ -39,6 +41,11 @@ fi
 
 if [ ${#FFVersionsSuffix[@]} -ne ${#FFVersions[@]} ]; then
 	echo "Versions Suffix and Versions do not match";
+	exit 1;
+fi
+
+if [ ${#FFPinCores[@]} -ne ${#FFVersions[@]} ]; then
+	echo "Pin Cores and Versions do not match";
 	exit 1;
 fi
 
@@ -55,13 +62,14 @@ echo "2. Run the zlib testing server with node server.js"
 
 
 # param: outputDir/prefix
+# param: cores
 function runTest(){
 	rm -f ./testing/mozharness/build/local.json
 	#sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 	sleep 2
-	taskset -c ${PINCORE} ./mach talos-test --suite rlbox_test 2>&1 | tee "$1_terminal_output.txt"
+	taskset -c $2 ./mach talos-test --suite rlbox_test 2>&1 | tee "$1_terminal_output.txt"
 	sleep 2
-	taskset -c ${PINCORE} ./mach talos-test --suite rlbox_scaling 2>&1 | tee "$1_scaling_terminal_output.txt"
+	taskset -c $2 ./mach talos-test --suite rlbox_scaling 2>&1 | tee "$1_scaling_terminal_output.txt"
 	sleep 2
 	mv ./testing/mozharness/build/local.json "$1_page_render.json"
 }
@@ -72,13 +80,13 @@ for (( j = 0; j < ${#FFVersions[@]}; j++ )); do
 	cd ${FFVersionsDir[$j]}
 	cp "mozconfig${Pl}_${FFVersions[$j]}" mozconfig
 	pkill -f ProcessSandbox_otherside
-	runTest "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}"
+	runTest "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}" "${FFPinCores[$j]}"
 	cd $SAVEDDIR
 done
 
 sleep 2
 
 for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
-	./newAnalyzePerf.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_output.txt" 2>&1 >> "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_analysis.txt"
-	./newAnalyzePerf.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_scaling_terminal_output.txt" 2>&1 >> "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_scaling_terminal_analysis.txt"
+	./newAnalyzePerf.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_output.txt" 2>&1 >> "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_analysis.json"
+	./newAnalyzePerf.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_scaling_terminal_output.txt" 2>&1 >> "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_scaling_terminal_analysis.json"
 done
