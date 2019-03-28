@@ -190,6 +190,24 @@ nsIPrincipal* GetCurrentImageRequestPrincipal();
 namespace mozilla {
 namespace image {
 
+inline std::string getImageURIString(RasterImage* aImage)
+{
+  ImageURL* imageURI = nullptr;
+
+  //Try to retrieve the image URI from the ImageDecoder request
+  if(aImage != nullptr) { 
+    imageURI = aImage->GetURI();
+  }
+
+  //if still null bail out - empty string causes the use of a temporary sandbox
+  if(imageURI == nullptr) { return ""; }
+
+  nsCString spec;
+  nsresult rv = imageURI->GetSpec(spec);
+  std::string ret = spec.get();
+  return ret;
+}
+
 inline std::string getHostStringFromImage(RasterImage* aImage)
 {
   ImageURL* imageURI = nullptr;

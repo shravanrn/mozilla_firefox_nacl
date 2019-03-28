@@ -598,7 +598,7 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
  , mDecodeStyle(aDecodeStyle)
 {
   //printf("FF Flag nsJPEGDecoder\n");
-
+  mImageString = getImageURIString(aImage != nullptr? aImage : aImageExtra);
   mhostString = getHostStringFromImage(aImage != nullptr? aImage : aImageExtra);
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     rlbox_sbx_shared = jpegSandboxManager.createSandbox(mhostString);
@@ -2599,16 +2599,17 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
   #endif
 
   auto diff = decoder->JpegBench.StopAndFinish();
-  std::string tag = "JPEG_destroy";
-  {
-    //http://host61.total70.scaling.localhost:1337/img.jpeg
-    std::string::size_type endPos = decoder->mhostString.find(".scaling.localhost:1337");
-    if (endPos != std::string::npos) {
-      std::string::size_type startPos = decoder->mhostString.find("total");
-      std::string i(decoder->mhostString.substr(startPos, endPos - startPos));
-      tag += "scaling(" + i + ")";
-    } 
-  }
+  std::string tag = "JPEG_destroy(" + decoder->mImageString + ")";
+  // std::string tag = "JPEG_destroy";
+  // {
+  //   //http://host61.total70.scaling.localhost:1337/img.jpeg
+  //   std::string::size_type endPos = decoder->mhostString.find(".scaling.localhost:1337");
+  //   if (endPos != std::string::npos) {
+  //     std::string::size_type startPos = decoder->mhostString.find("total");
+  //     std::string i(decoder->mhostString.substr(startPos, endPos - startPos));
+  //     tag += "scaling(" + i + ")";
+  //   } 
+  // }
   printf("Capture_Time:%s,%llu,%llu|\n", tag.c_str(), invJpeg, diff);
   invJpeg++;
 

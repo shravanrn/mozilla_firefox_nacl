@@ -144,6 +144,7 @@ private:
 
 public:
 
+  std::string mImageString;
   std::string mhostString;
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     // std::once_flag rlbox_jpeg_init;

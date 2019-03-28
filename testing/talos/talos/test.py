@@ -784,6 +784,22 @@ class jpeg_page_render(PageloaderTest):
     timeout = 72000
 
 @register_test()
+class jpeg_perf(PageloaderTest):
+    """
+    Test the time taken to render jpeg images of different quality
+    """
+    tpmanifest = '${talos}/tests/jpeg_perf/tests.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 1000
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    timeout = 720000
+
+@register_test()
 class png_page_render(PageloaderTest):
     """
     Test the time taken to render 1 png image
