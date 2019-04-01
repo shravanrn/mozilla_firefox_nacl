@@ -39,13 +39,16 @@ def handle_line(line, s):
 
 
 def average(list):
-    return float(sum(list))/len(list)
+    n = len(list)
+    if n < 1:
+            return 0
+    return float(sum(list))/n
 
 
 def median(list):
     n = len(list)
     if n < 1:
-            return None
+            return 0
     if n % 2 == 1:
             return sorted(list)[n//2]
     else:
