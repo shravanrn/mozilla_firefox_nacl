@@ -203,7 +203,7 @@ inline std::string getImageURIString(RasterImage* aImage)
   if(imageURI == nullptr) { return ""; }
 
   nsCString spec;
-  nsresult rv = imageURI->GetSpec(spec);
+  imageURI->GetSpec(spec);
   std::string ret = spec.get();
   return ret;
 }
@@ -361,6 +361,8 @@ private:
   size_t mLastChunkLength;
 
 public:
+  std::string mImageString;
+
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     // RLBoxSandbox<TRLSandboxP>* rlbox_png = nullptr;
     // std::once_flag rlbox_png_init;

@@ -559,6 +559,7 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage, RasterImage* aImageExtra)
  , PngSbxActivated(false)
   #endif
 {
+    mImageString = getImageURIString(aImage != nullptr? aImage : aImageExtra);
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         std::string hostString = getHostStringFromImage(aImage != nullptr? aImage : aImageExtra);
         rlbox_sbx_shared = pngSandboxManager.createSandbox(hostString);
@@ -2617,7 +2618,8 @@ nsPNGDecoder::FinishInternal()
   if(!PngMaybeTooSmall)
   {
     auto diff = PngBench.JustFinish();
-    printf("Capture_Time:PNG_destroy,%llu,%llu|\n", invPng, diff);
+    std::string tag = "PNG_destroy(" + mImageString + ")";
+    printf("Capture_Time:%s,%llu,%llu|\n", tag.c_str(), invPng, diff);
     invPng++;
   }
 

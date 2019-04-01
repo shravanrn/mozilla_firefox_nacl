@@ -791,7 +791,24 @@ class jpeg_perf(PageloaderTest):
     tpmanifest = '${talos}/tests/jpeg_perf/tests.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 1000
+    tppagecycles = 4000
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    timeout = 720000
+
+
+@register_test()
+class png_perf(PageloaderTest):
+    """
+    Test the time taken to render png images of different quality
+    """
+    tpmanifest = '${talos}/tests/png_perf/tests.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 4000
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
