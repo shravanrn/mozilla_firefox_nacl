@@ -30,9 +30,8 @@ fi
 FFVersionsDir=("../../mozilla_firefox_stock/" "./" "./" "./" "./" "./")
 FFVersionsSuffix=("_stock" "" "" "" "" "")
 FFVersions=("static" "static_buffcopy" "nacl" "new_nacl_cpp" "new_ps_cpp" "new_ps_cpp_mutex")
-#Process tests are pinned to one core, process sandbox launches on the other core
-FFPinCores=("1" "1" "1" "1" "1" "1")
-
+#Process sbx is pinned to core 3. process-spin firefox is on separate core --- core 1, while process mutex is on the same core 3
+FFPinCores=("1" "1" "1" "1" "1" "3")
 
 if [ ${#FFVersionsDir[@]} -ne ${#FFVersions[@]} ]; then
 	echo "Versions Dir and Versions do not match";
@@ -67,10 +66,21 @@ function runTest(){
 	rm -f ./testing/mozharness/build/local.json
 	#sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 	sleep 2
+
 	taskset -c $2 ./mach talos-test --suite rlbox_test 2>&1 | tee "$1_terminal_output.txt"
+	retVal=${PIPESTATUS[0]}
+	if [ $retVal -ne 0 ]; then
+		exit 1
+	fi
 	sleep 2
+
 	taskset -c $2 ./mach talos-test --suite rlbox_scaling 2>&1 | tee "$1_scaling_terminal_output.txt"
+	retVal=${PIPESTATUS[0]}
+	if [ $retVal -ne 0 ]; then
+		exit 1
+	fi
 	sleep 2
+
 	mv ./testing/mozharness/build/local.json "$1_page_render.json"
 }
 
