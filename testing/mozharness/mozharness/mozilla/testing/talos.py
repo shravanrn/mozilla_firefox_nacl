@@ -655,7 +655,7 @@ class Talos(TestingMixin, MercurialScript, BlobUploadMixin, TooltoolMixin,
                 env['STYLO_THREADS'] = '1'
 
         # sets a timeout for how long talos should run without output
-        output_timeout = self.config.get('talos_output_timeout', 360000)
+        output_timeout = self.config.get('talos_output_timeout', 3600)
         # run talos tests
         run_tests = os.path.join(self.talos_path, 'talos', 'run_tests.py')
 
