@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cmath>
+#include <limits>
 #include <type_traits>
 #include <sys/syscall.h>
 #include "gfxColor.h"
@@ -90,6 +91,36 @@ using std::min;
   // RLBoxSandbox<TRLSandboxP>* rlbox_png = nullptr;
 #endif
 
+  //helper structs so that we don't have to malloc multiple times
+  struct png_get_iCCP_params {
+    png_uint_32 profileLen;
+    png_bytep profileData;
+    png_charp profileName;
+    int compression;
+  };
+
+  struct png_get_cHRM_And_gAMA_params {
+    qcms_CIE_xyYTRIPLE primaries;
+    qcms_CIE_xyY whitePoint;
+    double gammaOfFile;
+  };
+
+  struct png_get_IHDR_params {
+    png_uint_32 width;
+    png_uint_32 height;
+    int bit_depth;
+    int color_type;
+    int interlace_type;
+    int compression_type;
+    int filter_type;
+  };
+
+  struct png_get_tRNS_params {
+    png_bytep trans;
+    png_color_16p trans_values;
+    int num_trans;
+  };
+
 #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   #include "pngstruct.h"
   #include "pnginfo.h"
@@ -136,6 +167,7 @@ using std::min;
      unsigned int for_write       ; /* Otherwise it is a read structure */
      unsigned int owned_file      ; /* We own the file in io_ptr */
   } png_control;
+
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     rlbox_load_library_api(pnglib, TRLSandboxP)
   #else
@@ -624,6 +656,8 @@ nsPNGDecoder::~nsPNGDecoder()
       *new_mInfo_Loc = mInfo;
 
       sandbox_invoke_custom(rlbox_png, png_destroy_read_struct, new_mPNG_Loc, mInfo != nullptr? new_mInfo_Loc : nullptr, nullptr);
+      rlbox_png->freeInSandbox(new_mPNG_Loc);
+      rlbox_png->freeInSandbox(new_mInfo_Loc);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       auto new_mPNG_Loc = newInSandbox<png_structp>(pngSandbox);
       *new_mPNG_Loc = mPNG;
@@ -640,6 +674,8 @@ nsPNGDecoder::~nsPNGDecoder()
       *new_mInfo_Loc = (png_infop)getSandboxedPngPtr((uintptr_t)mInfo);
 
       d_png_destroy_read_struct(new_mPNG_Loc, mInfo ? new_mInfo_Loc : nullptr, nullptr);
+      freeInPngSandbox(new_mPNG_Loc);
+      freeInPngSandbox(new_mInfo_Loc);
     #endif
   }
   if (mCMSLine) {
@@ -935,6 +971,7 @@ nsPNGDecoder::InitInternal()
       auto new_mPNG_Loc = rlbox_png->mallocInSandbox<png_structp>();
       *new_mPNG_Loc = mPNG;
       sandbox_invoke_custom(rlbox_png, png_destroy_read_struct, new_mPNG_Loc, nullptr, nullptr);
+      rlbox_png->freeInSandbox(new_mPNG_Loc);
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       auto new_mPNG_Loc = newInSandbox<png_structp>(pngSandbox);
       *new_mPNG_Loc = mPNG;
@@ -943,6 +980,7 @@ nsPNGDecoder::InitInternal()
       png_structp* new_mPNG_Loc = (png_structp*) mallocInPngSandbox(sizeof(png_structp));
       *new_mPNG_Loc = (png_structp)getSandboxedPngPtr((uintptr_t)mPNG);
       d_png_destroy_read_struct(new_mPNG_Loc, nullptr, nullptr);
+      freeInPngSandbox(new_mPNG_Loc);
     #endif
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -1143,6 +1181,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
     sandbox_invoke_custom(rlbox_png, png_process_data, mPNG, mInfo,
                    sandbox_reinterpret_cast<unsigned char*>(aData_sandbox),
                    aLength);
+    rlbox_png->freeInSandbox(aData_sandbox);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     sandbox_invoke_custom(pngSandbox, png_process_data, mPNG, mInfo,
                    reinterpret_cast<unsigned char*>(const_cast<char*>((aData_sandbox))),
@@ -1151,6 +1190,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
     d_png_process_data(mPNG, mInfo,
                    reinterpret_cast<unsigned char*>(const_cast<char*>((aData_sandbox))),
                    aLength);
+    freeInPngSandbox(aData_sandbox);
   #endif
   PngBench.Stop();
 
@@ -1210,6 +1250,7 @@ nsPNGDecoder::FinishedPNGData()
     } else {
       sandbox_invoke_custom(rlbox_png, png_set_gamma, png_ptr, 2.2, 0.45455);
     }
+    rlbox_png->freeInSandbox(p_aGamma);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
 
     auto p_aGamma = newInSandbox<double>(pngSandbox);
@@ -1248,6 +1289,7 @@ nsPNGDecoder::FinishedPNGData()
     } else {
       d_png_set_gamma(png_ptr, 2.2, 0.45455);
     }
+    freeInPngSandbox(p_aGamma);
   #endif
 }
 
@@ -1277,19 +1319,16 @@ nsPNGDecoder::FinishedPNGData()
   ) {
 
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-      auto p_profileLen  = rlbox_png->mallocInSandbox<png_uint_32>();
-      auto p_profileData = rlbox_png->mallocInSandbox<png_bytep>();
-      auto p_profileName = rlbox_png->mallocInSandbox<png_charp>();
-      auto p_compression = rlbox_png->mallocInSandbox<int>();
+      auto p_params = rlbox_png->mallocInSandbox<png_get_iCCP_params>();
 
-      sandbox_invoke_custom(rlbox_png, png_get_iCCP, png_ptr, info_ptr, p_profileName, p_compression,
-                   p_profileData, p_profileLen);
+      sandbox_invoke_custom(rlbox_png, png_get_iCCP, png_ptr, info_ptr, &(p_params->profileName), &(p_params->compression),
+                   &(p_params->profileData), &(p_params->profileLen));
 
-      png_uint_32 profileLen = p_profileLen.copyAndVerify([](png_uint_32* pVal){
-        return *pVal;
+      png_uint_32 profileLen = p_params->profileLen.copyAndVerify([](png_uint_32 pVal){
+        return pVal;
       });
 
-      png_bytep profileData = (*p_profileData).copyAndVerifyArray(rlbox_png, [](png_bytep val){
+      png_bytep profileData = p_params->profileData.copyAndVerifyArray(rlbox_png, [](png_bytep val){
           return RLBox_Verify_Status::SAFE;
         }, profileLen, nullptr);
 
@@ -1297,6 +1336,8 @@ nsPNGDecoder::FinishedPNGData()
       {
         printf("Sbox - profileData array invalid value\n"); abort();
       }
+
+      rlbox_png->freeInSandbox(p_params);
 
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       auto p_profileLen  = newInSandbox<png_uint_32>(pngSandbox);
@@ -1320,16 +1361,15 @@ nsPNGDecoder::FinishedPNGData()
         printf("Sbox - profileData array invalid value\n"); abort();
       }
     #else
-      png_uint_32* p_profileLen = (png_uint_32*) mallocInPngSandbox(sizeof(png_uint_32));
-      png_bytep* p_profileData = (png_bytep*) mallocInPngSandbox(sizeof(png_bytep));
-      png_charp* p_profileName = (png_charp*) mallocInPngSandbox(sizeof(png_charp));
-      int* p_compression = (int*) mallocInPngSandbox(sizeof(int));
+      auto p_params = (png_get_iCCP_params*)mallocInPngSandbox(sizeof(png_get_iCCP_params));
 
-      d_png_get_iCCP(png_ptr, info_ptr, p_profileName, p_compression,
-                   p_profileData, p_profileLen);
+      d_png_get_iCCP(png_ptr, info_ptr, &(p_params->profileName), &(p_params->compression),
+                   &(p_params->profileData), &(p_params->profileLen));
 
-      png_uint_32 profileLen = (png_uint_32) getUnsandboxedPngPtr((uintptr_t)*p_profileLen);
-      png_bytep profileData  = (png_bytep)   getUnsandboxedPngPtr((uintptr_t)*p_profileData);
+      png_uint_32 profileLen = (png_uint_32) p_params->profileLen;
+      png_bytep profileData  = (png_bytep)   getUnsandboxedPngPtr((uintptr_t)p_params->profileData);
+
+      freeInPngSandbox(p_params);
     #endif
 
     profile = qcms_profile_from_memory((char*)profileData, profileLen);
@@ -1390,6 +1430,8 @@ nsPNGDecoder::FinishedPNGData()
           printf("Sbox - fileIntent value out of range\n");
           return 0;
         });
+
+        rlbox_png->freeInSandbox(p_fileIntent);
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
         auto p_fileIntent = newInSandbox<int>(pngSandbox);
 
@@ -1407,7 +1449,8 @@ nsPNGDecoder::FinishedPNGData()
         d_png_set_gray_to_rgb(png_ptr);
         d_png_get_sRGB(png_ptr, info_ptr, p_fileIntent);
 
-        int& fileIntent = *p_fileIntent;
+        int fileIntent = *p_fileIntent;
+        freeInPngSandbox(p_fileIntent);
       #endif
       uint32_t map[] = { QCMS_INTENT_PERCEPTUAL,
                          QCMS_INTENT_RELATIVE_COLORIMETRIC,
@@ -1441,14 +1484,13 @@ nsPNGDecoder::FinishedPNGData()
   )
   {
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-      auto p_primaries  = rlbox_png->mallocInSandbox<qcms_CIE_xyYTRIPLE>();
-      auto p_whitePoint = rlbox_png->mallocInSandbox<qcms_CIE_xyY>();
+      auto p_params = rlbox_png->mallocInSandbox<png_get_cHRM_And_gAMA_params>();
 
       sandbox_invoke_custom(rlbox_png, png_get_cHRM, png_ptr, info_ptr,
-                   &(p_whitePoint->x), &(p_whitePoint->y),
-                   &(p_primaries->red.x),   &(p_primaries->red.y),
-                   &(p_primaries->green.x), &(p_primaries->green.y),
-                   &(p_primaries->blue.x),  &(p_primaries->blue.y));
+                   &(p_params->whitePoint.x), &(p_params->whitePoint.y),
+                   &(p_params->primaries.red.x),   &(p_params->primaries.red.y),
+                   &(p_params->primaries.green.x), &(p_params->primaries.green.y),
+                   &(p_params->primaries.blue.x),  &(p_params->primaries.blue.y));
 
       auto qcms_CIE_xyY_Verifier = [](tainted<qcms_CIE_xyY, TRLSandboxP>* val) { 
         qcms_CIE_xyY ret;
@@ -1458,9 +1500,9 @@ nsPNGDecoder::FinishedPNGData()
         return ret; 
       };
 
-      qcms_CIE_xyY whitePoint = p_whitePoint.copyAndVerify(qcms_CIE_xyY_Verifier);
+      qcms_CIE_xyY whitePoint = (&(p_params->whitePoint)).copyAndVerify(qcms_CIE_xyY_Verifier);
 
-      qcms_CIE_xyYTRIPLE primaries = p_primaries.copyAndVerify([&qcms_CIE_xyY_Verifier](tainted<qcms_CIE_xyYTRIPLE, TRLSandboxP>* val) { 
+      qcms_CIE_xyYTRIPLE primaries = (&(p_params->primaries)).copyAndVerify([&qcms_CIE_xyY_Verifier](tainted<qcms_CIE_xyYTRIPLE, TRLSandboxP>* val) { 
         qcms_CIE_xyYTRIPLE ret;
         ret.red   = qcms_CIE_xyY_Verifier(&val->red);
         ret.green = qcms_CIE_xyY_Verifier(&val->green);
@@ -1471,19 +1513,19 @@ nsPNGDecoder::FinishedPNGData()
       whitePoint.Y =
         primaries.red.Y = primaries.green.Y = primaries.blue.Y = 1.0;
 
-      auto p_gammaOfFile = rlbox_png->mallocInSandbox<double>();
-      sandbox_invoke_custom(rlbox_png, png_get_gAMA, png_ptr, info_ptr, p_gammaOfFile);
+      sandbox_invoke_custom(rlbox_png, png_get_gAMA, png_ptr, info_ptr, &(p_params->gammaOfFile));
 
-      double gammaOfFile = p_gammaOfFile.copyAndVerify([&png_ptr](double* val) { 
-        auto ret = *val; 
-        if(std::isfinite(ret))
+      double gammaOfFile = p_params->gammaOfFile.copyAndVerify([&png_ptr](double val) { 
+        if(std::isfinite(val))
         {
-          return ret;
+          return val;
         }
 
         printf("Sbox - gamma value out of range\n"); abort();
         return double(0);
       });
+
+      rlbox_png->freeInSandbox(p_params);
 
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
       auto p_primaries  = newInSandbox<qcms_CIE_xyYTRIPLE>(pngSandbox);
@@ -1531,25 +1573,24 @@ nsPNGDecoder::FinishedPNGData()
       });
 
     #else
-      qcms_CIE_xyYTRIPLE* p_primaries = (qcms_CIE_xyYTRIPLE*) mallocInPngSandbox(sizeof(qcms_CIE_xyYTRIPLE));
-      qcms_CIE_xyY* p_whitePoint = (qcms_CIE_xyY*) mallocInPngSandbox(sizeof(qcms_CIE_xyY));
+      auto p_params = (png_get_cHRM_And_gAMA_params*) mallocInPngSandbox(sizeof(png_get_cHRM_And_gAMA_params));
 
       d_png_get_cHRM(png_ptr, info_ptr,
-                   &(p_whitePoint->x), &(p_whitePoint->y),
-                   &(p_primaries->red.x),   &(p_primaries->red.y),
-                   &(p_primaries->green.x), &(p_primaries->green.y),
-                   &(p_primaries->blue.x),  &(p_primaries->blue.y));
+                   &(p_params->whitePoint.x), &(p_params->whitePoint.y),
+                   &(p_params->primaries.red.x),   &(p_params->primaries.red.y),
+                   &(p_params->primaries.green.x), &(p_params->primaries.green.y),
+                   &(p_params->primaries.blue.x),  &(p_params->primaries.blue.y));
 
-      qcms_CIE_xyYTRIPLE& primaries = *p_primaries;
-      qcms_CIE_xyY& whitePoint = *p_whitePoint;
+      qcms_CIE_xyYTRIPLE primaries = p_params->primaries;
+      qcms_CIE_xyY whitePoint = p_params->whitePoint;
 
       whitePoint.Y =
         primaries.red.Y = primaries.green.Y = primaries.blue.Y = 1.0;
 
-      double* p_gammaOfFile = (double*) mallocInPngSandbox(sizeof(double));
-      d_png_get_gAMA(png_ptr, info_ptr, p_gammaOfFile);
+      d_png_get_gAMA(png_ptr, info_ptr, &(p_params->gammaOfFile));
 
-      double& gammaOfFile = *p_gammaOfFile;
+      double gammaOfFile = p_params->gammaOfFile;
+      freeInPngSandbox(p_params);
     #endif
 
     profile = qcms_profile_create_rgb_with_gamma(whitePoint, primaries,
@@ -1616,33 +1657,19 @@ nsPNGDecoder::FinishedPNGData()
     nsPNGDecoder* decoder = static_cast<nsPNGDecoder*>(pngRendererSaved);
     auto rlbox_png = decoder->rlbox_sbx->rlbox_png;
 
-    auto p_width  = rlbox_png->mallocInSandbox<png_uint_32>();
-    auto p_height = rlbox_png->mallocInSandbox<png_uint_32>();
-
-    auto p_bit_depth        = rlbox_png->mallocInSandbox<int>();
-    auto p_color_type       = rlbox_png->mallocInSandbox<int>();
-    auto p_interlace_type   = rlbox_png->mallocInSandbox<int>();
-    auto p_compression_type = rlbox_png->mallocInSandbox<int>();
-    auto p_filter_type      = rlbox_png->mallocInSandbox<int>();
+    auto p_params = rlbox_png->mallocInSandbox<png_get_IHDR_params>();
 
     unsigned int channels;
 
-    auto p_trans = rlbox_png->mallocInSandbox<png_bytep>();
-    *p_trans = nullptr;
-
-    auto p_num_trans = rlbox_png->mallocInSandbox<int>();
-    *p_num_trans = 0;
-
-
     // Always decode to 24-bit RGB or 32-bit RGBA
-    sandbox_invoke_custom(rlbox_png, png_get_IHDR, png_ptr, info_ptr, p_width, p_height, p_bit_depth, p_color_type,
-                 p_interlace_type, p_compression_type, p_filter_type);
+    sandbox_invoke_custom(rlbox_png, png_get_IHDR, png_ptr, info_ptr, &(p_params->width), &(p_params->height), &(p_params->bit_depth), &(p_params->color_type),
+                 &(p_params->interlace_type), &(p_params->compression_type), &(p_params->filter_type));
 
-    png_uint_32 width  = p_width. copyAndVerify([](png_uint_32* val) { return *val; });
-    png_uint_32 height = p_height.copyAndVerify([](png_uint_32* val) { return *val; });
+    png_uint_32 width  = (&(p_params->width)). copyAndVerify([](png_uint_32* val) { return *val; });
+    png_uint_32 height = (&(p_params->height)).copyAndVerify([](png_uint_32* val) { return *val; });
 
     //from here http://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html
-    int color_type = p_color_type.copyAndVerify([&png_ptr](int* val) {
+    int color_type = (&(p_params->color_type)).copyAndVerify([&png_ptr](int* val) {
       if(val != nullptr && (*val == 0 || *val == 2 || *val == 3 || *val == 4 || *val == 6))
       {
         return *val;
@@ -1652,7 +1679,7 @@ nsPNGDecoder::FinishedPNGData()
       return 0;
     });
 
-    int bit_depth = p_bit_depth.copyAndVerify([&png_ptr, &color_type](int* val) {
+    int bit_depth = (&(p_params->bit_depth)).copyAndVerify([&png_ptr, &color_type](int* val) {
       if(val != nullptr)
       {
         if(color_type == 0 && (*val == 1 || *val == 2 || *val == 4 || *val == 8 || *val == 16))
@@ -1681,7 +1708,7 @@ nsPNGDecoder::FinishedPNGData()
       return 0;
     });
 
-    int interlace_type = p_interlace_type.copyAndVerify([&png_ptr](int* val) {
+    int interlace_type = (&(p_params->interlace_type)).copyAndVerify([&png_ptr](int* val) {
       if(val != nullptr && (*val == 0 || *val == 1))
       {
         return *val;
@@ -1690,6 +1717,8 @@ nsPNGDecoder::FinishedPNGData()
       printf("Sbox - interlace_type value out of range\n"); abort();
       return 0;
     });
+
+    rlbox_png->freeInSandbox(p_params);
 
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     //pngEndTimer();
@@ -1703,12 +1732,6 @@ nsPNGDecoder::FinishedPNGData()
     auto p_filter_type      = newInSandbox<int>(pngSandbox);
 
     unsigned int channels;
-
-    auto p_trans = newInSandbox<png_bytep>(pngSandbox);
-    *p_trans = nullptr;
-
-    auto p_num_trans = newInSandbox<int>(pngSandbox);
-    *p_num_trans = 0;
 
     void* getProgPtrRet = sandbox_invoke_custom_ret_unsandboxed_ptr(pngSandbox, png_get_progressive_ptr, png_ptr);
 
@@ -1777,39 +1800,25 @@ nsPNGDecoder::FinishedPNGData()
     });
 
   #else
-    png_uint_32* p_width = (png_uint_32*) mallocInPngSandbox(sizeof(png_uint_32));
-    png_uint_32* p_height = (png_uint_32*) mallocInPngSandbox(sizeof(png_uint_32));
 
-    png_uint_32& width = *p_width;
-    png_uint_32& height = *p_height;
-
-    int* p_bit_depth = (int*) mallocInPngSandbox(sizeof(int));
-    int* p_color_type = (int*) mallocInPngSandbox(sizeof(int));
-    int* p_interlace_type = (int*) mallocInPngSandbox(sizeof(int));
-    int* p_compression_type = (int*) mallocInPngSandbox(sizeof(int));
-    int* p_filter_type = (int*) mallocInPngSandbox(sizeof(int));
-
-    int& bit_depth = *p_bit_depth;
-    int& color_type = *p_color_type;
-    int& interlace_type = *p_interlace_type;
-    int& compression_type = *p_compression_type;
-    int& filter_type = *p_filter_type;
+    auto p_params = (png_get_IHDR_params*) mallocInPngSandbox(sizeof(png_get_IHDR_params));
 
     unsigned int channels;
-
-    png_bytep* p_trans = (png_bytep*) mallocInPngSandbox(sizeof(png_bytep));
-    *p_trans = nullptr;
-
-    int* p_num_trans = (int*) mallocInPngSandbox(sizeof(int));
-    int& num_trans = *p_num_trans;
-    num_trans = 0;
 
     nsPNGDecoder* decoder =
                  static_cast<nsPNGDecoder*>(d_png_get_progressive_ptr(png_ptr));
 
     // Always decode to 24-bit RGB or 32-bit RGBA
-    d_png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type,
-                 &interlace_type, &compression_type, &filter_type);
+    d_png_get_IHDR(png_ptr, info_ptr, &(p_params->width), &(p_params->height), &(p_params->bit_depth), &(p_params->color_type),
+                 &(p_params->interlace_type), &(p_params->compression_type), &(p_params->filter_type));
+
+    png_uint_32 width = p_params->width;
+    png_uint_32 height = p_params->height;
+    int bit_depth = p_params->bit_depth;
+    int color_type = p_params->color_type;
+    int interlace_type = p_params->interlace_type;
+
+    freeInPngSandbox(p_params);
   #endif
 
   if(width < 100) {
@@ -1881,6 +1890,8 @@ nsPNGDecoder::FinishedPNGData()
     #endif
   }
 
+  int num_trans = 0;
+
   if (
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       sandbox_invoke_custom(rlbox_png, png_get_valid, png_ptr, info_ptr, PNG_INFO_tRNS)
@@ -1894,9 +1905,9 @@ nsPNGDecoder::FinishedPNGData()
   ) {
 
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-      auto p_trans_values = rlbox_png->mallocInSandbox<png_color_16p>();
-      sandbox_invoke_custom(rlbox_png, png_get_tRNS, png_ptr, info_ptr, p_trans, p_num_trans, p_trans_values);
-      tainted<png_color_16p, TRLSandboxP> trans_values = *p_trans_values;
+      auto p_params = rlbox_png->mallocInSandbox<png_get_tRNS_params>();
+      sandbox_invoke_custom(rlbox_png, png_get_tRNS, png_ptr, info_ptr, &(p_params->trans), &(p_params->num_trans), &(p_params->trans_values));
+      tainted<png_color_16p, TRLSandboxP> trans_values = p_params->trans_values;
 
       if(trans_values == nullptr)
       {
@@ -1907,9 +1918,21 @@ nsPNGDecoder::FinishedPNGData()
       png_uint_16 trans_values_green = trans_values->green.copyAndVerify([](png_uint_16 val) { return val; });
       png_uint_16 trans_values_blue  = trans_values->blue .copyAndVerify([](png_uint_16 val) { return val; });
       png_uint_16 trans_values_gray  = trans_values->gray .copyAndVerify([](png_uint_16 val) { return val; });
+      num_trans = (&(p_params->num_trans)).copyAndVerify([decoder, rlbox_png](int* val){ 
+        if(val == nullptr) 
+        {
+          sandbox_invoke_custom(rlbox_png, png_error, decoder->mPNG, rlbox_png->stackarr("Sbox - png_color_type value null"));
+        }
+        return *val; 
+      });
+
+      rlbox_png->freeInSandbox(p_params);
 
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
+      auto p_trans = newInSandbox<png_bytep>(pngSandbox);
+      *p_trans = nullptr;
       auto p_trans_values = newInSandbox<png_color_16p>(pngSandbox);
+      auto p_num_trans = newInSandbox<int>(pngSandbox);
       sandbox_invoke_custom(pngSandbox, png_get_tRNS, png_ptr, info_ptr, p_trans, p_num_trans, p_trans_values);
       unverified_data<png_color_16p> trans_values = *p_trans_values;
 
@@ -1922,11 +1945,22 @@ nsPNGDecoder::FinishedPNGData()
       png_uint_16 trans_values_green = trans_values->green.sandbox_copyAndVerify([](png_uint_16 val) { return val; });
       png_uint_16 trans_values_blue  = trans_values->blue .sandbox_copyAndVerify([](png_uint_16 val) { return val; });
       png_uint_16 trans_values_gray  = trans_values->gray .sandbox_copyAndVerify([](png_uint_16 val) { return val; });
-
+      num_trans = p_num_trans.sandbox_copyAndVerify([decoder](int* val){ 
+        if(val == nullptr) 
+        {
+          sandbox_invoke_custom(pngSandbox, png_error, decoder->mPNG, sandbox_stackarr("Sbox - png_color_type value null"));
+        }
+        return *val; 
+      });
     #else
-      png_color_16p* p_trans_values = (png_color_16p*)mallocInPngSandbox(sizeof(png_color_16p));
-      png_color_16p& trans_values = *p_trans_values;
-      d_png_get_tRNS(png_ptr, info_ptr, p_trans, &num_trans, &trans_values);
+      auto p_params = (png_get_tRNS_params*) mallocInPngSandbox(sizeof(png_get_tRNS_params));
+      d_png_get_tRNS(png_ptr, info_ptr, &(p_params->trans), &(p_params->num_trans), &(p_params->trans_values));
+      png_uint_16 trans_values_red   = p_params->trans_values->red;
+      png_uint_16 trans_values_green = p_params->trans_values->green;
+      png_uint_16 trans_values_blue  = p_params->trans_values->blue;
+      png_uint_16 trans_values_gray  = p_params->trans_values->gray;
+      num_trans = p_params->num_trans;
+      freeInPngSandbox(p_params);
     #endif
     // libpng doesn't reject a tRNS chunk with out-of-range samples
     // so we check it here to avoid setting up a useless opacity
@@ -1942,7 +1976,7 @@ nsPNGDecoder::FinishedPNGData()
          trans_values_green > sample_max ||
          trans_values_blue > sample_max))) {
           sandbox_invoke_custom(rlbox_png, png_free_data, png_ptr, info_ptr, PNG_FREE_TRNS, 0);
-          *p_num_trans = 0;
+          num_trans = 0;
         }
       #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
         if ((color_type == PNG_COLOR_TYPE_GRAY &&
@@ -1952,40 +1986,26 @@ nsPNGDecoder::FinishedPNGData()
          trans_values_green > sample_max ||
          trans_values_blue > sample_max))) {
           sandbox_invoke_custom(pngSandbox, png_free_data, png_ptr, info_ptr, PNG_FREE_TRNS, 0);
-          *p_num_trans = 0;
+          num_trans = 0;
         }
       #else
         if ((color_type == PNG_COLOR_TYPE_GRAY &&
-         trans_values->gray > sample_max) ||
+         trans_values_gray > sample_max) ||
          (color_type == PNG_COLOR_TYPE_RGB &&
-         (trans_values->red > sample_max ||
-         trans_values->green > sample_max ||
-         trans_values->blue > sample_max))) {
+         (trans_values_red > sample_max ||
+         trans_values_green > sample_max ||
+         trans_values_blue > sample_max))) {
             d_png_free_data(png_ptr, info_ptr, PNG_FREE_TRNS, 0);
             num_trans = 0;
         }
       #endif
     }
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-      int num_trans = p_num_trans.copyAndVerify([decoder, rlbox_png](int* val){ 
-        if(val == nullptr) 
-        {
-          sandbox_invoke_custom(rlbox_png, png_error, decoder->mPNG, rlbox_png->stackarr("Sbox - png_color_type value null"));
-        }
-        return *val; 
-      });
       if (num_trans != 0) {
         sandbox_invoke_custom(rlbox_png, png_set_expand, png_ptr);
       }
 
     #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-      int num_trans = p_num_trans.sandbox_copyAndVerify([decoder](int* val){ 
-        if(val == nullptr) 
-        {
-          sandbox_invoke_custom(pngSandbox, png_error, decoder->mPNG, sandbox_stackarr("Sbox - png_color_type value null"));
-        }
-        return *val; 
-      });
       if (num_trans != 0) {
         sandbox_invoke_custom(pngSandbox, png_set_expand, png_ptr);
       }
@@ -2023,24 +2043,6 @@ nsPNGDecoder::FinishedPNGData()
       intent = pIntent;
     }
   }
-
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    int num_trans = p_num_trans.copyAndVerify([decoder, rlbox_png](int* val){ 
-      if(val == nullptr) 
-      {
-        sandbox_invoke_custom(rlbox_png, png_error, decoder->mPNG, rlbox_png->stackarr("Sbox - png_color_type value null"));
-      }
-      return *val; 
-    });
-  #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
-    int num_trans = p_num_trans.sandbox_copyAndVerify([decoder](int* val){ 
-      if(val == nullptr) 
-      {
-        sandbox_invoke_custom(pngSandbox, png_error, decoder->mPNG, sandbox_stackarr("Sbox - png_color_type value null"));
-      }
-      return *val; 
-    });
-  #endif
 
   if (decoder->mInProfile && gfxPlatform::GetCMSOutputProfile()) {
     qcms_data_type outType;
@@ -2400,11 +2402,23 @@ PackUnpremultipliedRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut)
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     //data sanity checks already exist below
     png_uint_32 row_num = row_num_unv.copyAndVerify([](png_uint_32 val){ return val; });
-    int pass = pass_unv.copyAndVerify([](int val){ return val; });
+    int pass = pass_unv.copyAndVerify([](int val){ 
+      if(val < 0 || val > std::numeric_limits<decltype(decoder->mPass)>::max()) {
+        printf("Sbox - png row_callback pass value (%d) out of range\n", val);
+        abort();
+      }
+      return val; 
+    });
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     //data sanity checks already exist below
     png_uint_32 row_num = row_num_unv.sandbox_copyAndVerify([](png_uint_32 val){ return val; });
-    int pass = pass_unv.sandbox_copyAndVerify([](int val){ return val; });
+    int pass = pass_unv.sandbox_copyAndVerify([](int val){ 
+      if(val < 0 || val > std::numeric_limits<decltype(decoder->mPass)>::max()) {
+        printf("Sbox - png row_callback pass value (%d) out of range\n", val);
+        abort();
+      }
+      return val; 
+    });
   #endif
 
   while (pass > decoder->mPass) {
@@ -2893,13 +2907,9 @@ nsPNGDecoder::IsValidICOResource() const
       return false;
     }
 
-    auto p_png_width  = rlbox_png->mallocInSandbox<png_uint_32>();
-    auto p_png_height = rlbox_png->mallocInSandbox<png_uint_32>();
+    auto p_params = rlbox_png->mallocInSandbox<png_get_IHDR_params>();
 
-    auto p_png_bit_depth  = rlbox_png->mallocInSandbox<int>();
-    auto p_png_color_type = rlbox_png->mallocInSandbox<int>();
-
-    auto png_get_IHDRRet = sandbox_invoke_custom(rlbox_png, png_get_IHDR, mPNG, mInfo, p_png_width, p_png_height, p_png_bit_depth, p_png_color_type, nullptr, nullptr, nullptr)
+    auto png_get_IHDRRet = sandbox_invoke_custom(rlbox_png, png_get_IHDR, mPNG, mInfo, &(p_params->width), &(p_params->height), &(p_params->bit_depth), &(p_params->color_type), nullptr, nullptr, nullptr)
       .copyAndVerify([this](png_uint_32 val){
         if(val == 0 || val == 1) { return val; }
         printf("Sbox - png_get_IHDRRet value out of range\n");abort();
@@ -2907,14 +2917,14 @@ nsPNGDecoder::IsValidICOResource() const
 
     if (png_get_IHDRRet) {
       //don't need any complex verification as the code below checks it anyway
-      int png_bit_depth  = p_png_bit_depth.copyAndVerify([this](int* val) { 
+      int png_bit_depth  = (&(p_params->bit_depth)).copyAndVerify([this](int* val) { 
         if(val == nullptr) 
         {
           printf("Sbox - png_bit_depth value null"); abort();
         }
         return *val;
       });
-      int png_color_type = p_png_color_type.copyAndVerify([this](int* val) { 
+      int png_color_type = (&(p_params->color_type)).copyAndVerify([this](int* val) { 
         if(val == nullptr) 
         {
           printf("Sbox - png_color_type value null"); abort();
@@ -2925,6 +2935,9 @@ nsPNGDecoder::IsValidICOResource() const
       //clear the jmpBufferIndex on the way out as it is unsafe to call setjmp after this
       jumpBufferFilledIn = 0;
       pngRendererSaved = nullptr;
+
+      rlbox_png->freeInSandbox(p_params);
+
       return ((png_color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
          png_color_type == PNG_COLOR_TYPE_RGB) &&
         png_bit_depth == 8);
@@ -2999,23 +3012,15 @@ nsPNGDecoder::IsValidICOResource() const
       return false;
     }
 
-    png_uint_32* p_png_width = (png_uint_32*) mallocInPngSandbox(sizeof(png_uint_32));
-    png_uint_32* p_png_height = (png_uint_32*) mallocInPngSandbox(sizeof(png_uint_32));
+    auto p_params = (png_get_IHDR_params*) mallocInPngSandbox(sizeof(png_get_IHDR_params));
 
-    png_uint_32& png_width = *p_png_width;
-    png_uint_32& png_height = *p_png_height;
-
-    int* p_png_bit_depth = (int*) mallocInPngSandbox(sizeof(int));
-    int* p_png_color_type = (int*) mallocInPngSandbox(sizeof(int));
-
-    int& png_bit_depth = *p_png_bit_depth;
-    int& png_color_type = *p_png_color_type;
-
-    if (d_png_get_IHDR(mPNG, mInfo, &png_width, &png_height, &png_bit_depth,
-                     &png_color_type, nullptr, nullptr, nullptr)) {
-      return ((png_color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
-               png_color_type == PNG_COLOR_TYPE_RGB) &&
-              png_bit_depth == 8);
+    if (d_png_get_IHDR(mPNG, mInfo, &(p_params->width), &(p_params->height), &(p_params->bit_depth),
+                     &(p_params->color_type), nullptr, nullptr, nullptr)) {
+      auto ret = ((p_params->color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
+               p_params->color_type == PNG_COLOR_TYPE_RGB) &&
+              p_params->bit_depth == 8);
+      freeInPngSandbox(p_params);
+      return ret;
     } else {
       return false;
     }

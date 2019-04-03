@@ -514,6 +514,48 @@
 	f(qcms_CIE_xyY, blue, FIELD_NORMAL, ##__VA_ARGS__) \
 	g()
 
+#define sandbox_fields_reflection_pnglib_class_png_get_iCCP_params(f, g, ...) \
+	f(png_uint_32, profileLen, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(png_bytep, profileData, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(png_charp, profileName, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(int, compression, FIELD_NORMAL, ##__VA_ARGS__) \
+	g()
+
+#define sandbox_fields_reflection_pnglib_class_png_get_cHRM_And_gAMA_params(f, g, ...) \
+	f(qcms_CIE_xyYTRIPLE, primaries, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(qcms_CIE_xyY, whitePoint, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(double, gammaOfFile, FIELD_NORMAL, ##__VA_ARGS__) \
+	g()
+
+#define sandbox_fields_reflection_pnglib_class_png_get_IHDR_params(f, g, ...) \
+	f(png_uint_32, width, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(png_uint_32, height, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(int, bit_depth, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(int, color_type, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(int, interlace_type, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(int, compression_type, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(int, filter_type, FIELD_NORMAL, ##__VA_ARGS__) \
+	g()
+
+#define sandbox_fields_reflection_pnglib_class_png_get_tRNS_params(f, g, ...) \
+	f(png_bytep, trans, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(png_color_16p, trans_values, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(int, num_trans, FIELD_NORMAL, ##__VA_ARGS__) \
+	g()
+
 #define sandbox_fields_reflection_pnglib_allClasses(f, ...) \
 	f(z_stream_s, pnglib, ##__VA_ARGS__) \
 	f(png_color_16_struct, pnglib, ##__VA_ARGS__) \
@@ -533,4 +575,8 @@
 	f(png_sPLT_entry_struct, pnglib, ##__VA_ARGS__) \
 	f(png_control, pnglib, ##__VA_ARGS__) \
 	f(qcms_CIE_xyY, pnglib, ##__VA_ARGS__) \
-	f(qcms_CIE_xyYTRIPLE, pnglib, ##__VA_ARGS__)
+	f(qcms_CIE_xyYTRIPLE, pnglib, ##__VA_ARGS__) \
+	f(png_get_iCCP_params, pnglib, ##__VA_ARGS__) \
+	f(png_get_cHRM_And_gAMA_params, pnglib, ##__VA_ARGS__) \
+	f(png_get_IHDR_params, pnglib, ##__VA_ARGS__) \
+	f(png_get_tRNS_params, pnglib, ##__VA_ARGS__) \
