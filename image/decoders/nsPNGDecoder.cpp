@@ -2833,10 +2833,10 @@ nsPNGDecoder::FinishInternal()
     //pngEndTimer();
     nsPNGDecoder* decoder = static_cast<nsPNGDecoder*>(pngRendererSaved);
     auto rlbox_png = decoder->rlbox_sbx->rlbox_png;
-    const char* error_msg = error_msg_unv.copyAndVerifyString(rlbox_png, [](const char* val) { return (val != nullptr && strlen(val) < 10000)? RLBox_Verify_Status::SAFE : RLBox_Verify_Status::UNSAFE; }, nullptr);
+    const char* error_msg = "";//error_msg_unv.copyAndVerifyString(rlbox_png, [](const char* val) { return (val != nullptr && strlen(val) < 10000)? RLBox_Verify_Status::SAFE : RLBox_Verify_Status::UNSAFE; }, nullptr);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     //pngEndTimer();
-    const char* error_msg = error_msg_unv.sandbox_copyAndVerifyString([](const char* val) { return (val != nullptr && strlen(val) < 10000); }, nullptr);
+    const char* error_msg = "";//error_msg_unv.sandbox_copyAndVerifyString([](const char* val) { return (val != nullptr && strlen(val) < 10000); }, nullptr);
   #endif
   MOZ_LOG(sPNGLog, LogLevel::Error, ("libpng error: %s\n", error_msg));
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
@@ -2863,10 +2863,10 @@ nsPNGDecoder::FinishInternal()
     //pngEndTimer();
     nsPNGDecoder* decoder = static_cast<nsPNGDecoder*>(pngRendererSaved);
     auto rlbox_png = decoder->rlbox_sbx->rlbox_png;
-    const char* warning_msg = warning_msg_unv.copyAndVerifyString(rlbox_png, [](const char* val) { return (val != nullptr && strlen(val) < 10000)? RLBox_Verify_Status::SAFE : RLBox_Verify_Status::UNSAFE; }, nullptr);
+    const char* warning_msg = "";//warning_msg_unv.copyAndVerifyString(rlbox_png, [](const char* val) { return (val != nullptr && strlen(val) < 10000)? RLBox_Verify_Status::SAFE : RLBox_Verify_Status::UNSAFE; }, nullptr);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     //pngEndTimer();
-    const char* warning_msg = warning_msg_unv.sandbox_copyAndVerifyString([](const char* val) { return (val != nullptr && strlen(val) < 10000); }, nullptr);
+    const char* warning_msg = "";//warning_msg_unv.sandbox_copyAndVerifyString([](const char* val) { return (val != nullptr && strlen(val) < 10000); }, nullptr);
   #endif
   MOZ_LOG(sPNGLog, LogLevel::Warning, ("libpng warning: %s\n", warning_msg));
   #if defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
