@@ -4,6 +4,7 @@ import math
 import sys
 import csv
 import os
+from urllib.parse import urlparse
 
 def is_line_required(line):
     if (
@@ -27,14 +28,18 @@ def addTestValue(s, group, val):
         s.timings[group] = []
     s.timings[group].append(float(val))
 
-def handle_line(line, s):
+def handle_line(line, s, skipFirstHost):
     if "Capture_Time:" in line:
         fragment = line.split('Capture_Time:')[1].split('|')[0]
         group = fragment.split(',')[0]
+        if skipFirstHost:
+            group = group.split('(')[1].split(')')[0]
+            u = urlparse(group)
+            u = u._replace(netloc=u.netloc.split('.', 1)[1])
+            group = u.geturl()
         index = fragment.split(',')[1]
         val = fragment.split(',')[2]
         addTestValue(s, group, val)
-
     return s
 
 
@@ -87,13 +92,16 @@ def print_final_results(s):
 
 def main():
     if len(sys.argv) < 2:
-        print("Expected " + sys.argv[0] + " inputFileName")
+        print("Expected " + sys.argv[0] + " inputFileName [RemoveFirstSubdomain]")
         exit(1)
-    argv1=sys.argv[1]
+    inputFileName = sys.argv[1]
+    skipFirstHost = False
+    if len(sys.argv) >= 3:
+        skipFirstHost = bool(sys.argv[2])
     s = PerfState()
-    with open(argv1) as f:
+    with open(inputFileName) as f:
         for line in f:
-            s = handle_line(line, s)
+            s = handle_line(line, s, skipFirstHost)
 
     print_final_results(s)
 
