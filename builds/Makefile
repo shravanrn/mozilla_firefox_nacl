@@ -117,6 +117,15 @@ static64_buffcopy: inithasrun
 	$(CP) ../netwerk/streamconv/converters/moz_static_buffcopy.build ../netwerk/streamconv/converters/moz.build
 	cd .. && ./mach build
 
+static64_buffcopy_debug: inithasrun
+	$(CP) ../mozconfig64_static_buffcopy_debug ../mozconfig
+	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
+	$(CP) ../image/moz_copy.build ../image/moz.build
+	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
+	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
+	$(CP) ../netwerk/streamconv/converters/moz_static_buffcopy.build ../netwerk/streamconv/converters/moz.build
+	cd .. && ./mach build
+
 dynamic64: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy.build ../image/moz.build
@@ -285,6 +294,10 @@ run64_static:
 
 run64_static_buffcopy:
 	$(CP) ../mozconfig64_static_buffcopy ../mozconfig
+	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
+
+run64_static_buffcopydebug:
+	$(CP) ../mozconfig64_static_buffcopy_debug ../mozconfig
 	export MOZ_DISABLE_CONTENT_SANDBOX=1 && cd .. && ./mach run ./testing/talos/talos/tests/jpeg_page_render/jpeg_render.html ./testing/talos/talos/tests/jpeg_page_render/png_render.html
 
 run64_dynamic:
