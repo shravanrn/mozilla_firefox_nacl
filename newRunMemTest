@@ -1,0 +1,90 @@
+#!/bin/bash
+export MOZ_DISABLE_CONTENT_SANDBOX=1
+
+# set -o xtrace
+
+if [ -z "$1" ]; then 
+	echo "Expected argument ./runPerfTest output_folder [platform=32|64]"; 
+	exit 1; 
+fi
+
+if [[ -f "$1" ]]; then
+	echo "$1 already exists"; 
+	exit 1; 
+fi
+
+OUTPUTPATH=$(cd "$(dirname "$1")"; pwd)/$(basename "$1")
+mkdir -p ${OUTPUTPATH}
+cd "$(dirname "$0")"
+Pl="64"
+
+if [[ ! -z "$4" ]]; then
+	if [[ "$4" == "32" ]]; then
+		Pl="32"
+	else
+		echo "Unknown platform: $4"
+		exit 1
+	fi
+fi
+
+FFVersionsDir=("./" "./" "../../mozilla_firefox_stock/")
+FFVersionsSuffix=("" "" "_stock")
+FFVersions=("new_nacl_cpp" "new_ps_cpp" "static")
+FFPinCores=("1" "1" "1")
+
+if [ ${#FFVersionsDir[@]} -ne ${#FFVersions[@]} ]; then
+	echo "Versions Dir and Versions do not match";
+	exit 1;
+fi
+
+if [ ${#FFVersionsSuffix[@]} -ne ${#FFVersions[@]} ]; then
+	echo "Versions Suffix and Versions do not match";
+	exit 1;
+fi
+
+if [ ${#FFPinCores[@]} -ne ${#FFVersions[@]} ]; then
+	echo "Pin Cores and Versions do not match";
+	exit 1;
+fi
+
+for (( i = 0; i < ${#FFVersions[@]}; i++ )); do 
+	if [[ ! -d "${FFVersionsDir[$i]}firefox_${Pl}bit_optdebug_${FFVersions[$i]}" ]]; then
+		echo "Not all firefox versions found: ${FFVersionsDir[$i]}firefox_${Pl}bit_optdebug_${FFVersions[$i]}";
+		exit 1;
+	fi
+done
+
+echo "Starting. Make sure to "
+echo "1. Run the zlib testing server with node server.js"
+
+
+# param: outputDir/prefix
+# param: cores
+# param: imageCount
+function runTest(){
+	taskset -c $2 ./mach run "http://localhost:1337/jpeg-test?nr=$3" --setpref browser.sessionstore.resume_from_crash=false --setpref toolkit.startup.max_resumed_crashes=-1 > /dev/null 2>&1&
+	FFMACHPID=$!
+	sleep 6
+	FFPID=$(pgrep -P $FFMACHPID)
+	FFCHILDPIDS=($(pstree -T -p $FFPID | grep -o '([0-9]\+)' | grep -o '[0-9]\+'))
+	FFTOTALMEM=0
+	for (( l = 0; l < ${#FFCHILDPIDS[@]}; l++ )); do
+		CHILDMEM=$(ps -p ${FFCHILDPIDS[$l]} -o rss=)
+		FFTOTALMEM=$((FFTOTALMEM + CHILDMEM))
+	done
+	echo "$3 Images : $FFTOTALMEM" | tee -a "$1_memory_output.txt"
+	kill -s TERM $FFPID
+	sleep 6
+}
+
+SAVEDDIR=$PWD
+
+for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
+	cd ${FFVersionsDir[$j]}
+	cp "mozconfig${Pl}_${FFVersions[$j]}" mozconfig
+	pkill -f ProcessSandbox_otherside
+	for (( k = 1; k < 20; k++ )); do 
+		runTest "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}" "${FFPinCores[$j]}" $k
+	done
+	cd $SAVEDDIR
+done
