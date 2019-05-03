@@ -187,6 +187,11 @@ private:
     z_stream d_stream;
 #endif
 
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  RLBoxSandbox<TRLSandbox>* rlbox_zlib = NULL;
+#endif
+
+
     unsigned mLen, hMode, mSkipCount, mFlags;
 
     uint32_t check_header (nsIInputStream *iStr, uint32_t streamLen, nsresult *rv);

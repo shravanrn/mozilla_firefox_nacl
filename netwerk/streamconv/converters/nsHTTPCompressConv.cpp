@@ -31,7 +31,7 @@
 #include <sys/types.h>
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-RLBoxSandbox<TRLSandbox>* rlbox_zlib = NULL;
+// RLBoxSandbox<TRLSandbox>* rlbox_zlib = NULL;
 #elif SANDBOX_CPP == 1
 void ensureNaClSandboxInit();
 NaClSandbox* sbox = NULL;
@@ -55,14 +55,14 @@ static std::mutex mtx;
 
 void SandboxOnFirefoxExitingZLIB()
 {
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    if(rlbox_zlib != nullptr)
-    {
-      rlbox_zlib->destroySandbox();
-      free(rlbox_zlib);
-      rlbox_zlib = nullptr;
-    }
-  #endif
+  // #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  //   if(rlbox_zlib != nullptr)
+  //   {
+  //     rlbox_zlib->destroySandbox();
+  //     free(rlbox_zlib);
+  //     rlbox_zlib = nullptr;
+  //   }
+  // #endif
   #if SANDBOX_CPP == 2
   {
     std::lock_guard<std::mutex> guard(mtx);
@@ -111,7 +111,8 @@ void SandboxOnFirefoxExitingZLIB()
 static void constructZlibSandboxIfNecessary() {
   mtx.lock();
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    if(!rlbox_zlib) {
+    // if(!rlbox_zlib) {
+    if(false) {
   #elif defined(SANDBOX_CPP)
     if(!sbox) {
   #endif
@@ -141,8 +142,8 @@ static void constructZlibSandboxIfNecessary() {
       strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
 
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-        printf("Creating ZLIB Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
-        rlbox_zlib = RLBoxSandbox<TRLSandbox>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+        // printf("Creating ZLIB Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+        // rlbox_zlib = RLBoxSandbox<TRLSandbox>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
       #else
         printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
         ensureNaClSandboxInit();
@@ -199,7 +200,35 @@ nsHTTPCompressConv::nsHTTPCompressConv()
   , mMutex("nsHTTPCompressConv")
 {
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  constructZlibSandboxIfNecessary();
+  // constructZlibSandboxIfNecessary();
+  {
+    char SandboxingCodeRootFolder[1024];
+    int index;
+
+    if(!getcwd(SandboxingCodeRootFolder, 256)) abort();
+
+    char * found = strstr(SandboxingCodeRootFolder, "/mozilla-release");
+    if (found == NULL)
+    {
+      printf("Error initializing SandboxingCodeRootFolder\n");
+      exit(1);
+    }
+
+    index = found - SandboxingCodeRootFolder + 1;
+    SandboxingCodeRootFolder[index] = '\0';
+
+    char full_STARTUP_LIBRARY_PATH[1024];
+    char full_SANDBOX_INIT_APP[1024];
+
+    strcpy(full_STARTUP_LIBRARY_PATH, SandboxingCodeRootFolder);
+    strcat(full_STARTUP_LIBRARY_PATH, STARTUP_LIBRARY_PATH);
+
+    strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
+    strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
+
+    printf("Creating ZLIB Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+    rlbox_zlib = RLBoxSandbox<TRLSandbox>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+  }
   p_d_stream = rlbox_zlib->mallocInSandbox<z_stream>();
   if(p_d_stream == nullptr) {
     printf("Error in malloc for p_d_stream\n");
@@ -268,6 +297,16 @@ nsHTTPCompressConv::~nsHTTPCompressConv()
 #elif defined(SANDBOX_CPP)
   freeInSandbox(sbox, p_d_stream);
 #endif
+
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    if(rlbox_zlib != nullptr)
+    {
+      rlbox_zlib->destroySandbox();
+      free(rlbox_zlib);
+      rlbox_zlib = nullptr;
+      printf("Destroying ZLIB Sandbox\n");
+    }
+  #endif
 }
 
 NS_IMETHODIMP
