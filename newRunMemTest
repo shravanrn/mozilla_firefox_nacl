@@ -66,7 +66,8 @@ function runTest(){
 	FFMACHPID=$!
 	sleep 6
 	FFPID=$(pgrep -P $FFMACHPID)
-	FFCHILDPIDS=($(pstree -T -p $FFPID | grep -o '([0-9]\+)' | grep -o '[0-9]\+'))
+	FFWEBCONTENTID=$(pgrep -P $FFPID "Web Content")
+	FFCHILDPIDS=($(pstree -T -p $FFWEBCONTENTID | grep -o '([0-9]\+)' | grep -o '[0-9]\+'))
 	FFTOTALMEM=0
 	for (( l = 0; l < ${#FFCHILDPIDS[@]}; l++ )); do
 		CHILDMEM=$(ps -p ${FFCHILDPIDS[$l]} -o rss=)
@@ -83,7 +84,7 @@ for (( j = 0; j < ${#FFVersions[@]}; j++ )); do
 	cd ${FFVersionsDir[$j]}
 	cp "mozconfig${Pl}_${FFVersions[$j]}" mozconfig
 	pkill -f ProcessSandbox_otherside
-	for (( k = 1; k < 20; k++ )); do 
+	for (( k = 1; k < 22; k++ )); do 
 		runTest "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}" "${FFPinCores[$j]}" $k
 	done
 	cd $SAVEDDIR
