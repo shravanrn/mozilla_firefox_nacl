@@ -549,6 +549,8 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog("JPEGDecoderAccounting")
       printf("Creating "
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
       "NaCl"
+      #elif defined(PS_SANDBOX_USE_NEW_CPP_API)
+      "Process"
       #else
       "Wasm"
       #endif
