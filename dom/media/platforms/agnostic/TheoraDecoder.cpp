@@ -344,8 +344,16 @@ TheoraDecoder::ProcessDecode(MediaRawData* aSample)
     tainted<th_img_plane*, TRLSandbox> ycbcr = rlbox_theora->mallocInSandbox<th_img_plane>(3);
     sandbox_invoke(rlbox_theora, th_decode_ycbcr_out, mTheoraDecoderContext, ycbcr);
     auto& mTheoraInfo = *p_mTheoraInfo;
-    auto frame_width = mTheoraInfo.frame_width.UNSAFE_Unverified();
-    auto frame_height = mTheoraInfo.frame_height.UNSAFE_Unverified();
+    auto frame_dim_verif = [](ogg_uint32_t val) {
+      // Per media/libtheora/include/theora/codec.h
+      // multiple of 16, and less than 1048576
+      if (val % 16 != 0 || val > 1048576) {
+        abort();
+      }
+      return val;
+    };
+    auto frame_width = mTheoraInfo.frame_width.copyAndVerify(frame_dim_verif);
+    auto frame_height = mTheoraInfo.frame_height.copyAndVerify(frame_dim_verif);
     #else
     th_ycbcr_buffer ycbcr;
     th_decode_ycbcr_out(mTheoraDecoderContext, ycbcr);
@@ -355,23 +363,35 @@ TheoraDecoder::ProcessDecode(MediaRawData* aSample)
 
     VideoData::YCbCrBuffer b;
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    auto pixel_fmt = mTheoraInfo.pixel_fmt.UNSAFE_Unverified();
+    auto pixel_fmt = mTheoraInfo.pixel_fmt.copyAndVerify([](th_pixel_fmt val){
+      // check if it is within enum range
+      if (val > TH_PF_NFORMATS) {
+        abort();
+      }
+      return val;
+    });
     int hdec = !(pixel_fmt & 1);
     int vdec = !(pixel_fmt & 2);
 
+    // This is fine as this is just a buffer of pixels
     b.mPlanes[0].mData = ycbcr->data.UNSAFE_Unverified();
+    // This is being checked in dom/media/MediaData.cpp ValidateBufferAndPicture, so no further check needed here
     b.mPlanes[0].mStride = ycbcr->stride.UNSAFE_Unverified();
     b.mPlanes[0].mHeight = frame_height;
     b.mPlanes[0].mWidth = frame_width;
     b.mPlanes[0].mOffset = b.mPlanes[0].mSkip = 0;
 
+    // This is fine as this is just a buffer of pixels
     b.mPlanes[1].mData = (ycbcr + 1)->data.UNSAFE_Unverified();
+    // This is being checked in dom/media/MediaData.cpp ValidateBufferAndPicture, so no further check needed here
     b.mPlanes[1].mStride = (ycbcr + 1)->stride.UNSAFE_Unverified();
     b.mPlanes[1].mHeight = frame_height >> vdec;
     b.mPlanes[1].mWidth = frame_width >> hdec;
     b.mPlanes[1].mOffset = b.mPlanes[1].mSkip = 0;
 
+    // This is fine as this is just a buffer of pixels
     b.mPlanes[2].mData = (ycbcr + 2)->data.UNSAFE_Unverified();
+    // This is being checked in dom/media/MediaData.cpp ValidateBufferAndPicture, so no further check needed here
     b.mPlanes[2].mStride = (ycbcr + 2)->stride.UNSAFE_Unverified();
     b.mPlanes[2].mHeight = frame_height >> vdec;
     b.mPlanes[2].mWidth = frame_width >> hdec;
@@ -402,6 +422,7 @@ TheoraDecoder::ProcessDecode(MediaRawData* aSample)
     #endif
 
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    // This is being checked in dom/media/MediaData.cpp ValidateBufferAndPicture, so no further check needed here
     IntRect pictureArea(mTheoraInfo.pic_x.UNSAFE_Unverified(), mTheoraInfo.pic_y.UNSAFE_Unverified(),
                         mTheoraInfo.pic_width.UNSAFE_Unverified(), mTheoraInfo.pic_height.UNSAFE_Unverified());
     #else
