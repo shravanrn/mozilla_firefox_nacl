@@ -1102,6 +1102,24 @@ class jpeg_page_render_50(PageloaderTest):
     timeout = 72000
 
 @register_test()
+class theora_perf(PageloaderTest):
+    """
+    Test the frame rate delay in rendering a 1080p 60fps ogv
+    """
+    tpmanifest = '${talos}/tests/theora_perf/tests.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 2
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    # filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    filters = filter.mean.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+
+@register_test()
 class tscrollx(PageloaderTest):
     """
     This test does some scrolly thing.

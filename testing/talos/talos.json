@@ -68,8 +68,11 @@
         "zlib_test": {
             "tests": ["zlib_page_render"]
         },
+        "theora_test": {
+            "tests": ["theora_perf"]
+        },
         "rlbox_test": {
-            "tests": [ "jpeg_perf", "png_perf", "zlib_page_render"]
+            "tests": [ "jpeg_perf", "png_perf", "zlib_page_render", "theora_perf" ]
         },
         "rlbox_scaling": {
             "tests": ["jpeg_scaling_1", "jpeg_scaling_1_1", "jpeg_scaling_1_2", "jpeg_scaling_1_3", "jpeg_scaling_1_4", "jpeg_scaling_1_5", "jpeg_scaling_1_6", "jpeg_scaling_2", "jpeg_scaling_3", "jpeg_scaling_4", "jpeg_scaling_5", "jpeg_scaling_6", "jpeg_scaling_7"]
