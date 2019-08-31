@@ -25,7 +25,7 @@
   #define USE_LIBTHEORA
   #include "ProcessSandbox.h"
   #include "RLBox_Process.h"
-  using TRLSandbox = RLBox_Process<THEORAProcessSandbox>;
+  using TRLSandbox = RLBox_Process<TheoraProcessSandbox>;
   #undef USE_LIBTHEORA
 #endif
 
