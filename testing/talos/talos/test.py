@@ -1109,7 +1109,7 @@ class theora_perf(PageloaderTest):
     tpmanifest = '${talos}/tests/theora_perf/tests.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 2
+    tppagecycles = 5
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
