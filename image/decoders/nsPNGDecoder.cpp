@@ -1190,7 +1190,7 @@ nsPNGDecoder::ReadPNGData(const char* aData, size_t aLength)
     d_png_process_data(mPNG, mInfo,
                    reinterpret_cast<unsigned char*>(const_cast<char*>((aData_sandbox))),
                    aLength);
-    freeInPngSandbox(aData_sandbox);
+    freeInPngSandbox(const_cast<void*>(aData_sandbox));
   #endif
   PngBench.Stop();
 
