@@ -37,6 +37,9 @@ public:
     // Bug 1263836 will handle alpha scenario once implemented. It will shift
     // the check for alpha to PDMFactory but not itself remove the need for a
     // check.
+
+    // Temporarily, disable the FFMpeg decoder so we fall back to the VP9 decoder
+    return nullptr;
     if (aParams.VideoConfig().HasAlpha()) {
       return nullptr;
     }
