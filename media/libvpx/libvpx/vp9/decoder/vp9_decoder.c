@@ -50,6 +50,17 @@ static void initialize_dec(void) {
 
 static void vp9_dec_setup_mi(VP9_COMMON *cm) {
   cm->mi = cm->mip + cm->mi_stride + 1;
+  long int a = cm->mi_stride;
+  long int b = (cm-> mi_rows + 1);
+  long int c = sizeof(*cm->mip);
+  const long int lim = 2147483647;
+  if (a * b * c > lim) {
+    // Overflow
+    printf("Multiply Overflow (%ld) from %ld, %ld, %ld\n",
+      a * b * c,
+      a, b, c
+    );
+  }
   memset(cm->mip, 0, cm->mi_stride * (cm-> mi_rows + 1) * sizeof(*cm->mip));
   cm->mi_grid_visible = cm->mi_grid_base + cm->mi_stride + 1;
   memset(cm->mi_grid_base, 0,
