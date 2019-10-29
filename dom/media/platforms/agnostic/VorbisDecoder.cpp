@@ -15,6 +15,52 @@
 #undef LOG
 #define LOG(type, msg) MOZ_LOG(sPDMLog, type, msg)
 
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  #define sandbox_invoke_custom(sandbox, fnName, ...) sandbox_invoke_custom_helper_vorbis(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName, false), ##__VA_ARGS__)
+  #define sandbox_invoke_custom_return_app_ptr(sandbox, fnName, ...) sandbox_invoke_custom_return_app_ptr_helper_vorbis(sandbox, (decltype(fnName)*)sandbox->getFunctionPointerFromCache(#fnName, false), ##__VA_ARGS__)
+  #define sandbox_invoke_custom_with_ptr(sandbox, fnPtr, ...) sandbox_invoke_custom_helper_vorbis(sandbox, fnPtr, ##__VA_ARGS__)
+
+  template<typename TFunc, typename... TArgs>
+  inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
+  tainted<return_argument<TFunc>, TRLSandbox>
+  >::type sandbox_invoke_custom_helper_vorbis(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
+  {
+    // //vorbisStartTimer();
+    auto ret = sandbox->invokeWithFunctionPointer(fnPtr, params...);
+    // //vorbisEndTimer();
+    return ret;
+  }
+
+  template<typename TFunc, typename... TArgs>
+  inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
+  void
+  >::type sandbox_invoke_custom_helper_vorbis(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
+  {
+    // //vorbisStartTimer();
+    sandbox->invokeWithFunctionPointer(fnPtr, params...);
+    // //vorbisEndTimer();
+  }
+
+  template<typename TFunc, typename... TArgs>
+  inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
+  return_argument<TFunc>
+  >::type sandbox_invoke_custom_return_app_ptr_helper_vorbis(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
+  {
+    // //vorbisStartTimer();
+    auto ret = sandbox->invokeWithFunctionPointerReturnAppPtr(fnPtr, params...);
+    // //vorbisEndTimer();
+    return ret;
+  }
+
+  rlbox_load_library_api(vorbislib, TRLSandbox)
+#endif
+
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+extern "C" {
+void getSandboxingFolder(char* SandboxingCodeRootFolder);
+}
+#endif
+
 namespace mozilla {
 
 ogg_packet InitVorbisPacket(const unsigned char* aData, size_t aLength,
@@ -31,6 +77,22 @@ ogg_packet InitVorbisPacket(const unsigned char* aData, size_t aLength,
   return packet;
 }
 
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+void InitVorbisPacketTainted(tainted_volatile<ogg_packet, TRLSandbox>& packet,
+                         tainted<unsigned char*, TRLSandbox> aData, size_t aLength,
+                         bool aBOS, bool aEOS,
+                         int64_t aGranulepos, int64_t aPacketNo)
+{
+  packet.packet = aData;
+  packet.bytes = aLength;
+  packet.b_o_s = aBOS;
+  packet.e_o_s = aEOS;
+  packet.granulepos = aGranulepos;
+  packet.packetno = aPacketNo;
+}
+#endif
+
+
 VorbisDataDecoder::VorbisDataDecoder(const CreateDecoderParams& aParams)
   : mInfo(aParams.AudioConfig())
   , mTaskQueue(aParams.mTaskQueue)
@@ -39,18 +101,55 @@ VorbisDataDecoder::VorbisDataDecoder(const CreateDecoderParams& aParams)
 {
   // Zero these member vars to avoid crashes in Vorbis clear functions when
   // destructor is called before |Init|.
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  char SandboxingCodeRootFolder[1024];
+  getSandboxingFolder(SandboxingCodeRootFolder);
+
+  char full_STARTUP_LIBRARY_PATH[1024];
+  char full_SANDBOX_INIT_APP_VORBIS[1024];
+
+  strcpy(full_STARTUP_LIBRARY_PATH, SandboxingCodeRootFolder);
+  strcat(full_STARTUP_LIBRARY_PATH, STARTUP_LIBRARY_PATH);
+
+  strcpy(full_SANDBOX_INIT_APP_VORBIS, SandboxingCodeRootFolder);
+  strcat(full_SANDBOX_INIT_APP_VORBIS, SANDBOX_INIT_APP_VORBIS);
+
+  printf("Creating Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP_VORBIS);
+  rlbox_vorbis = RLBoxSandbox<TRLSandbox>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP_VORBIS);
+
+  p_mVorbisBlock = rlbox_vorbis->mallocInSandbox<vorbis_block>();
+  p_mVorbisDsp = rlbox_vorbis->mallocInSandbox<vorbis_dsp_state>();
+  p_mVorbisInfo = rlbox_vorbis->mallocInSandbox<vorbis_info>();
+  p_mVorbisComment = rlbox_vorbis->mallocInSandbox<vorbis_comment>();
+  // Safe as this is only memclr these structs
+  PodZero(p_mVorbisBlock.UNSAFE_Unverified());
+  PodZero(p_mVorbisDsp.UNSAFE_Unverified());
+  PodZero(p_mVorbisInfo.UNSAFE_Unverified());
+  PodZero(p_mVorbisComment.UNSAFE_Unverified());
+  #else
   PodZero(&mVorbisBlock);
   PodZero(&mVorbisDsp);
   PodZero(&mVorbisInfo);
   PodZero(&mVorbisComment);
+  #endif
 }
 
 VorbisDataDecoder::~VorbisDataDecoder()
 {
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  sandbox_invoke_custom(rlbox_vorbis, vorbis_block_clear, p_mVorbisBlock);
+  sandbox_invoke_custom(rlbox_vorbis, vorbis_dsp_clear, p_mVorbisDsp);
+  sandbox_invoke_custom(rlbox_vorbis, vorbis_info_clear, p_mVorbisInfo);
+  sandbox_invoke_custom(rlbox_vorbis, vorbis_comment_clear, p_mVorbisComment);
+
+  printf("Destroying Vorbis Sandbox\n");
+  rlbox_vorbis->destroySandbox();
+  #else
   vorbis_block_clear(&mVorbisBlock);
   vorbis_dsp_clear(&mVorbisDsp);
   vorbis_info_clear(&mVorbisInfo);
   vorbis_comment_clear(&mVorbisComment);
+  #endif
 }
 
 RefPtr<ShutdownPromise>
@@ -65,10 +164,18 @@ VorbisDataDecoder::Shutdown()
 RefPtr<MediaDataDecoder::InitPromise>
 VorbisDataDecoder::Init()
 {
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  sandbox_invoke_custom(rlbox_vorbis, vorbis_info_init, p_mVorbisInfo);
+  sandbox_invoke_custom(rlbox_vorbis, vorbis_comment_init, p_mVorbisComment);
+  // Safe as this is only memclr these structs
+  PodZero(p_mVorbisDsp.UNSAFE_Unverified());
+  PodZero(p_mVorbisBlock.UNSAFE_Unverified());
+  #else
   vorbis_info_init(&mVorbisInfo);
   vorbis_comment_init(&mVorbisComment);
   PodZero(&mVorbisDsp);
   PodZero(&mVorbisBlock);
+  #endif
 
   AutoTArray<unsigned char*,4> headers;
   AutoTArray<size_t,4> headerLens;
@@ -91,7 +198,11 @@ VorbisDataDecoder::Init()
 
   MOZ_ASSERT(mPacketCount == 3);
 
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  int r = sandbox_invoke_custom(rlbox_vorbis, vorbis_synthesis_init, p_mVorbisDsp, p_mVorbisInfo).UNSAFE_Unverified();
+  #else
   int r = vorbis_synthesis_init(&mVorbisDsp, &mVorbisInfo);
+  #endif
   if (r) {
     return InitPromise::CreateAndReject(
       MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
@@ -99,7 +210,11 @@ VorbisDataDecoder::Init()
       __func__);
   }
 
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  r = sandbox_invoke_custom(rlbox_vorbis, vorbis_block_init, p_mVorbisDsp, p_mVorbisBlock).UNSAFE_Unverified();
+  #else
   r = vorbis_block_init(&mVorbisDsp, &mVorbisBlock);
+  #endif
   if (r) {
     return InitPromise::CreateAndReject(
       MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
@@ -107,16 +222,29 @@ VorbisDataDecoder::Init()
       __func__);
   }
 
-  if (mInfo.mRate != (uint32_t)mVorbisDsp.vi->rate) {
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  // This is fine as this is only used for logging purposes
+  uint32_t rateFromBlock = (uint32_t)p_mVorbisDsp->vi->rate.UNSAFE_Unverified();
+  #else
+  uint32_t rateFromBlock = (uint32_t)mVorbisDsp.vi->rate;
+  #endif
+
+  if (mInfo.mRate != rateFromBlock) {
     LOG(LogLevel::Warning,
         ("Invalid Vorbis header: container and codec rate do not match!"));
   }
-  if (mInfo.mChannels != (uint32_t)mVorbisDsp.vi->channels) {
+
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  uint32_t channelsFromBlock = (uint32_t)p_mVorbisDsp->vi->channels.UNSAFE_Unverified();
+  #else
+  uint32_t channelsFromBlock = (uint32_t)mVorbisDsp.vi->rate;
+  #endif
+  if (mInfo.mChannels != channelsFromBlock) {
     LOG(LogLevel::Warning,
         ("Invalid Vorbis header: container and codec channels do not match!"));
   }
 
-  AudioConfig::ChannelLayout layout(mVorbisDsp.vi->channels);
+  AudioConfig::ChannelLayout layout(channelsFromBlock);
   if (!layout.IsValid()) {
     return InitPromise::CreateAndReject(
       MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
@@ -131,13 +259,51 @@ nsresult
 VorbisDataDecoder::DecodeHeader(const unsigned char* aData, size_t aLength)
 {
   bool bos = mPacketCount == 0;
+
+  #if(USE_SANDBOXING_BUFFERS != 0)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    tainted<unsigned char*, TRLSandbox> buff_copy = rlbox_vorbis->mallocInSandbox<unsigned char>(aLength);
+    memcpy(buff_copy.UNSAFE_Unverified(), aData, aLength);
+    tainted<ogg_packet*, TRLSandbox> p_pkt = rlbox_vorbis->mallocInSandbox<ogg_packet>();
+    auto& pkt = *p_pkt;
+    InitVorbisPacketTainted(pkt, buff_copy, aLength, bos, false, 0, mPacketCount++);
+    #else
+      unsigned char* buff_copy = (unsigned char*) malloc(aLength);
+      memcpy(buff_copy, aData, aLength);
+      ogg_packet pkt = InitVorbisPacket(buff_copy, aLength, bos, false, 0, mPacketCount++);
+    #endif
+  #else
   ogg_packet pkt =
     InitVorbisPacket(aData, aLength, bos, false, 0, mPacketCount++);
+  #endif
+
   MOZ_ASSERT(mPacketCount <= 3);
 
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  int r = sandbox_invoke_custom(rlbox_vorbis, vorbis_synthesis_headerin,
+                                    p_mVorbisInfo,
+                                    p_mVorbisComment,
+                                    p_pkt).copyAndVerify([](int val){
+                                      // one time boolean read, which Firefox can handle any value of
+                                      // no verification needed
+                                      return val;
+                                    });
+  #else
   int r = vorbis_synthesis_headerin(&mVorbisInfo,
                                     &mVorbisComment,
                                     &pkt);
+  #endif
+
+  #if(USE_SANDBOXING_BUFFERS != 0)
+    //TODO: Clear buffer
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+      rlbox_vorbis->freeInSandbox(buff_copy);
+      rlbox_vorbis->freeInSandbox(p_pkt);
+    #else
+      free(buff_copy);
+    #endif
+  #endif
+
   return r == 0 ? NS_OK : NS_ERROR_FAILURE;
 }
 
@@ -168,11 +334,38 @@ VorbisDataDecoder::ProcessDecode(MediaRawData* aSample)
     mLastFrameTime = Some(aSample->mTime.ToMicroseconds());
   }
 
+  #if(USE_SANDBOXING_BUFFERS != 0)
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+      tainted<unsigned char*, TRLSandbox> buff_copy = rlbox_vorbis->mallocInSandbox<unsigned char>(aLength);
+      memcpy(buff_copy.UNSAFE_Unverified(), aData, aLength);
+      tainted<ogg_packet*, TRLSandbox> p_pkt = rlbox_vorbis->mallocInSandbox<ogg_packet>();
+      auto& pkt = *p_pkt;
+      InitVorbisPacketTainted(
+        pkt, buff_copy, aLength, false, aSample->mEOS,
+        aSample->mTimecode.ToMicroseconds(), mPacketCount++);
+    #else
+      unsigned char* buff_copy = (unsigned char*) malloc(aLength);
+      memcpy(buff_copy, aData, aLength);
+      ogg_packet pkt = InitVorbisPacket(
+        buff_copy, aLength, false, aSample->mEOS,
+        aSample->mTimecode.ToMicroseconds(), mPacketCount++);
+    #endif
+  #else
   ogg_packet pkt = InitVorbisPacket(
     aData, aLength, false, aSample->mEOS,
     aSample->mTimecode.ToMicroseconds(), mPacketCount++);
+  #endif
 
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  int err = sandbox_invoke_custom(rlbox_vorbis, vorbis_synthesis, 
+                p_mVorbisBlock, &pkt).copyAndVerify([](int val){
+                  // one time boolean read, which Firefox can handle any value of
+                  // no verification needed
+                  return val;
+                });
+  #else
   int err = vorbis_synthesis(&mVorbisBlock, &pkt);
+  #endif
   if (err) {
     return DecodePromise::CreateAndReject(
       MediaResult(NS_ERROR_DOM_MEDIA_DECODE_ERR,
@@ -180,7 +373,16 @@ VorbisDataDecoder::ProcessDecode(MediaRawData* aSample)
       __func__);
   }
 
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  err = sandbox_invoke_custom(rlbox_vorbis, vorbis_synthesis_blockin, p_mVorbisDsp, p_mVorbisBlock)
+                .copyAndVerify([](int val){
+                  // one time boolean read, which Firefox can handle any value of
+                  // no verification needed
+                  return val;
+                });
+  #else
   err = vorbis_synthesis_blockin(&mVorbisDsp, &mVorbisBlock);
+  #endif
   if (err) {
     return DecodePromise::CreateAndReject(
       MediaResult(NS_ERROR_DOM_MEDIA_DECODE_ERR,
@@ -188,25 +390,46 @@ VorbisDataDecoder::ProcessDecode(MediaRawData* aSample)
       __func__);
   }
 
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  tainted<VorbisPCMValue***, TRLSandbox> p_pcm = rlbox_vorbis->mallocInSandbox<VorbisPCMValue**>();
+  auto& pcm = *p_pcm;
+  pcm = nullptr;
+  int32_t frames = sandbox_invoke_custom(rlbox_vorbis, vorbis_synthesis_pcmout, p_mVorbisDsp, &pcm)
+                    .UNSAFE_Unverified();
+  #else
   VorbisPCMValue** pcm = 0;
   int32_t frames = vorbis_synthesis_pcmout(&mVorbisDsp, &pcm);
+  #endif
   if (frames == 0) {
     return DecodePromise::CreateAndResolve(DecodedData(), __func__);
   }
 
   DecodedData results;
   while (frames > 0) {
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    uint32_t channels = p_mVorbisDsp->vi->channels.UNSAFE_Unverified();
+    uint32_t rate = p_mVorbisDsp->vi->rate.UNSAFE_Unverified();
+    #else
     uint32_t channels = mVorbisDsp.vi->channels;
     uint32_t rate = mVorbisDsp.vi->rate;
+    #endif
     AlignedAudioBuffer buffer(frames*channels);
     if (!buffer) {
       return DecodePromise::CreateAndReject(
         MediaResult(NS_ERROR_OUT_OF_MEMORY, __func__), __func__);
     }
     for (uint32_t j = 0; j < channels; ++j) {
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+      tainted<VorbisPCMValue*, TRLSandbox> channel = *(pcm + j);
+      #else
       VorbisPCMValue* channel = pcm[j];
+      #endif
       for (uint32_t i = 0; i < uint32_t(frames); ++i) {
-        buffer[i*channels + j] = MOZ_CONVERT_VORBIS_SAMPLE(channel[i]);
+        #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+          buffer[i*channels + j] = MOZ_CONVERT_VORBIS_SAMPLE((*(channel + i)).UNSAFE_Unverified());
+        #else
+          buffer[i*channels + j] = MOZ_CONVERT_VORBIS_SAMPLE(channel[i]);
+        #endif
       }
     }
 
@@ -255,7 +478,16 @@ VorbisDataDecoder::ProcessDecode(MediaRawData* aSample)
     results.AppendElement(new AudioData(aOffset, time, duration,
                                         frames, data.Forget(), channels, rate));
     mFrames += frames;
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    err = sandbox_invoke_custom(rlbox_vorbis, vorbis_synthesis_read, p_mVorbisDsp, frames)
+            .copyAndVerify([](int val){
+              // one time boolean read, which Firefox can handle any value of
+              // no verification needed
+              return val;
+            });
+    #else
     err = vorbis_synthesis_read(&mVorbisDsp, frames);
+    #endif
     if (err) {
       return DecodePromise::CreateAndReject(
         MediaResult(NS_ERROR_DOM_MEDIA_DECODE_ERR,
@@ -263,7 +495,11 @@ VorbisDataDecoder::ProcessDecode(MediaRawData* aSample)
         __func__);
     }
 
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    frames = sandbox_invoke_custom(rlbox_vorbis, vorbis_synthesis_pcmout, p_mVorbisDsp, &pcm).UNSAFE_Unverified();
+    #else
     frames = vorbis_synthesis_pcmout(&mVorbisDsp, &pcm);
+    #endif
   }
   return DecodePromise::CreateAndResolve(Move(results), __func__);
 }
@@ -284,7 +520,11 @@ VorbisDataDecoder::Flush()
     // Ignore failed results from vorbis_synthesis_restart. They
     // aren't fatal and it fails when ResetDecode is called at a
     // time when no vorbis data has been read.
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    sandbox_invoke_custom(rlbox_vorbis, vorbis_synthesis_restart, p_mVorbisDsp);
+    #else
     vorbis_synthesis_restart(&mVorbisDsp);
+    #endif
     mLastFrameTime.reset();
     return FlushPromise::CreateAndResolve(true, __func__);
   });
@@ -352,3 +592,9 @@ VorbisDataDecoder::VorbisLayout(uint32_t aChannels)
 
 } // namespace mozilla
 #undef LOG
+
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  #undef sandbox_invoke_custom
+  #undef sandbox_invoke_custom_return_app_ptr
+  #undef sandbox_invoke_custom_with_ptr
+#endif
