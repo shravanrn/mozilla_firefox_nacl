@@ -54,7 +54,6 @@
     return ret;
   }
 
-
   rlbox_load_library_api(theoralib, TRLSandbox)
 #endif
 
@@ -245,7 +244,6 @@ TheoraDecoder::DoDecodeHeader(const unsigned char* aData, size_t aLength)
   bool bos = mPacketCount == 0;
 
   #if(USE_SANDBOXING_BUFFERS != 0)
-    //TODO: Copy buffer
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       tainted<unsigned char*, TRLSandbox> buff_copy = rlbox_theora->mallocInSandbox<unsigned char>(aLength);
       memcpy(buff_copy.UNSAFE_Unverified(), aData, aLength);
@@ -310,7 +308,6 @@ TheoraDecoder::ProcessDecode(MediaRawData* aSample)
 
   bool bos = mPacketCount == 0;
   #if(USE_SANDBOXING_BUFFERS != 0)
-    //TODO: Copy buffer
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       tainted<unsigned char*, TRLSandbox> buff_copy = rlbox_theora->mallocInSandbox<unsigned char>(aLength);
       memcpy(buff_copy.UNSAFE_Unverified(), aData, aLength);
@@ -508,3 +505,9 @@ TheoraDecoder::IsTheora(const nsACString& aMimeType)
 
 } // namespace mozilla
 #undef LOG
+
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  #undef sandbox_invoke_custom
+  #undef sandbox_invoke_custom_return_app_ptr
+  #undef sandbox_invoke_custom_with_ptr
+#endif

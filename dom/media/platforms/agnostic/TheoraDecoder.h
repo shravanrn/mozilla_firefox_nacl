@@ -35,9 +35,6 @@ using namespace std::chrono;
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   #include "rlbox.h"
   using namespace rlbox;
-#endif
-
-#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   #include "theoralib_structs_for_cpp_api_new.h"
 #endif
 
