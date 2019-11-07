@@ -341,7 +341,6 @@ TheoraDecoder::ProcessDecode(MediaRawData* aSample)
   #endif
 
   #if(USE_SANDBOXING_BUFFERS != 0)
-    //TODO: Clear buffer
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       rlbox_theora->freeInSandbox(buff_copy);
       rlbox_theora->freeInSandbox(p_pkt);

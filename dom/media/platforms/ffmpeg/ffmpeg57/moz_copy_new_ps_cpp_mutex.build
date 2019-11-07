@@ -1,0 +1,34 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+UNIFIED_SOURCES += [
+    '../FFmpegAudioDecoder.cpp',
+    '../FFmpegDataDecoder.cpp',
+    '../FFmpegDecoderModule.cpp',
+    '../FFmpegVideoDecoder.cpp',
+]
+LOCAL_INCLUDES += [
+    '..',
+    'include',
+]
+
+if CONFIG['GNU_CXX']:
+  CXXFLAGS += [ '-Wno-deprecated-declarations' ]
+if CONFIG['CLANG_CXX']:
+  CXXFLAGS += [
+    '-Wno-unknown-attributes',
+  ]
+
+FINAL_LIBRARY = 'xul'
+DEFINES['USE_SANDBOXING_BUFFERS'] = 1
+DEFINES['PS_SANDBOX_USE_NEW_CPP_API'] = 42
+DEFINES['STARTUP_LIBRARY_PATH'] = '""'
+DEFINES['SANDBOX_INIT_APP_THEORA'] = '"ProcessSandbox/ProcessSandbox_otherside_theora64"'
+LOCAL_INCLUDES += [
+    '/../ProcessSandbox',
+    '/../rlbox_api',
+    '/media/libtheora_naclport/',
+]

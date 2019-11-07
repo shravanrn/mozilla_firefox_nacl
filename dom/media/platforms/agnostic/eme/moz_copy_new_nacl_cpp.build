@@ -1,0 +1,33 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+EXPORTS += [
+    'ChromiumCDMVideoDecoder.h',
+    'DecryptThroughputLimit.h',
+    'EMEDecoderModule.h',
+    'SamplesWaitingForKey.h',
+]
+
+UNIFIED_SOURCES += [
+    'ChromiumCDMVideoDecoder.cpp',
+    'EMEDecoderModule.cpp',
+    'SamplesWaitingForKey.cpp',
+]
+
+include('/ipc/chromium/chromium-config.mozbuild')
+
+FINAL_LIBRARY = 'xul'
+DEFINES['USE_SANDBOXING_BUFFERS'] = 1
+DEFINES['NACL_SANDBOX_USE_NEW_CPP_API'] = 42
+DEFINES['STARTUP_LIBRARY_PATH'] = '"Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe"'
+DEFINES['SANDBOX_INIT_APP_THEORA'] = '"libtheora/builds/x64/nacl_build/mainCombine/libtheora.nexe"'
+DEFINES['SANDBOX_INIT_APP_VPX'] = '"libvpx/builds/x64/nacl_build/mainCombine/libvpx.nexe"'
+LOCAL_INCLUDES += [
+    '/../rlbox_api',
+    '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
+    '/media/libtheora_naclport/',
+    '/media/libvpx_naclport/',
+]

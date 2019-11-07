@@ -86,6 +86,17 @@ static64: inithasrun
 	$(CP) ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_nocopy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_nocopy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_nocopy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_nocopy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_nocopy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_nocopy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_nocopy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_nocopy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_nocopy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_nocopy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_nocopy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_nocopy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_nocopy.build ../dom/media/webm/moz.build
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
 	$(CP) ../netwerk/streamconv/converters/moz_static.build ../netwerk/streamconv/converters/moz.build
@@ -96,6 +107,17 @@ static64_zlibnacl: inithasrun
 	$(CP) ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_nocopy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_nocopy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_nocopy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_nocopy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_nocopy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_nocopy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_nocopy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_nocopy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_nocopy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_nocopy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_nocopy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_nocopy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_nocopy.build ../dom/media/webm/moz.build
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
 	$(CP) ../netwerk/streamconv/converters/moz_nacl.build ../netwerk/streamconv/converters/moz.build
@@ -106,6 +128,17 @@ static64_zlibps: inithasrun
 	$(CP) ../image/decoders/moz_nocopy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_nocopy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_nocopy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_nocopy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_nocopy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_nocopy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_nocopy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_nocopy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_nocopy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_nocopy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_nocopy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_nocopy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_nocopy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_nocopy.build ../dom/media/webm/moz.build
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
 	$(CP) ../netwerk/streamconv/converters/moz_ps.build ../netwerk/streamconv/converters/moz.build
@@ -116,6 +149,17 @@ static64_buffcopy: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
 	$(CP) ../netwerk/streamconv/converters/moz_static_buffcopy.build ../netwerk/streamconv/converters/moz.build
@@ -126,6 +170,17 @@ static64_buffcopy_debug: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build
 	$(CP) ../netwerk/streamconv/converters/moz_static_buffcopy.build ../netwerk/streamconv/converters/moz.build
@@ -135,6 +190,17 @@ dynamic64: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_nonnacl ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nonnacl.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nonnacl.build ../media/libpng_naclport/moz.build
@@ -145,6 +211,17 @@ nacl64: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_nacl ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
@@ -155,6 +232,17 @@ nacl64_cpp: inithasrun
 	$(CP) ../image/decoders/moz_copy_nacl_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy_nacl_cpp.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_nacl_cpp ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
@@ -165,6 +253,17 @@ new_nacl64_cpp: inithasrun
 	$(CP) ../image/decoders/moz_copy_new_nacl_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy_new_nacl_cpp.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy_new_nacl_cpp.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy_new_nacl_cpp.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy_new_nacl_cpp.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy_new_nacl_cpp.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy_new_nacl_cpp.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy_new_nacl_cpp.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy_new_nacl_cpp.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy_new_nacl_cpp.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy_new_nacl_cpp.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy_new_nacl_cpp.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy_new_nacl_cpp.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy_new_nacl_cpp.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_new_nacl_cpp ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
@@ -175,6 +274,17 @@ new_ps64_cpp: inithasrun
 	$(CP) ../image/decoders/moz_copy_new_ps_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy_new_ps_cpp.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy_new_ps_cpp.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy_new_ps_cpp.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy_new_ps_cpp.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy_new_ps_cpp.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy_new_ps_cpp.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy_new_ps_cpp.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy_new_ps_cpp.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy_new_ps_cpp.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy_new_ps_cpp.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy_new_ps_cpp.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy_new_ps_cpp.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy_new_ps_cpp.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_new_ps_cpp ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -184,7 +294,18 @@ new_ps64_cpp: inithasrun
 new_ps64_cpp_mutex: inithasrun
 	$(CP) ../image/decoders/moz_copy_new_ps_cpp_mutex.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy_new_ps_cpp_mutex.build ../image/moz.build
-	$(CP) ../dom/media/platforms/moz_copy_new_ps_cpp.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/moz_copy_new_ps_cpp_mutex.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy_new_ps_cpp_mutex.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy_new_ps_cpp_mutex.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy_new_ps_cpp_mutex.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy_new_ps_cpp_mutex.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy_new_ps_cpp_mutex.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy_new_ps_cpp_mutex.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy_new_ps_cpp_mutex.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy_new_ps_cpp_mutex.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy_new_ps_cpp_mutex.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy_new_ps_cpp_mutex.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy_new_ps_cpp_mutex.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_new_ps_cpp_mutex ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -195,6 +316,17 @@ ps64_cpp: inithasrun
 	$(CP) ../image/decoders/moz_copy_process_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy_process_cpp.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_process_cpp ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -205,6 +337,17 @@ ps64_cpp_debug: inithasrun
 	$(CP) ../image/decoders/moz_copy_process_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy_process_cpp.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_process_cpp_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -215,6 +358,17 @@ ps64: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_ps ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -225,6 +379,17 @@ nacl64_nosimd: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_nacl_nosimd ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl_nosimd.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl.build ../media/libpng_naclport/moz.build
@@ -235,6 +400,17 @@ dynamic64_dbg: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_nonnacl_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nonnacl_debug.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nonnacl_debug.build ../media/libpng_naclport/moz.build
@@ -245,6 +421,17 @@ nacl64_dbg: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_nacl_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl_debug.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl_debug.build ../media/libpng_naclport/moz.build
@@ -255,6 +442,17 @@ nacl64_cpp_dbg: inithasrun
 	$(CP) ../image/decoders/moz_copy_nacl_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy_nacl_cpp.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_nacl_cpp_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl_debug.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl_debug.build ../media/libpng_naclport/moz.build
@@ -265,6 +463,17 @@ new_nacl64_cpp_dbg: inithasrun
 	$(CP) ../image/decoders/moz_copy_new_nacl_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy_new_nacl_cpp.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy_new_nacl_cpp.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy_new_nacl_cpp.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy_new_nacl_cpp.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy_new_nacl_cpp.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy_new_nacl_cpp.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy_new_nacl_cpp.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy_new_nacl_cpp.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy_new_nacl_cpp.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy_new_nacl_cpp.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy_new_nacl_cpp.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy_new_nacl_cpp.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy_new_nacl_cpp.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_new_nacl_cpp_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl_debug.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl_debug.build ../media/libpng_naclport/moz.build
@@ -275,6 +484,17 @@ new_ps64_cpp_dbg: inithasrun
 	$(CP) ../image/decoders/moz_copy_new_ps_cpp.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy_new_ps_cpp.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy_new_ps_cpp.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy_new_ps_cpp.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy_new_ps_cpp.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy_new_ps_cpp.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy_new_ps_cpp.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy_new_ps_cpp.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy_new_ps_cpp.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy_new_ps_cpp.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy_new_ps_cpp.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy_new_ps_cpp.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy_new_ps_cpp.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy_new_ps_cpp.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_new_ps_cpp_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -285,6 +505,17 @@ ps64_dbg: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_debug_ps ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -295,6 +526,17 @@ ps64_asan: inithasrun
 	$(CP) ../image/decoders/moz_copy.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_asan_ps ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
@@ -305,6 +547,17 @@ wasm64_debug: inithasrun
 	$(CP) ../image/decoders/moz_copy_wasm.build ../image/decoders/moz.build
 	$(CP) ../image/moz_copy_wasm.build ../image/moz.build
 	$(CP) ../dom/media/platforms/moz_copy.build ../dom/media/platforms/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/moz_copy.build ../dom/media/platforms/ffmpeg/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffvpx/moz_copy.build ../dom/media/platforms/ffmpeg/ffvpx/moz.build
+	$(CP) ../dom/media/platforms/omx/moz_copy.build ../dom/media/platforms/omx/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/ffmpeg57/moz_copy.build ../dom/media/platforms/ffmpeg/ffmpeg57/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav55/moz_copy.build ../dom/media/platforms/ffmpeg/libav55/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav54/moz_copy.build ../dom/media/platforms/ffmpeg/libav54/moz.build
+	$(CP) ../dom/media/platforms/ffmpeg/libav53/moz_copy.build ../dom/media/platforms/ffmpeg/libav53/moz.build
+	$(CP) ../dom/media/platforms/agnostic/gmp/moz_copy.build ../dom/media/platforms/agnostic/gmp/moz.build
+	$(CP) ../dom/media/platforms/agnostic/eme/moz_copy.build ../dom/media/platforms/agnostic/eme/moz.build
+	$(CP) ../dom/media/gtest/moz_copy.build ../dom/media/gtest/moz.build
+	$(CP) ../dom/media/webm/moz_copy.build ../dom/media/webm/moz.build
 	$(CP) ../mozconfig64_wasm_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_static.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_static.build ../media/libpng_naclport/moz.build

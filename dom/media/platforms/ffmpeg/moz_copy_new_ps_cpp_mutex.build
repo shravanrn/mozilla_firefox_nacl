@@ -1,0 +1,45 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+EXPORTS += [
+    'FFmpegRuntimeLinker.h',
+]
+
+DIRS += [
+    'libav53',
+    'libav54',
+    'libav55',
+    'ffmpeg57',
+]
+
+UNIFIED_SOURCES += [
+    'FFmpegRuntimeLinker.cpp',
+]
+
+# Copy sandbox data to intermediate buffers
+DEFINES['USE_SANDBOXING_BUFFERS'] = 1
+
+# Comment out the following if you want to use the CPP api of NaClSandbox. The value '42' below is disregarded
+# DEFINES['NACL_SANDBOX_USE_CPP_API'] = 42
+# DEFINES['PROCESS_SANDBOX_USE_CPP_API'] = 42
+
+# Comment out the following if you want to use the CPP api of ProcessSandbox. The value '42' below is disregarded
+# DEFINES['NACL_SANDBOX_USE_NEW_CPP_API'] = 42
+# DEFINES['WASM_SANDBOX_USE_CPP_API'] = 42
+DEFINES['PS_SANDBOX_USE_NEW_CPP_API'] = 42
+
+DEFINES['PS_SANDBOX_DONT_USE_SPIN'] = 42
+
+DEFINES['STARTUP_LIBRARY_PATH'] = '""'
+DEFINES['SANDBOX_INIT_APP_THEORA'] = '"ProcessSandbox/ProcessSandbox_otherside_theora64"'
+
+LOCAL_INCLUDES += [
+    '/../ProcessSandbox',
+    '/../rlbox_api',
+    '/media/libtheora_naclport/',
+]
+
+FINAL_LIBRARY = 'xul'
