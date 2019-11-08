@@ -681,10 +681,18 @@ WebMDemuxer::GetNextPacket(TrackInfo::TrackType aType,
         auto sample = MakeSpan(data, length);
         switch (mVideoCodec) {
         case NESTEGG_CODEC_VP8:
+          #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+          isKeyframe = VPXDecoder::IsKeyframe(VPXDecoder::getKeyframeSandbox(), sample, VPXDecoder::Codec::VP8);
+          #else
           isKeyframe = VPXDecoder::IsKeyframe(sample, VPXDecoder::Codec::VP8);
+          #endif
           break;
         case NESTEGG_CODEC_VP9:
+          #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+          isKeyframe = VPXDecoder::IsKeyframe(VPXDecoder::getKeyframeSandbox(), sample, VPXDecoder::Codec::VP9);
+          #else
           isKeyframe = VPXDecoder::IsKeyframe(sample, VPXDecoder::Codec::VP9);
+          #endif
           break;
 #ifdef MOZ_AV1
         case NESTEGG_CODEC_AV1:

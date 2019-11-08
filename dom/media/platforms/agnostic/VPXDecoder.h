@@ -10,6 +10,10 @@
 #include "mozilla/Span.h"
 
 #include <stdint.h>
+#include <chrono>
+#include <atomic>
+using namespace std::chrono;
+
 #define VPX_DONT_DEFINE_STDINT_TYPES
 #include "vpx/vp8dx.h"
 #include "vpx/vpx_codec.h"
@@ -72,14 +76,21 @@ public:
 
   // Return true if a sample is a keyframe for the specified codec.
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  static RLBoxSandbox<TRLSandbox>* getKeyframeSandbox();
   static bool IsKeyframe(RLBoxSandbox<TRLSandbox>* rlbox_vpx, Span<const uint8_t> aBuffer, Codec aCodec);
   #else
-  #endif
   static bool IsKeyframe(Span<const uint8_t> aBuffer, Codec aCodec);
+  #endif
   // Return the frame dimensions for a sample for the specified codec.
   static gfx::IntSize GetFrameSize(Span<const uint8_t> aBuffer, Codec aCodec);
 
 private:
+
+  std::atomic_ullong vpxDecodeInvocations{0};
+  std::atomic_ullong timeBetweenVpxDecode{0};
+  std::atomic_ullong timeSpentInVpxDecode{0};
+  std::atomic_ullong previousVpxDecodeCall;
+
   ~VPXDecoder();
   RefPtr<DecodePromise> ProcessDecode(MediaRawData* aSample);
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
