@@ -30,5 +30,6 @@ DEFINES['SANDBOX_INIT_APP_THEORA'] = '"ProcessSandbox/ProcessSandbox_otherside_t
 LOCAL_INCLUDES += [
     '/../ProcessSandbox',
     '/../rlbox_api',
-    '/media/libtheora_naclport/',
+    '/media/libtheora_naclport/'
+,'/media/libvpx_naclport/',
 ]

@@ -25,15 +25,15 @@ using namespace std::chrono;
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
   #include "RLBox_NaCl.h"
-  using TRLSandbox = RLBox_NaCl;
+  using TRLSandboxV = RLBox_NaCl;
 #elif defined(WASM_SANDBOX_USE_CPP_API)
   #include "RLBox_Wasm.h"
-  using TRLSandbox = RLBox_Wasm;
+  using TRLSandboxV = RLBox_Wasm;
 #elif defined(PS_SANDBOX_USE_NEW_CPP_API)
   #define USE_LIBVPX
   #include "ProcessSandbox.h"
   #include "RLBox_Process.h"
-  using TRLSandbox = RLBox_Process<VpxProcessSandbox>;
+  using TRLSandboxV = RLBox_Process<VPXProcessSandbox>;
   #undef USE_LIBVPX
 #endif
 
@@ -76,8 +76,8 @@ public:
 
   // Return true if a sample is a keyframe for the specified codec.
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  static RLBoxSandbox<TRLSandbox>* getKeyframeSandbox();
-  static bool IsKeyframe(RLBoxSandbox<TRLSandbox>* rlbox_vpx, Span<const uint8_t> aBuffer, Codec aCodec);
+  static RLBoxSandbox<TRLSandboxV>* getKeyframeSandbox();
+  static bool IsKeyframe(RLBoxSandbox<TRLSandboxV>* rlbox_vpx, Span<const uint8_t> aBuffer, Codec aCodec);
   #else
   static bool IsKeyframe(Span<const uint8_t> aBuffer, Codec aCodec);
   #endif
@@ -94,7 +94,7 @@ private:
   ~VPXDecoder();
   RefPtr<DecodePromise> ProcessDecode(MediaRawData* aSample);
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  MediaResult DecodeAlpha(tainted<vpx_image_t*, TRLSandbox>* aImgAlpha, const MediaRawData* aSample);
+  MediaResult DecodeAlpha(tainted<vpx_image_t*, TRLSandboxV>* aImgAlpha, const MediaRawData* aSample);
   #else
   MediaResult DecodeAlpha(vpx_image_t** aImgAlpha, const MediaRawData* aSample);
   #endif
@@ -103,9 +103,9 @@ private:
   const RefPtr<TaskQueue> mTaskQueue;
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  RLBoxSandbox<TRLSandbox>* rlbox_vpx;
-  tainted<vpx_codec_ctx_t*, TRLSandbox> p_mVPX;
-  tainted<vpx_codec_ctx_t*, TRLSandbox> p_mVPXAlpha;
+  RLBoxSandbox<TRLSandboxV>* rlbox_vpx;
+  tainted<vpx_codec_ctx_t*, TRLSandboxV> p_mVPX;
+  tainted<vpx_codec_ctx_t*, TRLSandboxV> p_mVPXAlpha;
   #else
   // VPx decoder state
   vpx_codec_ctx_t mVPX;

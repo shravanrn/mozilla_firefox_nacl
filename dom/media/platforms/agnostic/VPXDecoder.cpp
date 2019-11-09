@@ -25,8 +25,8 @@
 
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
-  tainted<return_argument<TFunc>, TRLSandbox>
-  >::type sandbox_invoke_custom_helper_vpx(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
+  tainted<return_argument<TFunc>, TRLSandboxV>
+  >::type sandbox_invoke_custom_helper_vpx(RLBoxSandbox<TRLSandboxV>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
     // //vpxStartTimer();
     auto ret = sandbox->invokeWithFunctionPointer(fnPtr, params...);
@@ -37,7 +37,7 @@
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
   void
-  >::type sandbox_invoke_custom_helper_vpx(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
+  >::type sandbox_invoke_custom_helper_vpx(RLBoxSandbox<TRLSandboxV>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
     // //vpxStartTimer();
     sandbox->invokeWithFunctionPointer(fnPtr, params...);
@@ -47,7 +47,7 @@
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
   return_argument<TFunc>
-  >::type sandbox_invoke_custom_return_app_ptr_helper_vpx(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
+  >::type sandbox_invoke_custom_return_app_ptr_helper_vpx(RLBoxSandbox<TRLSandboxV>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
     // //vpxStartTimer();
     auto ret = sandbox->invokeWithFunctionPointerReturnAppPtr(fnPtr, params...);
@@ -55,7 +55,7 @@
     return ret;
   }
 
-  rlbox_load_library_api(vpxlib, TRLSandbox)
+  rlbox_load_library_api(vpxlib, TRLSandboxV)
 #endif
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
@@ -81,8 +81,8 @@ static VPXDecoder::Codec MimeTypeToCodec(const nsACString& aMimeType)
 
 static nsresult
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-InitContext(RLBoxSandbox<TRLSandbox>* rlbox_vpx,
-            tainted<vpx_codec_ctx_t*, TRLSandbox> aCtx,
+InitContext(RLBoxSandbox<TRLSandboxV>* rlbox_vpx,
+            tainted<vpx_codec_ctx_t*, TRLSandboxV> aCtx,
             const VideoInfo& aInfo,
             const VPXDecoder::Codec aCodec)
 #else
@@ -93,7 +93,7 @@ InitContext(vpx_codec_ctx_t* aCtx,
 {
   int decode_threads = 2;
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  tainted<vpx_codec_iface_t*, TRLSandbox> dx = nullptr;
+  tainted<vpx_codec_iface_t*, TRLSandboxV> dx = nullptr;
   #else
   vpx_codec_iface_t* dx = nullptr;
   #endif
@@ -120,7 +120,7 @@ InitContext(vpx_codec_ctx_t* aCtx,
   decode_threads = std::min(decode_threads, PR_GetNumberOfProcessors());
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  tainted<vpx_codec_dec_cfg_t*, TRLSandbox> p_config = rlbox_vpx->mallocInSandbox<vpx_codec_dec_cfg_t>();
+  tainted<vpx_codec_dec_cfg_t*, TRLSandboxV> p_config = rlbox_vpx->mallocInSandbox<vpx_codec_dec_cfg_t>();
   p_config->threads = decode_threads;
   p_config->w = p_config->h = 0; // set after decode
 
@@ -142,7 +142,7 @@ InitContext(vpx_codec_ctx_t* aCtx,
 }
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-static RLBoxSandbox<TRLSandbox>* createVPXSandbox() {
+static RLBoxSandbox<TRLSandboxV>* createVPXSandbox() {
   char SandboxingCodeRootFolder[1024];
   getSandboxingFolder(SandboxingCodeRootFolder);
 
@@ -156,7 +156,7 @@ static RLBoxSandbox<TRLSandbox>* createVPXSandbox() {
   strcat(full_SANDBOX_INIT_APP_VPX, SANDBOX_INIT_APP_VPX);
 
   printf("Creating Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP_VPX);
-  auto rlbox_vpx = RLBoxSandbox<TRLSandbox>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP_VPX);
+  auto rlbox_vpx = RLBoxSandbox<TRLSandboxV>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP_VPX);
   return rlbox_vpx;
 }
 #endif
@@ -188,6 +188,8 @@ VPXDecoder::~VPXDecoder()
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   rlbox_vpx->freeInSandbox(p_mVPX);
   rlbox_vpx->freeInSandbox(p_mVPXAlpha);
+  printf("Destroying Vpx Sandbox\n");
+  rlbox_vpx->destroySandbox();
   #endif
   MOZ_COUNT_DTOR(VPXDecoder);
   if (vpxDecodeInvocations > 5) {
@@ -281,7 +283,7 @@ VPXDecoder::ProcessDecode(MediaRawData* aSample)
 
   #if(USE_SANDBOXING_BUFFERS != 0)
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-      tainted<unsigned char*, TRLSandbox> buff_copy = rlbox_vpx->mallocInSandbox<unsigned char>(aLength);
+      tainted<unsigned char*, TRLSandboxV> buff_copy = rlbox_vpx->mallocInSandbox<unsigned char>(aLength);
       //unsafe is fine for memcpy
       memcpy(buff_copy.UNSAFE_Unverified(), aData, aLength);
       //unsafe is fine as an incorrect value would cause us to fail gracefully
@@ -317,10 +319,10 @@ VPXDecoder::ProcessDecode(MediaRawData* aSample)
   }
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  tainted<vpx_codec_iter_t*, TRLSandbox> p_iter = rlbox_vpx->mallocInSandbox<vpx_codec_iter_t>();
+  tainted<vpx_codec_iter_t*, TRLSandboxV> p_iter = rlbox_vpx->mallocInSandbox<vpx_codec_iter_t>();
   *p_iter = nullptr;
-  tainted<vpx_image_t *, TRLSandbox> img;
-  tainted<vpx_image_t *, TRLSandbox> img_alpha = nullptr;
+  tainted<vpx_image_t *, TRLSandboxV> img;
+  tainted<vpx_image_t *, TRLSandboxV> img_alpha = nullptr;
   #else
   vpx_codec_iter_t iter = nullptr;
   vpx_image_t *img;
@@ -521,7 +523,7 @@ VPXDecoder::Drain()
 
 MediaResult
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-VPXDecoder::DecodeAlpha(tainted<vpx_image_t *, TRLSandbox>* aImgAlpha, const MediaRawData* aSample)
+VPXDecoder::DecodeAlpha(tainted<vpx_image_t *, TRLSandboxV>* aImgAlpha, const MediaRawData* aSample)
 #else
 VPXDecoder::DecodeAlpha(vpx_image_t** aImgAlpha, const MediaRawData* aSample)
 #endif
@@ -531,7 +533,7 @@ VPXDecoder::DecodeAlpha(vpx_image_t** aImgAlpha, const MediaRawData* aSample)
 
   #if(USE_SANDBOXING_BUFFERS != 0)
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-      tainted<unsigned char*, TRLSandbox> buff_copy = rlbox_vpx->mallocInSandbox<unsigned char>(aLength);
+      tainted<unsigned char*, TRLSandboxV> buff_copy = rlbox_vpx->mallocInSandbox<unsigned char>(aLength);
       //unsafe is fine memcpy
       memcpy(buff_copy.UNSAFE_Unverified(), aData, aLength);
     #else
@@ -570,7 +572,7 @@ VPXDecoder::DecodeAlpha(vpx_image_t** aImgAlpha, const MediaRawData* aSample)
   }
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  tainted<vpx_codec_iter_t*, TRLSandbox> p_iter = rlbox_vpx->mallocInSandbox<vpx_codec_iter_t>();
+  tainted<vpx_codec_iter_t*, TRLSandboxV> p_iter = rlbox_vpx->mallocInSandbox<vpx_codec_iter_t>();
   *p_iter = nullptr;
 
   *aImgAlpha = sandbox_invoke(rlbox_vpx, vpx_codec_get_frame, p_mVPXAlpha, p_iter);
@@ -626,14 +628,14 @@ VPXDecoder::IsVP9(const nsACString& aMimeType)
 }
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-RLBoxSandbox<TRLSandbox>* VPXDecoder::getKeyframeSandbox() {
-  static RLBoxSandbox<TRLSandbox>* keyframeSandbox = createVPXSandbox();
+RLBoxSandbox<TRLSandboxV>* VPXDecoder::getKeyframeSandbox() {
+  static RLBoxSandbox<TRLSandboxV>* keyframeSandbox = createVPXSandbox();
   return keyframeSandbox;
 }
 
 /* static */
 bool
-VPXDecoder::IsKeyframe(RLBoxSandbox<TRLSandbox>* rlbox_vpx, Span<const uint8_t> aBuffer, Codec aCodec)
+VPXDecoder::IsKeyframe(RLBoxSandbox<TRLSandboxV>* rlbox_vpx, Span<const uint8_t> aBuffer, Codec aCodec)
 {
   auto p_si = rlbox_vpx->mallocInSandbox<vpx_codec_stream_info_t>();
   // Safe as this is just a memset
@@ -642,16 +644,16 @@ VPXDecoder::IsKeyframe(RLBoxSandbox<TRLSandbox>* rlbox_vpx, Span<const uint8_t> 
 
   auto aData = aBuffer.Elements();
   auto aLength = aBuffer.Length();
-  tainted<uint8_t*, TRLSandbox> buff_copy = rlbox_vpx->mallocInSandbox<uint8_t>(aLength);
+  tainted<uint8_t*, TRLSandboxV> buff_copy = rlbox_vpx->mallocInSandbox<uint8_t>(aLength);
   //unsafe is fine memcpy
   memcpy(buff_copy.UNSAFE_Unverified(), aData, aLength);
 
   if (aCodec == Codec::VP8) {
-    tainted<vpx_codec_iface_t *, TRLSandbox> ret = sandbox_invoke(rlbox_vpx, vpx_codec_vp8_dx);
+    tainted<vpx_codec_iface_t *, TRLSandboxV> ret = sandbox_invoke(rlbox_vpx, vpx_codec_vp8_dx);
     sandbox_invoke(rlbox_vpx, vpx_codec_peek_stream_info, ret, buff_copy, aLength, p_si);
     return bool(p_si->is_kf.UNSAFE_Unverified(/* TODO */));
   } else if (aCodec == Codec::VP9) {
-    tainted<vpx_codec_iface_t *, TRLSandbox> ret = sandbox_invoke(rlbox_vpx, vpx_codec_vp9_dx);
+    tainted<vpx_codec_iface_t *, TRLSandboxV> ret = sandbox_invoke(rlbox_vpx, vpx_codec_vp9_dx);
     sandbox_invoke(rlbox_vpx, vpx_codec_peek_stream_info, ret, buff_copy, aLength, p_si);
     return bool(p_si->is_kf.UNSAFE_Unverified(/* TODO */));
   }

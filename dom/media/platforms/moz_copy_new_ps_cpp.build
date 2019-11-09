@@ -117,14 +117,16 @@ FINAL_LIBRARY = 'xul'
 
 DEFINES['STARTUP_LIBRARY_PATH'] = '""'
 DEFINES['SANDBOX_INIT_APP_THEORA'] = '"ProcessSandbox/ProcessSandbox_otherside_theora64"'
+DEFINES['SANDBOX_INIT_APP_VPX'] = '"ProcessSandbox/ProcessSandbox_otherside_vpx64"'
 
 LOCAL_INCLUDES += [
     '/../ProcessSandbox',
     '/../rlbox_api',
-    '/media/libtheora_naclport/',
+    '/media/libtheora_naclport/'
+,'/media/libvpx_naclport/',
 ]
 
 if CONFIG['GNU_CXX']:
     CXXFLAGS += ['-Wno-error=shadow']
 
-OS_LIBS += ['-L../../../../ProcessSandbox', '-lProcessSandbox_theora64']
+OS_LIBS += ['-L../../../../ProcessSandbox', '-lProcessSandbox_theora64', '-lProcessSandbox_vpx64']
