@@ -1,6 +1,6 @@
 ac_add_options --enable-application=browser
 mk_add_options MOZ_MAKE_FLAGS="-j3"
-mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/firefox_64bit_optdebug_static_zlib_nacl
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/../ffbuilds/firefox_64bit_optdebug_static_zlib_nacl
 
 #ac_add_options --enable-debug
 ac_add_options --enable-optimize

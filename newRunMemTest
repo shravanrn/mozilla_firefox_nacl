@@ -27,10 +27,15 @@ if [[ ! -z "$4" ]]; then
 	fi
 fi
 
-FFVersionsDir=("./" "./" "../../mozilla_firefox_stock/")
+FFVersionsDir=("./" "./" "../mozilla_firefox_stock/")
 FFVersionsSuffix=("" "" "_stock")
 FFVersions=("new_nacl_cpp" "new_ps_cpp" "static")
 FFPinCores=("1" "1" "1")
+
+# FFVersionsDir=("./" "./")
+# FFVersionsSuffix=("" "")
+# FFVersions=("new_nacl_cpp" "new_ps_cpp")
+# FFPinCores=("1" "1")
 
 if [ ${#FFVersionsDir[@]} -ne ${#FFVersions[@]} ]; then
 	echo "Versions Dir and Versions do not match";

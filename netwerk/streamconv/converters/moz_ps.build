@@ -46,4 +46,4 @@ LOCAL_INCLUDES += [
     '/netwerk/base',
 ]
 
-OS_LIBS += ['-L../../../../ProcessSandbox', '-lProcessSandbox_zlib64']
+OS_LIBS += ['-L$(topsrcdir)/../ProcessSandbox', '-lProcessSandbox_zlib64']

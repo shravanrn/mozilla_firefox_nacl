@@ -1,6 +1,6 @@
 ac_add_options --enable-application=browser
 mk_add_options MOZ_MAKE_FLAGS="-j8"
-mk_add_options MOZ_OBJDIR=/mnt/2E304AEC2C0759A2/ffbuilds/firefox_64bit_optdebug_new_ps_cpp_debug
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/../ffbuilds/firefox_64bit_optdebug_new_ps_cpp_debug
 
 ac_add_options --enable-debug
 #ac_add_options --enable-optimize

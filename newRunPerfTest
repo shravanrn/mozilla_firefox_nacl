@@ -27,11 +27,16 @@ if [[ ! -z "$4" ]]; then
 	fi
 fi
 
-FFVersionsDir=("../../mozilla_firefox_stock/" "./" "./" "./" "./" "./")
+FFVersionsDir=("../mozilla_firefox_stock/" "./" "./" "./" "./" "./")
 FFVersionsSuffix=("_stock" "" "" "" "" "")
 FFVersions=("static" "static_buffcopy" "nacl" "new_nacl_cpp" "new_ps_cpp" "new_ps_cpp_mutex")
 #Process sbx is pinned to core 3. process-spin firefox is on separate core --- core 1, while process mutex is on the same core 3
 FFPinCores=("1" "1" "1" "1" "1" "3")
+
+# FFVersionsDir=("./" "./" "./" "../mozilla_firefox_stock/")
+# FFVersionsSuffix=("" "" "" "_stock")
+# FFVersions=("new_nacl_cpp" "new_ps_cpp" "new_ps_cpp_mutex" "static")
+# FFPinCores=("1" "1" "3" "1")
 
 if [ ${#FFVersionsDir[@]} -ne ${#FFVersions[@]} ]; then
 	echo "Versions Dir and Versions do not match";
@@ -81,6 +86,7 @@ function runTest(){
 	fi
 	sleep 2
 
+	# taskset -c $2 ./mach talos-test --activeTests png_perf 2>&1 | tee "$1_terminal_output.txt"
 	mv ./testing/mozharness/build/local.json "$1_page_render.json"
 }
 
@@ -98,5 +104,5 @@ sleep 2
 
 for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
 	./newAnalyzePerf.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_output.txt" 2>&1 >> "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_analysis.json"
-	./newAnalyzePerf.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_scaling_terminal_output.txt" 2>&1 >> "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_scaling_terminal_analysis.json"
+	./newAnalyzePerf.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_scaling_terminal_output.txt" 2>&1 >> "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_scaling_terminal_analysis.json" True
 done
