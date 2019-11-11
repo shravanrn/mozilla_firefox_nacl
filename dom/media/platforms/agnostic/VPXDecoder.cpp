@@ -406,6 +406,7 @@ VPXDecoder::ProcessDecode(MediaRawData* aSample)
 
     if (fmt == VPX_IMG_FMT_I420) {
       // chroma_shifts should be 0 or 1 media/libvpx/libvpx/test/y4m_test.cc - HeaderChecks
+      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
       auto y_chroma_shift = img->y_chroma_shift.copyAndVerify([](unsigned int val){
         if(val == 0 || val == 1) { return val; }
         abort();
@@ -414,6 +415,10 @@ VPXDecoder::ProcessDecode(MediaRawData* aSample)
         if(val == 0 || val == 1) { return val; }
         abort();
       });
+      #else
+      auto y_chroma_shift = img->y_chroma_shift;
+      auto x_chroma_shift = img->x_chroma_shift;
+      #endif
       b.mPlanes[1].mHeight = (d_h + 1) >> y_chroma_shift;
       b.mPlanes[1].mWidth = (d_w + 1) >> x_chroma_shift;
 
