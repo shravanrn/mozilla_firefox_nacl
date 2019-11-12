@@ -1135,6 +1135,22 @@ class vpx_perf(PageloaderTest):
     unit = 'ms'
     timeout = 72000
 
+@register_test()
+class vorbis_perf(PageloaderTest):
+    """
+    Test the bit rate when playing an ogg file
+    """
+    tpmanifest = '${talos}/tests/vorbis_perf/tests.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 5
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    # filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    filters = filter.mean.prepare()
+    unit = 'ms'
+    timeout = 72000
 
 @register_test()
 class tscrollx(PageloaderTest):

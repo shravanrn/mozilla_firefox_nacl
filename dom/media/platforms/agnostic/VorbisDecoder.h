@@ -6,6 +6,10 @@
 #if !defined(VorbisDecoder_h_)
 #define VorbisDecoder_h_
 
+#include <chrono>
+#include <atomic>
+using namespace std::chrono;
+
 #include "AudioConverter.h"
 #include "PlatformDecoderModule.h"
 #include "mozilla/Maybe.h"
@@ -15,6 +19,31 @@
 #else
 #include "vorbis/codec.h"
 #endif
+
+#if !defined(USE_SANDBOXING_BUFFERS)
+  #error "No build option defined. File VorbisDecoder.h is being included from an unexpected location"
+#endif
+
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+  #include "RLBox_NaCl.h"
+  using TRLSandbox = RLBox_NaCl;
+#elif defined(WASM_SANDBOX_USE_CPP_API)
+  #include "RLBox_Wasm.h"
+  using TRLSandbox = RLBox_Wasm;
+#elif defined(PS_SANDBOX_USE_NEW_CPP_API)
+  #define USE_LIBVORBIS
+  #include "ProcessSandbox.h"
+  #include "RLBox_Process.h"
+  using TRLSandbox = RLBox_Process<VorbisProcessSandbox>;
+  #undef USE_LIBVORBIS
+#endif
+
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  #include "rlbox.h"
+  using namespace rlbox;
+  #include "vorbislib_structs_for_cpp_api_new.h"
+#endif
+
 
 namespace mozilla {
 
@@ -39,6 +68,13 @@ public:
   static const AudioConfig::Channel* VorbisLayout(uint32_t aChannels);
 
 private:
+
+  std::atomic_ullong vorbisDecodeInvocations{0};
+  std::atomic_ullong timeBetweenVorbisDecode{0};
+  std::atomic_ullong timeSpentInVorbisDecode{0};
+  std::atomic_ullong previousVorbisDecodeCall;
+  std::atomic_ullong bitsProcessedByVorbis{0};
+
   nsresult DecodeHeader(const unsigned char* aData, size_t aLength);
   RefPtr<DecodePromise> ProcessDecode(MediaRawData* aSample);
 
@@ -46,10 +82,18 @@ private:
   const RefPtr<TaskQueue> mTaskQueue;
 
   // Vorbis decoder state
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  RLBoxSandbox<TRLSandbox>* rlbox_vorbis;
+  tainted<vorbis_info*, TRLSandbox> p_mVorbisInfo;
+  tainted<vorbis_comment*, TRLSandbox> p_mVorbisComment;
+  tainted<vorbis_dsp_state*, TRLSandbox> p_mVorbisDsp;
+  tainted<vorbis_block*, TRLSandbox> p_mVorbisBlock;
+  #else
   vorbis_info mVorbisInfo;
   vorbis_comment mVorbisComment;
   vorbis_dsp_state mVorbisDsp;
   vorbis_block mVorbisBlock;
+  #endif
 
   int64_t mPacketCount;
   int64_t mFrames;

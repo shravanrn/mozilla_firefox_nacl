@@ -118,11 +118,13 @@ FINAL_LIBRARY = 'xul'
 DEFINES['STARTUP_LIBRARY_PATH'] = '"Sandboxing_NaCl/native_client/scons-out/nacl_irt-x86-64/staging/irt_core.nexe"'
 DEFINES['SANDBOX_INIT_APP_THEORA'] = '"libtheora/builds/x64/nacl_build/mainCombine/libtheora.nexe"'
 DEFINES['SANDBOX_INIT_APP_VPX'] = '"libvpx/builds/x64/nacl_build/mainCombine/libvpx.nexe"'
+DEFINES['SANDBOX_INIT_APP_VORBIS'] = '"libvorbis/builds/x64/nacl_build/mainCombine/libvorbis.nexe"'
 
 LOCAL_INCLUDES += [
     '/../rlbox_api',
     '/../Sandboxing_NaCl/native_client/src/trusted/dyn_ldr',
     '/media/libtheora_naclport/',
+    '/media/libvorbis_naclport/',
     '/media/libvpx_naclport/',
 ]
 
