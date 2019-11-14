@@ -102,9 +102,23 @@
   g() \
   f(struct alloc_chain *, reap, FIELD_NORMAL, ##__VA_ARGS__)
 
+#define sandbox_fields_reflection_vorbislib_class_ogg_packet(f, g, ...) \
+	f(unsigned char *, packet, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(long           , bytes, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(long           , b_o_s, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(long           , e_o_s, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(ogg_int64_t    , granulepos, FIELD_NORMAL, ##__VA_ARGS__) \
+	g() \
+	f(ogg_int64_t    , packetno, FIELD_NORMAL, ##__VA_ARGS__)
+
 #define sandbox_fields_reflection_vorbislib_allClasses(f, ...) \
 	f(vorbis_info, vorbislib, ##__VA_ARGS__) \
 	f(vorbis_comment, vorbislib, ##__VA_ARGS__) \
 	f(vorbis_dsp_state, vorbislib, ##__VA_ARGS__) \
 	f(oggpack_buffer, vorbislib, ##__VA_ARGS__) \
-	f(vorbis_block, vorbislib, ##__VA_ARGS__)
+	f(vorbis_block, vorbislib, ##__VA_ARGS__) \
+	f(ogg_packet, vorbislib, ##__VA_ARGS__)

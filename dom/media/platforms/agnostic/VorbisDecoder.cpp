@@ -22,8 +22,8 @@
 
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
-  tainted<return_argument<TFunc>, TRLSandbox>
-  >::type sandbox_invoke_custom_helper_vorbis(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
+  tainted<return_argument<TFunc>, TRLSandboxVb>
+  >::type sandbox_invoke_custom_helper_vorbis(RLBoxSandbox<TRLSandboxVb>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
     // //vorbisStartTimer();
     auto ret = sandbox->invokeWithFunctionPointer(fnPtr, params...);
@@ -34,7 +34,7 @@
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<std::is_void<return_argument<TFunc>>::value,
   void
-  >::type sandbox_invoke_custom_helper_vorbis(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
+  >::type sandbox_invoke_custom_helper_vorbis(RLBoxSandbox<TRLSandboxVb>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
     // //vorbisStartTimer();
     sandbox->invokeWithFunctionPointer(fnPtr, params...);
@@ -44,7 +44,7 @@
   template<typename TFunc, typename... TArgs>
   inline typename std::enable_if<!std::is_void<return_argument<TFunc>>::value,
   return_argument<TFunc>
-  >::type sandbox_invoke_custom_return_app_ptr_helper_vorbis(RLBoxSandbox<TRLSandbox>* sandbox, TFunc* fnPtr, TArgs&&... params)
+  >::type sandbox_invoke_custom_return_app_ptr_helper_vorbis(RLBoxSandbox<TRLSandboxVb>* sandbox, TFunc* fnPtr, TArgs&&... params)
   {
     // //vorbisStartTimer();
     auto ret = sandbox->invokeWithFunctionPointerReturnAppPtr(fnPtr, params...);
@@ -52,7 +52,7 @@
     return ret;
   }
 
-  rlbox_load_library_api(vorbislib, TRLSandbox)
+  rlbox_load_library_api(vorbislib, TRLSandboxVb)
 #endif
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
@@ -78,8 +78,8 @@ ogg_packet InitVorbisPacket(const unsigned char* aData, size_t aLength,
 }
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-void InitVorbisPacketTainted(tainted_volatile<ogg_packet, TRLSandbox>& packet,
-                         tainted<unsigned char*, TRLSandbox> aData, size_t aLength,
+void InitVorbisPacketTainted(tainted_volatile<ogg_packet, TRLSandboxVb>& packet,
+                         tainted<unsigned char*, TRLSandboxVb> aData, size_t aLength,
                          bool aBOS, bool aEOS,
                          int64_t aGranulepos, int64_t aPacketNo)
 {
@@ -115,7 +115,7 @@ VorbisDataDecoder::VorbisDataDecoder(const CreateDecoderParams& aParams)
   strcat(full_SANDBOX_INIT_APP_VORBIS, SANDBOX_INIT_APP_VORBIS);
 
   printf("Creating Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP_VORBIS);
-  rlbox_vorbis = RLBoxSandbox<TRLSandbox>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP_VORBIS);
+  rlbox_vorbis = RLBoxSandbox<TRLSandboxVb>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP_VORBIS);
 
   p_mVorbisBlock = rlbox_vorbis->mallocInSandbox<vorbis_block>();
   p_mVorbisDsp = rlbox_vorbis->mallocInSandbox<vorbis_dsp_state>();
@@ -269,9 +269,9 @@ VorbisDataDecoder::DecodeHeader(const unsigned char* aData, size_t aLength)
 
   #if(USE_SANDBOXING_BUFFERS != 0)
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    tainted<unsigned char*, TRLSandbox> buff_copy = rlbox_vorbis->mallocInSandbox<unsigned char>(aLength);
+    tainted<unsigned char*, TRLSandboxVb> buff_copy = rlbox_vorbis->mallocInSandbox<unsigned char>(aLength);
     memcpy(buff_copy.UNSAFE_Unverified(), aData, aLength);
-    tainted<ogg_packet*, TRLSandbox> p_pkt = rlbox_vorbis->mallocInSandbox<ogg_packet>();
+    tainted<ogg_packet*, TRLSandboxVb> p_pkt = rlbox_vorbis->mallocInSandbox<ogg_packet>();
     auto& pkt = *p_pkt;
     InitVorbisPacketTainted(pkt, buff_copy, aLength, bos, false, 0, mPacketCount++);
     #else
@@ -354,9 +354,9 @@ VorbisDataDecoder::ProcessDecode(MediaRawData* aSample)
 
   #if(USE_SANDBOXING_BUFFERS != 0)
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-      tainted<unsigned char*, TRLSandbox> buff_copy = rlbox_vorbis->mallocInSandbox<unsigned char>(aLength);
+      tainted<unsigned char*, TRLSandboxVb> buff_copy = rlbox_vorbis->mallocInSandbox<unsigned char>(aLength);
       memcpy(buff_copy.UNSAFE_Unverified(), aData, aLength);
-      tainted<ogg_packet*, TRLSandbox> p_pkt = rlbox_vorbis->mallocInSandbox<ogg_packet>();
+      tainted<ogg_packet*, TRLSandboxVb> p_pkt = rlbox_vorbis->mallocInSandbox<ogg_packet>();
       auto& pkt = *p_pkt;
       InitVorbisPacketTainted(
         pkt, buff_copy, aLength, false, aSample->mEOS,
@@ -409,7 +409,7 @@ VorbisDataDecoder::ProcessDecode(MediaRawData* aSample)
   }
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  tainted<VorbisPCMValue***, TRLSandbox> p_pcm = rlbox_vorbis->mallocInSandbox<VorbisPCMValue**>();
+  tainted<VorbisPCMValue***, TRLSandboxVb> p_pcm = rlbox_vorbis->mallocInSandbox<VorbisPCMValue**>();
   auto& pcm = *p_pcm;
   pcm = nullptr;
   int32_t frames = sandbox_invoke_custom(rlbox_vorbis, vorbis_synthesis_pcmout, p_mVorbisDsp, &pcm)
@@ -438,7 +438,7 @@ VorbisDataDecoder::ProcessDecode(MediaRawData* aSample)
     }
     for (uint32_t j = 0; j < channels; ++j) {
       #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-      tainted<VorbisPCMValue*, TRLSandbox> channel = *(pcm + j);
+      tainted<VorbisPCMValue*, TRLSandboxVb> channel = *(pcm + j);
       #else
       VorbisPCMValue* channel = pcm[j];
       #endif

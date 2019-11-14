@@ -26,15 +26,15 @@ using namespace std::chrono;
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
   #include "RLBox_NaCl.h"
-  using TRLSandbox = RLBox_NaCl;
+  using TRLSandboxVb = RLBox_NaCl;
 #elif defined(WASM_SANDBOX_USE_CPP_API)
   #include "RLBox_Wasm.h"
-  using TRLSandbox = RLBox_Wasm;
+  using TRLSandboxVb = RLBox_Wasm;
 #elif defined(PS_SANDBOX_USE_NEW_CPP_API)
   #define USE_LIBVORBIS
   #include "ProcessSandbox.h"
   #include "RLBox_Process.h"
-  using TRLSandbox = RLBox_Process<VorbisProcessSandbox>;
+  using TRLSandboxVb = RLBox_Process<VorbisProcessSandbox>;
   #undef USE_LIBVORBIS
 #endif
 
@@ -83,11 +83,11 @@ private:
 
   // Vorbis decoder state
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  RLBoxSandbox<TRLSandbox>* rlbox_vorbis;
-  tainted<vorbis_info*, TRLSandbox> p_mVorbisInfo;
-  tainted<vorbis_comment*, TRLSandbox> p_mVorbisComment;
-  tainted<vorbis_dsp_state*, TRLSandbox> p_mVorbisDsp;
-  tainted<vorbis_block*, TRLSandbox> p_mVorbisBlock;
+  RLBoxSandbox<TRLSandboxVb>* rlbox_vorbis;
+  tainted<vorbis_info*, TRLSandboxVb> p_mVorbisInfo;
+  tainted<vorbis_comment*, TRLSandboxVb> p_mVorbisComment;
+  tainted<vorbis_dsp_state*, TRLSandboxVb> p_mVorbisDsp;
+  tainted<vorbis_block*, TRLSandboxVb> p_mVorbisBlock;
   #else
   vorbis_info mVorbisInfo;
   vorbis_comment mVorbisComment;
