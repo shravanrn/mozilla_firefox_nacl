@@ -1,0 +1,186 @@
+#!/bin/bash
+export MOZ_DISABLE_CONTENT_SANDBOX=1
+
+# set -o xtrace
+
+if [ -z "$1" ]; then 
+	echo "Expected argument ./runPerfTest output_folder [platform=32|64]"; 
+	exit 1; 
+fi
+
+if [[ -f "$1" ]]; then
+	echo "$1 already exists"; 
+	exit 1; 
+fi
+
+OUTPUTPATH=$(cd "$(dirname "$1")"; pwd)/$(basename "$1")
+mkdir -p ${OUTPUTPATH}
+cd "$(dirname "$0")"
+Pl="64"
+
+if [[ ! -z "$4" ]]; then
+	if [[ "$4" == "32" ]]; then
+		Pl="32"
+	else
+		echo "Unknown platform: $4"
+		exit 1
+	fi
+fi
+
+FFVersionsDir=("./" "./" "./" "../mozilla_firefox_stock/")
+FFVersionsSuffix=("" "" "" "_stock")
+FFVersions=("new_nacl_cpp" "new_ps_cpp" "new_ps_cpp_mutex" "static")
+FFPinCores=("1" "1" "3" "1")
+
+#FFVersionsDir=("../mozilla_firefox_stock/")
+#FFVersionsSuffix=("_stock")
+#FFVersions=("static")
+#FFPinCores=("1")
+
+
+#FFVersionsDir=("./")
+#FFVersionsSuffix=("")
+#FFVersions=("new_ps_cpp_mutex")
+#FFPinCores=("3")
+
+if [ ${#FFVersionsDir[@]} -ne ${#FFVersions[@]} ]; then
+	echo "Versions Dir and Versions do not match";
+	exit 1;
+fi
+
+if [ ${#FFVersionsSuffix[@]} -ne ${#FFVersions[@]} ]; then
+	echo "Versions Suffix and Versions do not match";
+	exit 1;
+fi
+
+if [ ${#FFPinCores[@]} -ne ${#FFVersions[@]} ]; then
+	echo "Pin Cores and Versions do not match";
+	exit 1;
+fi
+
+# for (( i = 0; i < ${#FFVersions[@]}; i++ )); do 
+# 	if [[ ! -d "${FFVersionsDir[$i]}firefox_${Pl}bit_optdebug_${FFVersions[$i]}" ]]; then
+# 		echo "Not all firefox versions found: ${FFVersionsDir[$i]}firefox_${Pl}bit_optdebug_${FFVersions[$i]}";
+# 		exit 1;
+# 	fi
+# done
+
+echo "Starting."
+
+
+# param: outputDir/prefix
+# param: cores
+# param: site
+function runTest(){
+	echo "Prefix : $1"
+	echo "Site : $3" | tee -a "$1_cpu_memory_output.txt"
+	rm -f /tmp/cgmemtime_out.txt
+
+	taskset -c $2 /home/shr/Code/cgmemtime/cgmemtime ./mach run "$3" --setpref browser.sessionstore.resume_from_crash=false --setpref toolkit.startup.max_resumed_crashes=-1 > /dev/null 2>&1&
+	CGPID=$!
+	FFMACHPID=$(pgrep -P $CGPID)
+
+	while [ -z "$FFMACHPID" ]
+    do
+        echo "Waiting for mach"
+        sleep 1
+        FFMACHPID=$(pgrep -P $CGPID)
+    done
+
+	FFPID=$(pgrep -P $FFMACHPID)
+	while [ -z "$FFPID" ]
+	do
+		echo "Waiting for firefox"
+		sleep 1
+		FFPID=$(pgrep -P $FFMACHPID)
+	done
+
+	echo "Firefox Id : $FFPID"
+
+	A=($(sed -n '2,5p' /proc/stat))
+	# user         + nice     + system   + idle
+	B0=$((${A[1]}  + ${A[2]}  + ${A[3]}  + ${A[4]}))
+	B1=$((${A[12]} + ${A[13]} + ${A[14]} + ${A[15]}))
+	B2=$((${A[23]} + ${A[24]} + ${A[25]} + ${A[26]}))
+	B3=$((${A[34]} + ${A[35]} + ${A[36]} + ${A[37]}))
+
+	FTOTALMEM=0
+	for (( m = 1; m < 10; m++ )); do
+		CHILDMEM=$(pstree -p $FFPID | grep -o '([0-9]\+)' | grep -o '[0-9]\+' |  xargs ps -o rss,%cpu,cmd -p | awk '{memory+=$1} END {print memory}')
+		FFTOTALMEM=$((FFTOTALMEM + CHILDMEM))
+#		FFWEBCONTENTID=$(pgrep -P $FFPID "Web Content")
+#		FFCHILDPIDS=($(pstree -T -p $FFWEBCONTENTID | grep -o '([0-9]\+)' | grep -o '[0-9]\+'))
+#		for (( l = 0; l < ${#FFCHILDPIDS[@]}; l++ )); do
+#			CHILDMEM=$(ps -p ${FFCHILDPIDS[$l]} -o rss=)
+#			FFTOTALMEM=$((FFTOTALMEM + CHILDMEM))
+#		done
+		sleep 1
+	done
+	FFAVGMEM=$((FFTOTALMEM / 10))
+	echo "Mem: $FFAVGMEM" | tee -a "$1_cpu_memory_output.txt"
+
+	# user         + nice     + system   + idle
+	C=($(sed -n '2,5p' /proc/stat))
+	D0=$((${C[1]}  + ${C[2]}  + ${C[3]}  + ${C[4]}))
+	D1=$((${C[12]} + ${C[13]} + ${C[14]} + ${C[15]}))
+	D2=$((${C[23]} + ${C[24]} + ${C[25]} + ${C[26]}))
+	D3=$((${C[34]} + ${C[35]} + ${C[36]} + ${C[37]}))
+	# cpu usage per core
+	E0=$(echo "scale=1; (100 * ($B0 - $D0 - ${A[4]}   + ${C[4]})  / ($B0 - $D0))" | bc)
+	E1=$(echo "scale=1; (100 * ($B1 - $D1 - ${A[15]}  + ${C[15]}) / ($B1 - $D1))" | bc)
+	E2=$(echo "scale=1; (100 * ($B2 - $D2 - ${A[26]}  + ${C[26]}) / ($B2 - $D2))" | bc)
+	E3=$(echo "scale=1; (100 * ($B3 - $D3 - ${A[37]}  + ${C[37]}) / ($B3 - $D3))" | bc)
+
+	# cpu usage per core
+	E0=$(echo "scale=1; (100 * ($B0 - $D0 - ${A[4]}   + ${C[4]})  / ($B0 - $D0))" | bc)
+	E1=$(echo "scale=1; (100 * ($B1 - $D1 - ${A[15]}  + ${C[15]}) / ($B1 - $D1))" | bc)
+	E2=$(echo "scale=1; (100 * ($B2 - $D2 - ${A[26]}  + ${C[26]}) / ($B2 - $D2))" | bc)
+	E3=$(echo "scale=1; (100 * ($B3 - $D3 - ${A[37]}  + ${C[37]}) / ($B3 - $D3))" | bc)
+	echo "CPU 0   $E0"  | tee -a "$1_cpu_memory_output.txt"
+	echo "CPU 1   $E1"  | tee -a "$1_cpu_memory_output.txt"
+	echo "CPU 2   $E2"  | tee -a "$1_cpu_memory_output.txt"
+	echo "CPU 3   $E3"  | tee -a "$1_cpu_memory_output.txt"
+
+	kill -s TERM $FFPID
+	sleep 5
+	CGMEM=$(cat /tmp/cgmemtime_out.txt)
+	echo "CGMem: $CGMEM" | tee -a "$1_cpu_memory_output.txt"
+}
+
+SAVEDDIR=$PWD
+
+WebsitesList=(
+# Warm up
+    "about:blank"
+# Sites in the site isolation paper
+    "https://www.google.com/"
+    "https://www.yelp.com/"
+    "https://www.eurosport.com/"
+    "https://www.legacy.com/"
+    "https://www.reddit.com/"
+    "https://www.seatguru.com/"
+    "https://www.twitch.tv/"
+    "https://www.amazon.com/"
+    "https://www.economist.com/"
+    "https://www.espn.com/"
+    "https://www.wowprogress.com/"
+# Content heavy sites
+    # "https://twitter.com/search?l=en&q=since%3A2019-05-01&src=typd"
+    # "https://www.amazon.com/"
+    # "https://www.reddit.com/"
+    # "https://www.nytimes.com/"
+    # "https://www.cnn.com/"
+    # "https://www.facebook.com/"
+    # "https://www.youtube.com/"
+)
+
+for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
+	cd ${FFVersionsDir[$j]}
+	cp "mozconfig${Pl}_${FFVersions[$j]}" mozconfig
+	for (( k = 0; k < ${#WebsitesList[@]}; k++ )); do 
+		pkill -f ProcessSandbox_otherside
+		pkill -f firefox
+		runTest "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}" "${FFPinCores[$j]}" "${WebsitesList[$k]}"
+	done
+	cd $SAVEDDIR
+done
