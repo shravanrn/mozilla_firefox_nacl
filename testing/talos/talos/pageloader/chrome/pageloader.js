@@ -965,6 +965,15 @@ function plLoadURLsFromURI(manifestUri) {
         console.log("Was " + urlspec + " Now " + newurlspec + "!!!!!!!!");
         urlspec = newurlspec
       }
+      if(urlspec.indexOf(":1337/toweb") !== -1)
+      {
+        console.log("FOUND web path- fixing path!!!!!!!!");
+        var startLoc = urlspec.indexOf(":1337/toweb")
+        var endLoc = startLoc + ":1337/toweb".length - 1
+        var newurlspec = urlspec.slice(0, startLoc) + urlspec.slice(endLoc + 1, urlspec.length);
+        console.log("Was " + urlspec + " Now " + newurlspec + "!!!!!!!!");
+        urlspec = newurlspec
+      }
       var url = gIOS.newURI(urlspec, null, manifestUri);
 
       if (pageFilterRegexp && !pageFilterRegexp.test(url.spec))

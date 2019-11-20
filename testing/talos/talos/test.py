@@ -849,6 +849,22 @@ class zlib_page_render(PageloaderTest):
     timeout = 72000
 
 @register_test()
+class extern_page_load(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/extern_page_load/extern_page_load.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 55
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
 class jpeg_scaling_1(PageloaderTest):
     """
     Test the scaling of sandbox creation of jpeg 1
