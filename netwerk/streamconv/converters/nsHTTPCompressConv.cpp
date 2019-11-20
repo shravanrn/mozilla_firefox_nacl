@@ -53,16 +53,144 @@ sandbox_nacl_load_library_api(zlib)
 static std::mutex mtx;
 #endif
 
+
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+
+extern "C" {
+void getSandboxingFolder(char* SandboxingCodeRootFolder);
+}
+
+namespace mozilla {
+namespace net {
+
+class ZLIBSandboxResource {
+public:
+  RLBoxSandbox<TRLSandbox>* rlbox_zlib;
+
+  ZLIBSandboxResource() {
+    char SandboxingCodeRootFolder[1024];
+    getSandboxingFolder(SandboxingCodeRootFolder);
+
+    char full_STARTUP_LIBRARY_PATH[1024];
+    char full_SANDBOX_INIT_APP[1024];
+
+    strcpy(full_STARTUP_LIBRARY_PATH, SandboxingCodeRootFolder);
+    strcat(full_STARTUP_LIBRARY_PATH, STARTUP_LIBRARY_PATH);
+
+    strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
+    strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
+
+    printf("Creating "
+    #if defined(NACL_SANDBOX_USE_NEW_CPP_API)
+    "NaCl"
+    #elif defined(PS_SANDBOX_USE_NEW_CPP_API)
+    "Process"
+    #else
+    "Wasm"
+    #endif
+    " Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+
+    rlbox_zlib = RLBoxSandbox<TRLSandbox>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+  }
+
+  ~ZLIBSandboxResource() {
+    rlbox_zlib->destroySandbox();
+    free(rlbox_zlib);
+    printf("Destroying ZLIB sandbox\n");
+  }
+};
+
+template<typename T>
+class SandboxManager
+{
+private:
+    std::map<std::string, std::shared_ptr<T>> sandboxes;
+    std::mutex sandboxMapMutex;
+    static const bool SandboxEnforceLimits = true;
+    //we can go to higher limits, but this seems fine
+    static const int SandboxSoftLimit = 5;
+
+public:
+
+    inline std::shared_ptr<T> createSandbox(std::string name) {
+      //use a fresh temporary sandbox if we couldn't find the origin
+      if(name == "") {
+        auto ret = std::make_shared<T>();
+        return ret;
+      }
+
+      std::lock_guard<std::mutex> lock(sandboxMapMutex);
+      auto iter = sandboxes.find(name) ;
+      if (iter != sandboxes.end()) {
+        // Found existing Sandbox
+        return iter->second;
+      }
+
+      if (SandboxEnforceLimits) {
+        if (sandboxes.size() > SandboxSoftLimit) {
+          //just throw away some of the older sandboxes that are not currently in use
+          //these will be recreated if needed
+          //It could be that more sandboxes in use > SandboxSoftLimit
+          //in which case, the total count will temporarily be above the SandboxSoftLimit
+
+          auto endIter = sandboxes.end();
+          for(auto iter = sandboxes.begin(); iter != endIter; ) {
+            //check if anyone else has a ref i.e. someone is using the sandbox 
+            if (iter->second.use_count() == 1) {
+              iter = sandboxes.erase(iter);
+            } else {
+              ++iter;
+            }
+          }
+        }
+      }
+
+      // Making Sandbox
+      auto ret = std::make_shared<T>();
+      sandboxes[name] = ret;
+      return ret;
+    }
+
+    inline void printCounts() {
+      std::lock_guard<std::mutex> lock(sandboxMapMutex);
+      for (auto it = sandboxes.begin(); it != sandboxes.end(); ++it) {
+        printf("Sandbox: %s Count: %ld\n", it->first.c_str(), it->second.use_count());
+      }
+    }
+
+    inline void destroySandbox(std::string name) {
+      std::lock_guard<std::mutex> lock(sandboxMapMutex);
+      auto iter = sandboxes.find(name) ;
+      if (iter != sandboxes.end()) {
+        sandboxes.erase(iter);
+      }
+    }
+
+    inline void destroyAll() {
+      std::lock_guard<std::mutex> lock(sandboxMapMutex);
+      sandboxes.clear();
+    }
+};
+
+static SandboxManager<ZLIBSandboxResource> zlibSandboxManager;
+
+}
+}
+#endif
+
+
+
 void SandboxOnFirefoxExitingZLIB()
 {
-  // #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  //   if(rlbox_zlib != nullptr)
-  //   {
-  //     rlbox_zlib->destroySandbox();
-  //     free(rlbox_zlib);
-  //     rlbox_zlib = nullptr;
-  //   }
-  // #endif
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    mozilla::net::zlibSandboxManager.destroyAll();
+    // if(rlbox_zlib != nullptr)
+    // {
+    //   rlbox_zlib->destroySandbox();
+    //   free(rlbox_zlib);
+    //   rlbox_zlib = nullptr;
+    // }
+  #endif
   #if SANDBOX_CPP == 2
   {
     std::lock_guard<std::mutex> guard(mtx);
@@ -106,16 +234,11 @@ void SandboxOnFirefoxExitingZLIB()
   #endif
 }
 
-#if defined(SANDBOX_CPP) || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+#if defined(SANDBOX_CPP)
 
 static void constructZlibSandboxIfNecessary() {
   mtx.lock();
-  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    // if(!rlbox_zlib) {
-    if(false) {
-  #elif defined(SANDBOX_CPP)
     if(!sbox) {
-  #endif
       char SandboxingCodeRootFolder[1024];
       int index;
 
@@ -131,7 +254,7 @@ static void constructZlibSandboxIfNecessary() {
       index = found - SandboxingCodeRootFolder + 1;
       SandboxingCodeRootFolder[index] = '\0';
 
-#if SANDBOX_CPP == 1 || defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+#if SANDBOX_CPP == 1
       char full_STARTUP_LIBRARY_PATH[1024];
       char full_SANDBOX_INIT_APP[1024];
 
@@ -141,15 +264,10 @@ static void constructZlibSandboxIfNecessary() {
       strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
       strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
 
-      #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-        // printf("Creating ZLIB Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
-        // rlbox_zlib = RLBoxSandbox<TRLSandbox>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
-      #else
-        printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
-        ensureNaClSandboxInit();
-        sbox = createDlSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
-        initCPPApi(sbox);
-      #endif
+      printf("Creating NaCl Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+      ensureNaClSandboxInit();
+      sbox = createDlSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+      initCPPApi(sbox);
 #elif SANDBOX_CPP == 2
       char full_PS_OTHERSIDE_PATH[1024];
 
@@ -201,39 +319,11 @@ nsHTTPCompressConv::nsHTTPCompressConv()
 {
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
   // constructZlibSandboxIfNecessary();
-  {
-    char SandboxingCodeRootFolder[1024];
-    int index;
-
-    if(!getcwd(SandboxingCodeRootFolder, 256)) abort();
-
-    char * found = strstr(SandboxingCodeRootFolder, "/mozilla-release");
-    if (found == NULL)
-    {
-      printf("Error initializing SandboxingCodeRootFolder\n");
-      exit(1);
-    }
-
-    index = found - SandboxingCodeRootFolder + 1;
-    SandboxingCodeRootFolder[index] = '\0';
-
-    char full_STARTUP_LIBRARY_PATH[1024];
-    char full_SANDBOX_INIT_APP[1024];
-
-    strcpy(full_STARTUP_LIBRARY_PATH, SandboxingCodeRootFolder);
-    strcat(full_STARTUP_LIBRARY_PATH, STARTUP_LIBRARY_PATH);
-
-    strcpy(full_SANDBOX_INIT_APP, SandboxingCodeRootFolder);
-    strcat(full_SANDBOX_INIT_APP, SANDBOX_INIT_APP);
-
-    printf("Creating ZLIB Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
-    rlbox_zlib = RLBoxSandbox<TRLSandbox>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
-  }
-  p_d_stream = rlbox_zlib->mallocInSandbox<z_stream>();
-  if(p_d_stream == nullptr) {
-    printf("Error in malloc for p_d_stream\n");
-    exit(1);
-  }
+  // p_d_stream = rlbox_zlib->mallocInSandbox<z_stream>();
+  // if(p_d_stream == nullptr) {
+  //   printf("Error in malloc for p_d_stream\n");
+  //   exit(1);
+  // }
 #elif defined(SANDBOX_CPP)
   constructZlibSandboxIfNecessary();
   p_d_stream = newInSandbox<z_stream>(sbox);
@@ -253,6 +343,9 @@ nsHTTPCompressConv::nsHTTPCompressConv()
 
 nsHTTPCompressConv::~nsHTTPCompressConv()
 {
+#if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    auto rlbox_zlib = rlbox_sbx->rlbox_zlib;
+#endif
   LOG(("nsHttpCompresssConv %p dtor\n", this));
   if (mInpBuffer != nullptr) {
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
@@ -299,13 +392,13 @@ nsHTTPCompressConv::~nsHTTPCompressConv()
 #endif
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    if(rlbox_zlib != nullptr)
-    {
-      rlbox_zlib->destroySandbox();
-      free(rlbox_zlib);
-      rlbox_zlib = nullptr;
-      printf("Destroying ZLIB Sandbox\n");
-    }
+    // if(rlbox_zlib != nullptr)
+    // {
+    //   rlbox_zlib->destroySandbox();
+    //   free(rlbox_zlib);
+    //   rlbox_zlib = nullptr;
+    //   printf("Destroying ZLIB Sandbox\n");
+    // }
   #endif
 }
 
@@ -482,6 +575,9 @@ nsHTTPCompressConv::BrotliHandler(nsIInputStream *stream, void *closure, const c
   return self->mBrotli->mStatus;
 }
 
+std::string GetCompressedContentHostString();
+std::string GetCompressedContentMime();
+
 NS_IMETHODIMP
 nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
                                     nsISupports *aContext,
@@ -489,6 +585,21 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
                                     uint64_t aSourceOffset,
                                     uint32_t aCount)
 {
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    if (rlbox_sbx == nullptr) {
+      mHostContentString = GetCompressedContentHostString() + GetCompressedContentMime();
+      rlbox_sbx_shared = zlibSandboxManager.createSandbox(mHostContentString);
+      rlbox_sbx = rlbox_sbx_shared.get();
+
+      p_d_stream = rlbox_sbx->rlbox_zlib->mallocInSandbox<z_stream>();
+      if(p_d_stream == nullptr) {
+        printf("Error in malloc for p_d_stream\n");
+        exit(1);
+      }
+    }
+    auto rlbox_zlib = rlbox_sbx->rlbox_zlib;
+  #endif
+
   nsresult rv = NS_ERROR_INVALID_CONTENT_ENCODING;
   uint32_t streamLen = aCount;
   LOG(("nsHttpCompressConv %p OnDataAvailable %d", this, aCount));

@@ -58,6 +58,8 @@ using namespace rlbox;
 #include "assert.h"
 #include "state.h"
 
+#include <memory>
+
 class nsIStringInputStream;
 
 #define NS_HTTPCOMPRESSCONVERTER_CID                    \
@@ -114,6 +116,8 @@ public:
   nsISupports *mContext;
   uint64_t     mSourceOffset;
 };
+
+class ZLIBSandboxResource;
 
 class nsHTTPCompressConv
   : public nsIStreamConverter
@@ -188,7 +192,10 @@ private:
 #endif
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-  RLBoxSandbox<TRLSandbox>* rlbox_zlib = NULL;
+    std::string mHostContentString = "";
+    std::shared_ptr<ZLIBSandboxResource> rlbox_sbx_shared = nullptr;
+    ZLIBSandboxResource* rlbox_sbx = nullptr;
+    // RLBoxSandbox<TRLSandbox>* rlbox_zlib = NULL;
 #endif
 
 

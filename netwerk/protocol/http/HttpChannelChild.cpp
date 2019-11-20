@@ -798,6 +798,82 @@ HttpChannelChild::MaybeDivertOnData(const nsCString& data,
   }
 }
 
+thread_local std::string* CompressedContentHostString = nullptr;
+thread_local std::string* CompressedContentMime = nullptr;
+
+std::string GetCompressedContentHostString() {
+  if (!CompressedContentHostString) {
+    return "";
+  }
+  return *CompressedContentHostString;
+}
+std::string GetCompressedContentMime() {
+  if (!CompressedContentMime) {
+    return "";
+  }
+  return *CompressedContentMime;
+}
+void SetCompressedContentHostString(std::string val) {
+  if(!CompressedContentHostString) {
+    CompressedContentHostString = new std::string;
+  }
+  *CompressedContentHostString = val;
+}
+void SetCompressedContentMime(std::string val) {
+  if(!CompressedContentMime) {
+    CompressedContentMime = new std::string;
+  }
+  *CompressedContentMime = val;
+}
+
+
+inline std::string getHostStringForCompressed(nsIURI* uri)
+{
+  //if still null bail out - empty string causes the use of a temporary sandbox
+  if(uri == nullptr) { return ""; }
+
+  //check for special schemas like file or data
+  {
+    nsCString scheme;
+    nsresult rv = uri->GetScheme(scheme);
+    if(NS_SUCCEEDED(rv)){
+      //just put all file URI's into a new sandbox for "file::"
+      if(strcmp(scheme.get(), "file") == 0) {
+        return "file::";
+      }
+      //for data URI's use the origin from the page - aka principal
+      else if(strcmp(scheme.get(), "data") == 0) {
+        return "data::";
+      }
+    }
+  }
+
+  //if a normal scheme like https, construct the origin
+  {
+    nsCString scheme;
+    nsresult rv;
+    rv = uri->GetScheme(scheme);
+    if(NS_FAILED(rv)){
+      return "";
+    }
+    nsCString host;
+    rv = uri->GetHost(host);
+    if(NS_FAILED(rv)){
+      return "";
+    }
+    std::string hostStr = scheme.get();
+    hostStr += "://";
+    hostStr += host.get();
+    int port = -1;//uri->GetPort();
+    if(port != -1) {
+      hostStr += ":";
+      hostStr += std::to_string(port);
+    }
+    return hostStr;
+  }
+}
+
+
 void
 HttpChannelChild::OnTransportAndData(const nsresult& channelStatus,
                                      const nsresult& transportStatus,
@@ -880,7 +956,25 @@ HttpChannelChild::OnTransportAndData(const nsresult& channelStatus,
     return;
   }
 
+  {
+    if (mURI != nullptr) {
+      SetCompressedContentHostString(getHostStringForCompressed(mURI));
+    }
+
+    {
+      nsCString contentType;
+      GetContentType(contentType);
+      SetCompressedContentMime(contentType.get());
+    }
+  }
+
   DoOnDataAvailable(this, mListenerContext, stringStream, offset, count);
+
+  {
+    SetCompressedContentHostString("");
+    SetCompressedContentMime("");
+  }
+
   stringStream->Close();
 }
 
@@ -954,7 +1048,25 @@ HttpChannelChild::DoOnDataAvailable(nsIRequest* aRequest, nsISupports* aContext,
   if (mCanceled)
     return;
 
+  {
+    if (mURI != nullptr) {
+      SetCompressedContentHostString(getHostStringForCompressed(mURI));
+    }
+
+    {
+      nsCString contentType;
+      GetContentType(contentType);
+      SetCompressedContentMime(contentType.get());
+    }
+  }
+
   nsresult rv = mListener->OnDataAvailable(aRequest, aContext, aStream, offset, count);
+
+  {
+    SetCompressedContentHostString("");
+    SetCompressedContentMime("");
+  }
+
   if (NS_FAILED(rv)) {
     CancelOnMainThread(rv);
   }

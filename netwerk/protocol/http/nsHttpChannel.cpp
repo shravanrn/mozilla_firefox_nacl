@@ -7700,6 +7700,10 @@ private:
     int64_t mProgressMax;
 };
 
+std::string getHostStringForCompressed(nsIURI* uri);
+void SetCompressedContentHostString(std::string val);
+void SetCompressedContentMime(std::string val);
+
 NS_IMETHODIMP
 nsHttpChannel::OnDataAvailable(nsIRequest *request, nsISupports *ctxt,
                                nsIInputStream *input,
@@ -7791,11 +7795,29 @@ nsHttpChannel::OnDataAvailable(nsIRequest *request, nsISupports *ctxt,
             seekable = nullptr;
         }
 
+        {
+            if (mURI != nullptr) {
+                SetCompressedContentHostString(getHostStringForCompressed(mURI));
+            }
+
+            {
+                nsCString contentType;
+                GetContentType(contentType);
+                SetCompressedContentMime(contentType.get());
+            }
+        }
+
         nsresult rv =  mListener->OnDataAvailable(this,
                                                   mListenerContext,
                                                   input,
                                                   mLogicalOffset,
                                                   count);
+
+        {
+            SetCompressedContentHostString("");
+            SetCompressedContentMime("");
+        }
+
         if (NS_SUCCEEDED(rv)) {
             // by contract mListener must read all of "count" bytes, but
             // nsInputStreamPump is tolerant to seekable streams that violate that

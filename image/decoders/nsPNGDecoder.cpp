@@ -2862,7 +2862,7 @@ nsPNGDecoder::FinishInternal()
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
     //pngEndTimer();
     nsPNGDecoder* decoder = static_cast<nsPNGDecoder*>(pngRendererSaved);
-    auto rlbox_png = decoder->rlbox_sbx->rlbox_png;
+    // auto rlbox_png = decoder->rlbox_sbx->rlbox_png;
     const char* warning_msg = "";//warning_msg_unv.copyAndVerifyString(rlbox_png, [](const char* val) { return (val != nullptr && strlen(val) < 10000)? RLBox_Verify_Status::SAFE : RLBox_Verify_Status::UNSAFE; }, nullptr);
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     //pngEndTimer();

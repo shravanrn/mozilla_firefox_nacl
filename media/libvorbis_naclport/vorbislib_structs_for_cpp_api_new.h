@@ -115,10 +115,19 @@
 	g() \
 	f(ogg_int64_t    , packetno, FIELD_NORMAL, ##__VA_ARGS__)
 
-#define sandbox_fields_reflection_vorbislib_allClasses(f, ...) \
-	f(vorbis_info, vorbislib, ##__VA_ARGS__) \
-	f(vorbis_comment, vorbislib, ##__VA_ARGS__) \
-	f(vorbis_dsp_state, vorbislib, ##__VA_ARGS__) \
-	f(oggpack_buffer, vorbislib, ##__VA_ARGS__) \
-	f(vorbis_block, vorbislib, ##__VA_ARGS__) \
-	f(ogg_packet, vorbislib, ##__VA_ARGS__)
+#if defined(PS_SANDBOX_USE_NEW_CPP_API)
+	#define sandbox_fields_reflection_vorbislib_allClasses(f, ...) \
+		f(vorbis_info, vorbislib, ##__VA_ARGS__) \
+		f(vorbis_comment, vorbislib, ##__VA_ARGS__) \
+		f(vorbis_dsp_state, vorbislib, ##__VA_ARGS__) \
+		f(oggpack_buffer, vorbislib, ##__VA_ARGS__) \
+		f(vorbis_block, vorbislib, ##__VA_ARGS__) \
+		f(ogg_packet, vorbislib, ##__VA_ARGS__)
+#else
+	#define sandbox_fields_reflection_vorbislib_allClasses(f, ...) \
+		f(vorbis_info, vorbislib, ##__VA_ARGS__) \
+		f(vorbis_comment, vorbislib, ##__VA_ARGS__) \
+		f(vorbis_dsp_state, vorbislib, ##__VA_ARGS__) \
+		f(oggpack_buffer, vorbislib, ##__VA_ARGS__) \
+		f(vorbis_block, vorbislib, ##__VA_ARGS__)
+#endif
