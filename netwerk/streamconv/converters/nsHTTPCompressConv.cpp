@@ -344,6 +344,8 @@ nsHTTPCompressConv::nsHTTPCompressConv()
 nsHTTPCompressConv::~nsHTTPCompressConv()
 {
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+    // sandbox may not have been initialized, in which case, no cleanup
+    if (!rlbox_sbx) { return; }
     auto rlbox_zlib = rlbox_sbx->rlbox_zlib;
 #endif
   LOG(("nsHttpCompresssConv %p dtor\n", this));

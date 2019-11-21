@@ -39,7 +39,11 @@ public:
     // check.
 
     // Temporarily, disable the FFMpeg decoder so we fall back to the VP9 decoder
-    return nullptr;
+    std::string mime = aParams.VideoConfig().mMimeType.get();
+    if (mime == "video/vp9") {
+      return nullptr;
+    }
+
     if (aParams.VideoConfig().HasAlpha()) {
       return nullptr;
     }

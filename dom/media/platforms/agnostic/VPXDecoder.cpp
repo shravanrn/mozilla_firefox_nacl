@@ -190,6 +190,7 @@ VPXDecoder::~VPXDecoder()
   rlbox_vpx->freeInSandbox(p_mVPXAlpha);
   printf("Destroying Vpx Sandbox\n");
   rlbox_vpx->destroySandbox();
+  rlbox_vpx = nullptr;
   #endif
   MOZ_COUNT_DTOR(VPXDecoder);
   if (vpxDecodeInvocations > 5) {
@@ -206,8 +207,10 @@ VPXDecoder::Shutdown()
   RefPtr<VPXDecoder> self = this;
   return InvokeAsync(mTaskQueue, __func__, [self, this]() {
     #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
-    sandbox_invoke(rlbox_vpx, vpx_codec_destroy, p_mVPX);
-    sandbox_invoke(rlbox_vpx, vpx_codec_destroy, p_mVPXAlpha);
+    if (rlbox_vpx) {
+      sandbox_invoke(rlbox_vpx, vpx_codec_destroy, p_mVPX);
+      sandbox_invoke(rlbox_vpx, vpx_codec_destroy, p_mVPXAlpha);
+    }
     #else
     vpx_codec_destroy(&mVPX);
     vpx_codec_destroy(&mVPXAlpha);
@@ -653,19 +656,21 @@ VPXDecoder::IsKeyframe(RLBoxSandbox<TRLSandboxV>* rlbox_vpx, Span<const uint8_t>
   //unsafe is fine memcpy
   memcpy(buff_copy.UNSAFE_Unverified(), aData, aLength);
 
+  bool retBool = false;
   if (aCodec == Codec::VP8) {
     tainted<vpx_codec_iface_t *, TRLSandboxV> ret = sandbox_invoke(rlbox_vpx, vpx_codec_vp8_dx);
     sandbox_invoke(rlbox_vpx, vpx_codec_peek_stream_info, ret, buff_copy, aLength, p_si);
-    return bool(p_si->is_kf.UNSAFE_Unverified(/* TODO */));
+    retBool = bool(p_si->is_kf.UNSAFE_Unverified(/* TODO */));
   } else if (aCodec == Codec::VP9) {
     tainted<vpx_codec_iface_t *, TRLSandboxV> ret = sandbox_invoke(rlbox_vpx, vpx_codec_vp9_dx);
     sandbox_invoke(rlbox_vpx, vpx_codec_peek_stream_info, ret, buff_copy, aLength, p_si);
-    return bool(p_si->is_kf.UNSAFE_Unverified(/* TODO */));
+    retBool = bool(p_si->is_kf.UNSAFE_Unverified(/* TODO */));
   }
 
+  rlbox_vpx->freeInSandbox(p_si);
   rlbox_vpx->freeInSandbox(buff_copy);
 
-  return false;
+  return retBool;
 }
 #else
 /* static */
@@ -692,6 +697,31 @@ VPXDecoder::IsKeyframe(Span<const uint8_t> aBuffer, Codec aCodec)
 gfx::IntSize
 VPXDecoder::GetFrameSize(Span<const uint8_t> aBuffer, Codec aCodec)
 {
+  #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
+  auto rlbox_vpx = getKeyframeSandbox();
+  auto p_si = rlbox_vpx->mallocInSandbox<vpx_codec_stream_info_t>();
+  // Safe as this is just a memset
+  PodZero(p_si.UNSAFE_Unverified());
+  p_si->sz = sizeof(*p_si);
+
+  auto aData = aBuffer.Elements();
+  auto aLength = aBuffer.Length();
+  tainted<uint8_t*, TRLSandboxV> buff_copy = rlbox_vpx->mallocInSandbox<uint8_t>(aLength);
+  //unsafe is fine memcpy
+  memcpy(buff_copy.UNSAFE_Unverified(), aData, aLength);
+
+  if (aCodec == Codec::VP8) {
+    tainted<vpx_codec_iface_t *, TRLSandboxV> ret = sandbox_invoke(rlbox_vpx, vpx_codec_vp8_dx);
+    sandbox_invoke(rlbox_vpx, vpx_codec_peek_stream_info, ret, buff_copy, aLength, p_si);
+  } else if (aCodec == Codec::VP9) {
+    tainted<vpx_codec_iface_t *, TRLSandboxV> ret = sandbox_invoke(rlbox_vpx, vpx_codec_vp9_dx);
+    sandbox_invoke(rlbox_vpx, vpx_codec_peek_stream_info, ret, buff_copy, aLength, p_si);
+  }
+  auto retSize = gfx::IntSize(p_si->w.UNSAFE_Unverified(), p_si->h.UNSAFE_Unverified());
+  rlbox_vpx->freeInSandbox(p_si);
+  rlbox_vpx->freeInSandbox(buff_copy);
+  return retSize;
+  #else
   vpx_codec_stream_info_t si;
   PodZero(&si);
   si.sz = sizeof(si);
@@ -702,9 +732,10 @@ VPXDecoder::GetFrameSize(Span<const uint8_t> aBuffer, Codec aCodec)
   } else if (aCodec == Codec::VP9) {
     vpx_codec_peek_stream_info(vpx_codec_vp9_dx(), aBuffer.Elements(), aBuffer.Length(), &si);
   }
-
   return gfx::IntSize(si.w, si.h);
+  #endif
 }
+
 } // namespace mozilla
 #undef LOG
 
