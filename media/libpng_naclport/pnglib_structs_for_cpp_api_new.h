@@ -579,4 +579,4 @@
 	f(png_get_iCCP_params, pnglib, ##__VA_ARGS__) \
 	f(png_get_cHRM_And_gAMA_params, pnglib, ##__VA_ARGS__) \
 	f(png_get_IHDR_params, pnglib, ##__VA_ARGS__) \
-	f(png_get_tRNS_params, pnglib, ##__VA_ARGS__) \
+	f(png_get_tRNS_params, pnglib, ##__VA_ARGS__)

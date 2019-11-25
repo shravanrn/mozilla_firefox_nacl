@@ -477,7 +477,7 @@ new_nacl64_cpp_dbg: inithasrun
 	$(CP) ../mozconfig64_new_nacl_cpp_debug ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_nacl_debug.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_nacl_debug.build ../media/libpng_naclport/moz.build
-	$(CP) ../netwerk/streamconv/converters/moz_new_nacl.build ../netwerk/streamconv/converters/moz.build
+	$(CP) ../netwerk/streamconv/converters/moz_new_nacl_debug.build ../netwerk/streamconv/converters/moz.build
 	cd .. && ./mach build
 
 new_ps64_cpp_dbg: inithasrun

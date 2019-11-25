@@ -71,6 +71,9 @@
         "extern_page_load_test": {
             "tests": ["extern_page_load"]
         },
+        "extern_page_load_test_all": {
+            "tests": ["extern_page_load1", "extern_page_load2", "extern_page_load3", "extern_page_load4", "extern_page_load5", "extern_page_load6", "extern_page_load7", "extern_page_load8", "extern_page_load9", "extern_page_load10", "extern_page_load11"]
+        },
         "theora_test": {
             "tests": ["theora_perf"]
         },
@@ -81,7 +84,7 @@
             "tests": ["vorbis_perf"]
         },
         "rlbox_test": {
-            "tests": [ "jpeg_perf", "png_perf", "zlib_page_render", "theora_perf", "vpx_perf", "vorbis_perf", "extern_page_load" ]
+            "tests": [ "jpeg_perf", "png_perf", "zlib_page_render", "theora_perf", "vpx_perf", "vorbis_perf", "extern_page_load1", "extern_page_load2", "extern_page_load3", "extern_page_load4", "extern_page_load5", "extern_page_load6", "extern_page_load7", "extern_page_load8", "extern_page_load9", "extern_page_load10", "extern_page_load11" ]
         },
         "rlbox_scaling": {
             "tests": ["jpeg_scaling_1", "jpeg_scaling_1_1", "jpeg_scaling_1_2", "jpeg_scaling_1_3", "jpeg_scaling_1_4", "jpeg_scaling_1_5", "jpeg_scaling_1_6", "jpeg_scaling_2", "jpeg_scaling_3", "jpeg_scaling_4", "jpeg_scaling_5", "jpeg_scaling_6", "jpeg_scaling_7"]

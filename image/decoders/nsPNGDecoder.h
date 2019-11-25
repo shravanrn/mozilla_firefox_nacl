@@ -80,7 +80,7 @@ private:
     std::mutex sandboxMapMutex;
     static const bool SandboxEnforceLimits = true;
     //we can go to higher limits, but this seems fine
-    static const int SandboxSoftLimit = 5;
+    static const int SandboxSoftLimit = 10;
 
 public:
 
@@ -99,20 +99,18 @@ public:
       }
 
       if (SandboxEnforceLimits) {
-        if (sandboxes.size() > SandboxSoftLimit) {
-          //just throw away some of the older sandboxes that are not currently in use
-          //these will be recreated if needed
-          //It could be that more sandboxes in use > SandboxSoftLimit
-          //in which case, the total count will temporarily be above the SandboxSoftLimit
+        //just throw away some of the older sandboxes that are not currently in use
+        //these will be recreated if needed
+        //It could be that more sandboxes in use > SandboxSoftLimit
+        //in which case, the total count will temporarily be above the SandboxSoftLimit
 
-          auto endIter = sandboxes.end();
-          for(auto iter = sandboxes.begin(); iter != endIter; ) {
-            //check if anyone else has a ref i.e. someone is using the sandbox 
-            if (iter->second.use_count() == 1) {
-              iter = sandboxes.erase(iter);
-            } else {
-              ++iter;
-            }
+        auto endIter = sandboxes.end();
+        for(auto iter = sandboxes.begin(); iter != endIter && sandboxes.size() > SandboxSoftLimit; ) {
+          //check if anyone else has a ref i.e. someone is using the sandbox 
+          if (iter->second.use_count() == 1) {
+            iter = sandboxes.erase(iter);
+          } else {
+            ++iter;
           }
         }
       }

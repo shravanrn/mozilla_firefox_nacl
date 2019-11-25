@@ -856,11 +856,187 @@ class extern_page_load(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 55
+    tppagecycles = 10
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
-    filters = filter.ignore_first.prepare(5) + filter.median.prepare()
+    filters = filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class extern_page_load1(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/extern_page_load/extern_page_load1.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 10
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class extern_page_load2(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/extern_page_load/extern_page_load2.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 10
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class extern_page_load3(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/extern_page_load/extern_page_load3.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 10
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class extern_page_load4(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/extern_page_load/extern_page_load4.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 10
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class extern_page_load5(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/extern_page_load/extern_page_load5.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 10
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class extern_page_load6(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/extern_page_load/extern_page_load6.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 10
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class extern_page_load7(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/extern_page_load/extern_page_load7.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 10
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class extern_page_load8(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/extern_page_load/extern_page_load8.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 10
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class extern_page_load9(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/extern_page_load/extern_page_load9.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 10
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class extern_page_load10(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/extern_page_load/extern_page_load10.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 10
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.median.prepare()
+    unit = 'ms'
+    timeout = 72000
+
+@register_test()
+class extern_page_load11(PageloaderTest):
+    """
+    Test the time taken to render a large page of text, delivered with gzip compression
+    """
+    tpmanifest = '${talos}/tests/extern_page_load/extern_page_load11.manifest'
+    tpcycles = 1
+    tploadnocache = True
+    tppagecycles = 10
+    tpmozafterpaint = True
+    gecko_profile_interval = 1
+    gecko_profile_entries = 10000000
+    filters = filter.median.prepare()
     unit = 'ms'
     timeout = 72000
 

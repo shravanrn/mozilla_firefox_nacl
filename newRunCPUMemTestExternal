@@ -58,12 +58,12 @@ if [ ${#FFPinCores[@]} -ne ${#FFVersions[@]} ]; then
 	exit 1;
 fi
 
-# for (( i = 0; i < ${#FFVersions[@]}; i++ )); do 
-# 	if [[ ! -d "${FFVersionsDir[$i]}firefox_${Pl}bit_optdebug_${FFVersions[$i]}" ]]; then
-# 		echo "Not all firefox versions found: ${FFVersionsDir[$i]}firefox_${Pl}bit_optdebug_${FFVersions[$i]}";
-# 		exit 1;
-# 	fi
-# done
+for (( i = 0; i < ${#FFVersions[@]}; i++ )); do 
+	if [[ ! -d "../ffbuilds/firefox_${Pl}bit_optdebug_${FFVersions[$i]}" ]]; then
+		echo "Not all firefox versions found: ../ffbuilds/firefox_${Pl}bit_optdebug_${FFVersions[$i]}";
+		exit 1;
+	fi
+done
 
 echo "Starting."
 
@@ -105,7 +105,7 @@ function runTest(){
 	B3=$((${A[34]} + ${A[35]} + ${A[36]} + ${A[37]}))
 
 	FTOTALMEM=0
-	for (( m = 1; m < 10; m++ )); do
+	for (( m = 0; m < 20; m++ )); do
 		CHILDMEM=$(pstree -p $FFPID | grep -o '([0-9]\+)' | grep -o '[0-9]\+' |  xargs ps -o rss,%cpu,cmd -p | awk '{memory+=$1} END {print memory}')
 		FFTOTALMEM=$((FFTOTALMEM + CHILDMEM))
 #		FFWEBCONTENTID=$(pgrep -P $FFPID "Web Content")
