@@ -309,7 +309,7 @@ new_ps64_cpp_mutex: inithasrun
 	$(CP) ../mozconfig64_new_ps_cpp_mutex ../mozconfig
 	$(CP) ../media/libjpeg_naclport/moz_ps.build ../media/libjpeg_naclport/moz.build
 	$(CP) ../media/libpng_naclport/moz_ps.build ../media/libpng_naclport/moz.build
-	$(CP) ../netwerk/streamconv/converters/moz_new_ps.build ../netwerk/streamconv/converters/moz.build
+	$(CP) ../netwerk/streamconv/converters/moz_new_ps_mutex.build ../netwerk/streamconv/converters/moz.build
 	cd .. && ./mach build
 
 ps64_cpp: inithasrun

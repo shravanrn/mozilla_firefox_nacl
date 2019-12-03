@@ -68,6 +68,11 @@ public:
   RLBoxSandbox<TRLSandbox>* rlbox_zlib;
 
   ZLIBSandboxResource() {
+  //   rlbox_zlib = nullptr;
+  // }
+
+  // RLBoxSandbox<TRLSandbox>* initialize() {
+  //   if (rlbox_zlib) { return rlbox_zlib; }
     char SandboxingCodeRootFolder[1024];
     getSandboxingFolder(SandboxingCodeRootFolder);
 
@@ -91,12 +96,15 @@ public:
     " Sandbox %s, %s\n", full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
 
     rlbox_zlib = RLBoxSandbox<TRLSandbox>::createSandbox(full_STARTUP_LIBRARY_PATH, full_SANDBOX_INIT_APP);
+    // return rlbox_zlib;
   }
 
   ~ZLIBSandboxResource() {
-    rlbox_zlib->destroySandbox();
-    free(rlbox_zlib);
-    printf("Destroying ZLIB sandbox\n");
+    if (rlbox_zlib) {
+      rlbox_zlib->destroySandbox();
+      free(rlbox_zlib);
+      printf("Destroying ZLIB sandbox\n");
+    }
   }
 };
 
@@ -108,14 +116,42 @@ private:
     std::mutex sandboxMapMutex;
     static const bool SandboxEnforceLimits = true;
     //we can go to higher limits, but this seems fine
+    // #if defined(PS_SANDBOX_DONT_USE_SPIN)
+    // static const int SandboxSoftLimit = 100;
+    // #else
     static const int SandboxSoftLimit = 50;
+    // #endif
 
 public:
+
+    // inline void checkSandboxCreation(std::shared_ptr<T> ret) {
+    //   auto succeeded = ret->initialize();
+    //   if (succeeded) { return; }
+
+    //   printf("ZLIB Sandbox creation failed. Cleaning some ZLIB sandboxes.\n");
+    //   auto endIter = sandboxes.end();
+    //   for(auto iter = sandboxes.begin(); iter != endIter && !succeeded; ) {
+    //     //check if anyone else has a ref i.e. someone is using the sandbox 
+    //     if (iter->second.use_count() == 1) {
+    //       iter = sandboxes.erase(iter);
+    //       succeeded = ret->initialize();
+    //     } else {
+    //       ++iter;
+    //     }
+    //   }
+
+    //   if (!succeeded) {
+    //     printf("All attempts to create a zlib sandbox failed.\n");
+    //     abort();
+    //   }
+    // }
 
     inline std::shared_ptr<T> createSandbox(std::string name) {
       //use a fresh temporary sandbox if we couldn't find the origin
       if(name == "") {
+        // printf("!!!!!!!!Making empty ZLIB sandbox.\n");
         auto ret = std::make_shared<T>();
+        // checkSandboxCreation(ret);
         return ret;
       }
 
@@ -127,24 +163,26 @@ public:
       }
 
       if (SandboxEnforceLimits) {
-          //just throw away some of the older sandboxes that are not currently in use
-          //these will be recreated if needed
-          //It could be that more sandboxes in use > SandboxSoftLimit
-          //in which case, the total count will temporarily be above the SandboxSoftLimit
+        //just throw away some of the older sandboxes that are not currently in use
+        //these will be recreated if needed
+        //It could be that more sandboxes in use > SandboxSoftLimit
+        //in which case, the total count will temporarily be above the SandboxSoftLimit
 
-          auto endIter = sandboxes.end();
+        auto endIter = sandboxes.end();
         for(auto iter = sandboxes.begin(); iter != endIter && sandboxes.size() > SandboxSoftLimit; ) {
-            //check if anyone else has a ref i.e. someone is using the sandbox 
-            if (iter->second.use_count() == 1) {
-              iter = sandboxes.erase(iter);
-            } else {
-              ++iter;
-            }
+          //check if anyone else has a ref i.e. someone is using the sandbox 
+          if (iter->second.use_count() == 1) {
+            iter = sandboxes.erase(iter);
+          } else {
+            ++iter;
           }
         }
+      }
 
       // Making Sandbox
+      // printf("!!!!!!!!Making ZLIB sandbox: %s.\n", name.c_str());
       auto ret = std::make_shared<T>();
+      // checkSandboxCreation(ret);
       sandboxes[name] = ret;
       return ret;
     }

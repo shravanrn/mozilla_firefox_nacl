@@ -71,6 +71,9 @@
         "extern_page_load_test": {
             "tests": ["extern_page_load"]
         },
+        "extern_page_load_test_ten": {
+            "tests": ["extern_page_load1", "extern_page_load2", "extern_page_load3", "extern_page_load4", "extern_page_load5", "extern_page_load6", "extern_page_load7", "extern_page_load8", "extern_page_load9", "extern_page_load10"]
+        },
         "extern_page_load_test_all": {
             "tests": ["extern_page_load1", "extern_page_load2", "extern_page_load3", "extern_page_load4", "extern_page_load5", "extern_page_load6", "extern_page_load7", "extern_page_load8", "extern_page_load9", "extern_page_load10", "extern_page_load11"]
         },
