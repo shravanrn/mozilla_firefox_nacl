@@ -67,6 +67,27 @@ done
 
 echo "Starting."
 
+# param: parent pid
+# return: $waitForChildRet is the child pid
+waitForChildRet=0
+function waitForChild() {
+	echo "Waiting for child of process: $1"
+	CHILDPID=$(pgrep -P $1)
+	for (( n = 0; n < 120; n++ )); do
+		if [ -n "$CHILDPID" ]; then
+			echo "Got child: $CHILDPID";
+			break;
+		fi
+		sleep 1
+		CHILDPID=$(pgrep -P $1)
+	done
+
+	if [ -z "$CHILDPID" ]; then
+		echo "Could not get child for: $1";
+	fi
+
+	waitForChildRet=$CHILDPID
+}
 
 # param: outputDir/prefix
 # param: cores
@@ -76,23 +97,20 @@ function runTest(){
 	echo "Site : $3" | tee -a "$1_cpu_memory_output.txt"
 	rm -f /tmp/cgmemtime_out.txt
 
-	taskset -c $2 ../cgmemtime/cgmemtime ./mach run "$3" --setpref browser.sessionstore.resume_from_crash=false --setpref toolkit.startup.max_resumed_crashes=-1 > /dev/null 2>&1&
-	CGPID=$!
-	FFMACHPID=$(pgrep -P $CGPID)
-
-	while [ -z "$FFMACHPID" ]
-    do
-        echo "Waiting for mach"
-        sleep 1
-        FFMACHPID=$(pgrep -P $CGPID)
-    done
-
-	FFPID=$(pgrep -P $FFMACHPID)
-	while [ -z "$FFPID" ]
-	do
-		echo "Waiting for firefox"
-		sleep 1
-		FFPID=$(pgrep -P $FFMACHPID)
+	FFMACHPID=""
+	CGPID=""
+	while [ -z "$FFMACHPID" ]; do
+		taskset -c $2 ../cgmemtime/cgmemtime ./mach run "$3" --setpref browser.sessionstore.resume_from_crash=false --setpref toolkit.startup.max_resumed_crashes=-1 > /dev/null 2>&1&
+		CGPID=$!
+		waitForChild $CGPID; FFMACHPID=$waitForChildRet
+		if [ -z "$FFMACHPID" ]; then
+			echo "Could not find cg. Retrying launch.";
+			continue;
+		fi
+		waitForChild $FFMACHPID; FFPID=$waitForChildRet
+		if [ -z "$FFMACHPID" ]; then
+			echo "Could not find mach. Retrying launch.";
+		fi
 	done
 
 	echo "Firefox Id : $FFPID"
@@ -174,13 +192,23 @@ WebsitesList=(
     # "https://www.youtube.com/"
 )
 
-for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
-	cd ${FFVersionsDir[$j]}
-	cp "mozconfig${Pl}_${FFVersions[$j]}" mozconfig
-	for (( k = 0; k < ${#WebsitesList[@]}; k++ )); do 
-		pkill -f ProcessSandbox_otherside
-		pkill -f firefox
-		runTest "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}" "${FFPinCores[$j]}" "${WebsitesList[$k]}"
+for (( z = 0; z < 10; z++ )); do 
+	for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
+		cd ${FFVersionsDir[$j]}
+		cp "mozconfig${Pl}_${FFVersions[$j]}" mozconfig
+		for (( k = 0; k < ${#WebsitesList[@]}; k++ )); do 
+			pkill -f ProcessSandbox_otherside
+			pkill -f WebContent
+			pkill -f firefox
+			sleep 3
+			runTest "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}" "${FFPinCores[$j]}" "${WebsitesList[$k]}"
+		done
+		cd $SAVEDDIR
 	done
-	cd $SAVEDDIR
 done
+
+for (( j = 0; j < ${#FFVersions[@]}; j++ )); do
+	./newAnalyzeCPUMem.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_cpu_memory_output.txt" > "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_cpu_mem_analysis.json"
+done
+
+./newAnalyzeCPUMemPart2.py "${OUTPUTPATH}/" > "${OUTPUTPATH}/analysis.txt"

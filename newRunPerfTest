@@ -33,10 +33,20 @@ FFVersions=("static" "static_buffcopy" "nacl" "new_nacl_cpp" "new_ps_cpp" "new_p
 #Process sbx is pinned to core 3. process-spin firefox is on separate core --- core 1, while process mutex is on the same core 3
 FFPinCores=("1" "1" "1" "1" "1" "3")
 
-# FFVersionsDir=("./" "./" "./" "../mozilla_firefox_stock/")
-# FFVersionsSuffix=("" "" "" "_stock")
-# FFVersions=("new_nacl_cpp" "new_ps_cpp" "new_ps_cpp_mutex" "static")
-# FFPinCores=("1" "1" "3" "1")
+# FFVersionsDir=("./" "./" "../mozilla_firefox_stock/"  "./")
+# FFVersionsSuffix=("" "" "_stock" "" )
+# FFVersions=("new_nacl_cpp" "new_ps_cpp" "static" "new_ps_cpp_mutex")
+# FFPinCores=("1" "1" "1" "3")
+
+# FFVersionsDir=("./")
+# FFVersionsSuffix=("")
+# FFVersions=("new_ps_cpp_mutex")
+# FFPinCores=("3")
+
+#FFVersionsDir=("../mozilla_firefox_stock/")
+#FFVersionsSuffix=("_stock")
+#FFVersions=("static")
+#FFPinCores=("1")
 
 if [ ${#FFVersionsDir[@]} -ne ${#FFVersions[@]} ]; then
 	echo "Versions Dir and Versions do not match";
@@ -54,8 +64,8 @@ if [ ${#FFPinCores[@]} -ne ${#FFVersions[@]} ]; then
 fi
 
 for (( i = 0; i < ${#FFVersions[@]}; i++ )); do 
-	if [[ ! -d "${FFVersionsDir[$i]}firefox_${Pl}bit_optdebug_${FFVersions[$i]}" ]]; then
-		echo "Not all firefox versions found: ${FFVersionsDir[$i]}firefox_${Pl}bit_optdebug_${FFVersions[$i]}";
+	if [[ ! -d "../ffbuilds/firefox_${Pl}bit_optdebug_${FFVersions[$i]}" ]]; then
+		echo "Not all firefox versions found: ../ffbuilds/firefox_${Pl}bit_optdebug_${FFVersions[$i]}";
 		exit 1;
 	fi
 done
@@ -78,6 +88,7 @@ function runTest(){
 		exit 1
 	fi
 	sleep 2
+	mv ./testing/mozharness/build/local.json "$1_rlbox_test_page_render.json"
 
 	taskset -c $2 ./mach talos-test --suite rlbox_scaling 2>&1 | tee "$1_scaling_terminal_output.txt"
 	retVal=${PIPESTATUS[0]}
@@ -85,9 +96,25 @@ function runTest(){
 		exit 1
 	fi
 	sleep 2
+	mv ./testing/mozharness/build/local.json "$1_rlbox_scaling_page_render.json"
+
+	taskset -c $2 ./mach talos-test --suite extern_page_load_test_ten 2>&1 | tee "$1_externalpage_output.txt"
+	retVal=${PIPESTATUS[0]}
+	if [ $retVal -ne 0 ]; then
+		exit 1
+	fi
+	sleep 2
+	mv ./testing/mozharness/build/local.json "$1_external_page_render.json"
+
+	taskset -c $2 ./mach talos-test --activeTests extern_page_load11 2>&1 | tee "$1_externalpage_output.txt"
+	retVal=${PIPESTATUS[0]}
+	if [ $retVal -ne 0 ]; then
+		exit 1
+	fi
+	sleep 2
+	mv ./testing/mozharness/build/local.json "$1_external_page_render11.json"
 
 	# taskset -c $2 ./mach talos-test --activeTests png_perf 2>&1 | tee "$1_terminal_output.txt"
-	mv ./testing/mozharness/build/local.json "$1_page_render.json"
 }
 
 SAVEDDIR=$PWD
