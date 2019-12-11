@@ -903,12 +903,25 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
   #if defined(PS_SANDBOX_USE_NEW_CPP_API)
     class ActiveRAIIWrapper{
       JPEGProcessSandbox* s;
+      bool a;
       public:
-      ActiveRAIIWrapper(JPEGProcessSandbox* ps) : s(ps) { s->makeActiveSandbox(); }
-      ~ActiveRAIIWrapper() { s->makeInactiveSandbox(); }
+      ActiveRAIIWrapper(JPEGProcessSandbox* ps, bool isActive) : s(ps), a(isActive) {
+        if (a) {
+          s->makeActiveSandbox();
+        }
+      }
+      void makeInactive(){
+        if (a) {
+          s->makeInactiveSandbox();
+          a = false;
+        }
+      }
+      ~ActiveRAIIWrapper() {
+        makeInactive();
+      }
     };
     #if !defined(PS_SANDBOX_DONT_USE_SPIN)
-    ActiveRAIIWrapper procSbxActivation(rlbox_jpeg->getSandbox());
+    ActiveRAIIWrapper procSbxActivation(rlbox_jpeg->getSandbox(), mImageWidth < 1000);
     #endif
   #endif
   //printf("FF Flag ReadJPEGData\n");
@@ -998,6 +1011,12 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
           }
           return val; 
         });
+        mImageWidth = image_width;
+        #if defined(PS_SANDBOX_USE_NEW_CPP_API) && !defined(PS_SANDBOX_DONT_USE_SPIN)
+          if (mImageWidth >= 1000) {
+            procSbxActivation.makeInactive();
+          }
+        #endif
         auto image_height = mInfo.image_height
         #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
         .copyAndVerify([this](JDIMENSION val){

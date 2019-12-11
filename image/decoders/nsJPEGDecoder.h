@@ -164,6 +164,7 @@ public:
     J_COLOR_SPACE m_out_color_space;
     jmp_buf m_jmpBuff;
     bool m_jmpBuffValid = FALSE; 
+    unsigned int mImageWidth = 0;
   #elif defined(NACL_SANDBOX_USE_CPP_API) || defined(PROCESS_SANDBOX_USE_CPP_API)
     unverified_data<struct jpeg_decompress_struct*> p_mInfo;
     unverified_data<struct jpeg_source_mgr*> p_mSourceMgr;

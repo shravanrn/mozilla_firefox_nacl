@@ -78,11 +78,21 @@ class SandboxManager
 private:
     std::map<std::string, std::shared_ptr<T>> sandboxes;
     std::mutex sandboxMapMutex;
-    static const bool SandboxEnforceLimits = true;
+    static std::once_flag SandboxEnforceLimitsSet;
+    static bool SandboxEnforceLimits;
     //we can go to higher limits, but this seems fine
     static const int SandboxSoftLimit = 10;
 
 public:
+
+    SandboxManager(){
+      std::call_once(SandboxEnforceLimitsSet, [&](){
+        SandboxEnforceLimits = !PR_GetEnv("MOZ_RLBOX_SANDBOX_NOLIMIT");
+        if (!SandboxEnforceLimits){ 
+          printf("RLBox: Not enforcing sandbox limits!\n");
+        }
+      });
+    }
 
     inline std::shared_ptr<T> createSandbox(std::string name) {
       //use a fresh temporary sandbox if we couldn't find the origin
@@ -141,6 +151,11 @@ public:
       sandboxes.clear();
     }
 };
+
+template<typename T>
+std::once_flag SandboxManager<T>::SandboxEnforceLimitsSet;
+template<typename T>
+bool SandboxManager<T>::SandboxEnforceLimits = true;
 
 struct RLBench
 {

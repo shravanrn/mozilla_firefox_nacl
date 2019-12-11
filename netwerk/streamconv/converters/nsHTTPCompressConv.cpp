@@ -22,6 +22,8 @@
 #include "state.h"
 #include "brotli/decode.h"
 
+#include "prenv.h"
+
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,6 +31,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <mutex>
 
 #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
 // RLBoxSandbox<TRLSandbox>* rlbox_zlib = NULL;
@@ -114,7 +117,8 @@ class SandboxManager
 private:
     std::map<std::string, std::shared_ptr<T>> sandboxes;
     std::mutex sandboxMapMutex;
-    static const bool SandboxEnforceLimits = true;
+    static std::once_flag SandboxEnforceLimitsSet;
+    static bool SandboxEnforceLimits;
     //we can go to higher limits, but this seems fine
     // #if defined(PS_SANDBOX_DONT_USE_SPIN)
     // static const int SandboxSoftLimit = 100;
@@ -123,6 +127,15 @@ private:
     // #endif
 
 public:
+
+    SandboxManager(){
+      std::call_once(SandboxEnforceLimitsSet, [&](){
+        SandboxEnforceLimits = !PR_GetEnv("MOZ_RLBOX_SANDBOX_NOLIMIT");
+        if (!SandboxEnforceLimits){ 
+          printf("RLBox: Not enforcing sandbox limits!\n");
+        }
+      });
+    }
 
     // inline void checkSandboxCreation(std::shared_ptr<T> ret) {
     //   auto succeeded = ret->initialize();
@@ -207,6 +220,11 @@ public:
       sandboxes.clear();
     }
 };
+
+template<typename T>
+std::once_flag SandboxManager<T>::SandboxEnforceLimitsSet;
+template<typename T>
+bool SandboxManager<T>::SandboxEnforceLimits = true;
 
 static SandboxManager<ZLIBSandboxResource> zlibSandboxManager;
 

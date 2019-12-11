@@ -1821,6 +1821,7 @@ nsPNGDecoder::FinishedPNGData()
     freeInPngSandbox(p_params);
   #endif
 
+  // Exclude very small images as the actual impact is very small
   if(width < 100) {
     decoder->PngMaybeTooSmall = true;
   } else {
@@ -1834,10 +1835,12 @@ nsPNGDecoder::FinishedPNGData()
       // };
       // ActiveRAIIWrapper procSbxActivation(IsMetadataDecode()? nullptr : );
       if (!decoder->IsMetadataDecode()){
-        #if !defined(PS_SANDBOX_DONT_USE_SPIN)
-        (rlbox_png->getSandbox())->makeActiveSandbox();
-        #endif
-        decoder->PngSbxActivated = true;
+        if (width < 1000) {
+          #if !defined(PS_SANDBOX_DONT_USE_SPIN)
+          (rlbox_png->getSandbox())->makeActiveSandbox();
+          #endif
+          decoder->PngSbxActivated = true;
+        }
       }
     #endif
   }
