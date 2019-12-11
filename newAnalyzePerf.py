@@ -5,23 +5,11 @@ import sys
 import csv
 import os
 from urllib.parse import urlparse
-
-def is_line_required(line):
-    if (
-        line.startswith("FFBuild") or
-        ("\"name\"" in line) or
-        ("\"value\"" in line) or
-        ("Final JPEG_Time" in line) or
-        ("Final PNG_Time" in line)
-    ):
-        if "INFO -" not in line:
-            return True
-    return False
+from statistics import mean, median, stdev
 
 class PerfState:
     def __init__(self):
         self.timings = {}
-
 
 def addTestValue(s, group, val):
     if group not in s.timings:
@@ -42,23 +30,6 @@ def handle_line(line, s, skipFirstHost):
         addTestValue(s, group, val)
     return s
 
-
-def average(list):
-    n = len(list)
-    if n < 1:
-            return 0
-    return float(sum(list))/n
-
-
-def median(list):
-    n = len(list)
-    if n < 1:
-            return 0
-    if n % 2 == 1:
-            return sorted(list)[n//2]
-    else:
-            return sum(sorted(list)[n//2-1:n//2+1])/2.0
-
 def print_final_results(s):
     print('{ "data" : [')
     first = True
@@ -75,11 +46,10 @@ def print_final_results(s):
         timeList = times[5:] #filter first 5
         print('  "Filtered Times": ' + str(timeList) + ",")
 
-        avg = average(timeList)
+        avg = mean(timeList)
         print('  "Average": "' + str("{0:,.2f}".format(avg)) + '",')
 
-        variance = list(map(lambda x: (x - avg)**2, timeList))
-        stdDev = math.sqrt(average(variance))
+        stdDev = stdev(timeList)
         print('  "StdDev": "' + str("{0:,.2f}".format(stdDev)) + '",')
 
         m = median(timeList)

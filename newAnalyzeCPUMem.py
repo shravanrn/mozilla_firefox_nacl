@@ -11,6 +11,7 @@ class SiteState:
         self.site = site
         self.cgmem = []
         self.mem = []
+        self.webcmem = []
         self.cpu0 = []
         self.cpu1 = []
         self.cpu2 = []
@@ -30,6 +31,8 @@ class PerfState:
         self.sites[self.current_site].cgmem.append(int(cgmem))
     def add_mem(self, mem):
         self.sites[self.current_site].mem.append(int(mem))
+    def add_webcmem(self, webcmem):
+        self.sites[self.current_site].webcmem.append(int(webcmem))
     def add_cpu0(self, cpu0):
         self.sites[self.current_site].cpu0.append(float(cpu0))
     def add_cpu1(self, cpu1):
@@ -47,6 +50,9 @@ def handle_line(line, s):
     elif 'CGMem: ' in line:
         cgmem = line.split('CGMem: ')[1].strip()
         s.add_cgmem(cgmem)
+    elif 'WebCMem: ' in line:
+        webcmem = line.split('WebCMem: ')[1].strip()
+        s.add_webcmem(webcmem)
     elif 'Mem: ' in line:
         mem = line.split('Mem: ')[1].strip()
         s.add_mem(mem)
@@ -85,19 +91,21 @@ def print_final_results(s):
         print('{')
         print('  "site": "'  + site  + '",')
 
-        print('  "cgmems": ' + str(siteState.cgmem) + ',')
-        print('  "mems": '   + str(siteState.mem)   + ',')
-        print('  "cpu0s": '  + str(siteState.cpu0)  + ',')
-        print('  "cpu1s": '  + str(siteState.cpu1)  + ',')
-        print('  "cpu2s": '  + str(siteState.cpu2)  + ',')
-        print('  "cpu3s": '  + str(siteState.cpu3)  + ',')
+        print('  "cgmems": '   + str(siteState.cgmem)     + ',')
+        print('  "mems": '     + str(siteState.mem)       + ',')
+        print('  "webcmems": ' + str(siteState.webcmem)   + ',')
+        print('  "cpu0s": '    + str(siteState.cpu0)      + ',')
+        print('  "cpu1s": '    + str(siteState.cpu1)      + ',')
+        print('  "cpu2s": '    + str(siteState.cpu2)      + ',')
+        print('  "cpu3s": '    + str(siteState.cpu3)      + ',')
 
-        print('  "cgmem": ' + str(median(siteState.cgmem)) + ',')
-        print('  "mem": '   + str(median(siteState.mem))   + ',')
-        print('  "cpu0": '  + str(median(siteState.cpu0))  + ',')
-        print('  "cpu1": '  + str(median(siteState.cpu1))  + ',')
-        print('  "cpu2": '  + str(median(siteState.cpu2))  + ',')
-        print('  "cpu3": '  + str(median(siteState.cpu3))       )
+        print('  "cgmem": '    + str(median(siteState.cgmem))     + ',')
+        print('  "mem": '      + str(median(siteState.mem))       + ',')
+        print('  "webcmem": '  + str(median(siteState.webcmem))   + ',')
+        print('  "cpu0": '     + str(median(siteState.cpu0))      + ',')
+        print('  "cpu1": '     + str(median(siteState.cpu1))      + ',')
+        print('  "cpu2": '     + str(median(siteState.cpu2))      + ',')
+        print('  "cpu3": '     + str(median(siteState.cpu3))           )
 
         print('}')
     print("} }")

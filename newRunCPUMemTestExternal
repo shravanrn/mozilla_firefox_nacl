@@ -27,10 +27,10 @@ if [[ ! -z "$4" ]]; then
 	fi
 fi
 
-FFVersionsDir=("./" "./" "./" "../mozilla_firefox_stock/")
-FFVersionsSuffix=("" "" "" "_stock")
-FFVersions=("new_nacl_cpp" "new_ps_cpp" "new_ps_cpp_mutex" "static")
-FFPinCores=("1" "1" "3" "1")
+FFVersionsDir=("./" "./" "../mozilla_firefox_stock/")
+FFVersionsSuffix=("" "" "_stock")
+FFVersions=("new_nacl_cpp" "new_ps_cpp" "static")
+FFPinCores=("1" "1" "1")
 
 #FFVersionsDir=("../mozilla_firefox_stock/")
 #FFVersionsSuffix=("_stock")
@@ -66,7 +66,8 @@ for (( i = 0; i < ${#FFVersions[@]}; i++ )); do
 done
 
 echo "Starting."
-
+echo "Make sure to run the following command before starting"
+echo "sudo ../cgmemtime/cgmemtime --setup -g $USER --perm 775"
 # param: parent pid
 # return: $waitForChildRet is the child pid
 waitForChildRet=0
@@ -123,19 +124,33 @@ function runTest(){
 	B3=$((${A[34]} + ${A[35]} + ${A[36]} + ${A[37]}))
 
 	FTOTALMEM=0
+	FCONTENTMEM=0
 	for (( m = 0; m < 20; m++ )); do
-		CHILDMEM=$(pstree -p $FFPID | grep -o '([0-9]\+)' | grep -o '[0-9]\+' |  xargs ps -o rss,%cpu,cmd -p | awk '{memory+=$1} END {print memory}')
-		FFTOTALMEM=$((FFTOTALMEM + CHILDMEM))
+#		CHILDMEM=$(pstree -p $FFPID | grep -o '([0-9]\+)' | grep -o '[0-9]\+' |  xargs ps -o rss,%cpu,cmd -p | awk '{memory+=$1} END {print memory}')
+#		FFTOTALMEM=$((FFTOTALMEM + CHILDMEM))
 #		FFWEBCONTENTID=$(pgrep -P $FFPID "Web Content")
 #		FFCHILDPIDS=($(pstree -T -p $FFWEBCONTENTID | grep -o '([0-9]\+)' | grep -o '[0-9]\+'))
-#		for (( l = 0; l < ${#FFCHILDPIDS[@]}; l++ )); do
-#			CHILDMEM=$(ps -p ${FFCHILDPIDS[$l]} -o rss=)
-#			FFTOTALMEM=$((FFTOTALMEM + CHILDMEM))
-#		done
+
+		FFCHILDPIDS=($(pstree -T -p $FFPID | grep -o '([0-9]\+)' | grep -o '[0-9]\+'))
+		for (( l = 0; l < ${#FFCHILDPIDS[@]}; l++ )); do
+			CHILDMEM=$(ps -p ${FFCHILDPIDS[$l]} -o rss=)
+			FFTOTALMEM=$((FFTOTALMEM + CHILDMEM))
+		done
+
+		FFWEBCONTENTID=$(pgrep -P $FFPID "Web Content")
+		FFCHILDPIDS=($(pstree -T -p $FFWEBCONTENTID | grep -o '([0-9]\+)' | grep -o '[0-9]\+'))
+		for (( l = 0; l < ${#FFCHILDPIDS[@]}; l++ )); do
+			CHILDMEM=$(ps -p ${FFCHILDPIDS[$l]} -o rss=)
+			FCONTENTMEM=$((FCONTENTMEM + CHILDMEM))
+		done
+
 		sleep 1
 	done
-	FFAVGMEM=$((FFTOTALMEM / 10))
+	FFAVGMEM=$((FFTOTALMEM / 20))
 	echo "Mem: $FFAVGMEM" | tee -a "$1_cpu_memory_output.txt"
+
+	FFAVGCONTENTMEM=$((FCONTENTMEM / 20))
+	echo "WebCMem: $FFAVGCONTENTMEM" | tee -a "$1_cpu_memory_output.txt"
 
 	# user         + nice     + system   + idle
 	C=($(sed -n '2,5p' /proc/stat))
@@ -193,18 +208,19 @@ WebsitesList=(
 )
 
 for (( z = 0; z < 10; z++ )); do 
-	for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
-		cd ${FFVersionsDir[$j]}
-		cp "mozconfig${Pl}_${FFVersions[$j]}" mozconfig
-		for (( k = 0; k < ${#WebsitesList[@]}; k++ )); do 
+	for (( k = 0; k < ${#WebsitesList[@]}; k++ )); do 
+		for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
+			cd ${FFVersionsDir[$j]}
+			cp "mozconfig${Pl}_${FFVersions[$j]}" mozconfig
 			pkill -f ProcessSandbox_otherside
 			pkill -f WebContent
 			pkill -f firefox
 			sleep 3
 			runTest "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}" "${FFPinCores[$j]}" "${WebsitesList[$k]}"
+			cd $SAVEDDIR
 		done
-		cd $SAVEDDIR
 	done
+
 done
 
 for (( j = 0; j < ${#FFVersions[@]}; j++ )); do
