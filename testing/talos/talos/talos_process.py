@@ -110,6 +110,10 @@ def run_browser(command, minidump_dir, timeout=None, on_started=None,
 
     LOG.info("Using env: %s" % pprint.pformat(kwargs['env']))
 
+    if kwargs['env'].has_key('TALOS_PROCESS_START_RUNNER'):
+        LOG.info('Found TALOS_PROCESS_START_RUNNER=' + kwargs['env']['TALOS_PROCESS_START_RUNNER'])
+        command = [kwargs['env']['TALOS_PROCESS_START_RUNNER']] + command
+
     kwargs['storeOutput'] = False
     kwargs['processOutputLine'] = reader
     kwargs['onFinish'] = event.set
