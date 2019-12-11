@@ -138,3 +138,5 @@ lextab.py
 !.vscode/tasks.json
 /firefox_32bit_*/
 /firefox_64bit_*/
+
+testing/talos/talos/tests/**/*.develop
