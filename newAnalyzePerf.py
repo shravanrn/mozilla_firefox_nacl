@@ -23,6 +23,8 @@ def handle_line(line, s, skipFirstHost):
         if skipFirstHost:
             group = group.split('(')[1].split(')')[0]
             u = urlparse(group)
+            if u.scheme == "data":
+                return s
             u = u._replace(netloc=u.netloc.split('.', 1)[1])
             group = u.geturl()
         index = fragment.split(',')[1]

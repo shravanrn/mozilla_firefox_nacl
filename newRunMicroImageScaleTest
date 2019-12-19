@@ -93,6 +93,7 @@ for (( j = 0; j < ${#FFVersions[@]}; j++ )); do
 done
 
 for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
-	./newAnalyzePerf.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_output.txt" 2>&1 >> "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_analysis.json" True
+	./newAnalyzePerf.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_output.txt" True 2>&1 >> "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_analysis.json"
 done
 
+newAnalyzeMicroScalePart2.py "${OUTPUTPATH}/"
