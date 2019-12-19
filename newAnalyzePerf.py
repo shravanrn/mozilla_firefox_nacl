@@ -36,6 +36,8 @@ def print_final_results(s):
     print('{ "data" : [')
     first = True
     for group, times in s.timings.items():
+        if len(times) < 5:
+            continue
         if first:
             first = False
         else:
