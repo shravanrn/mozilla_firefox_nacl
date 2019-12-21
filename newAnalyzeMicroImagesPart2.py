@@ -16,7 +16,7 @@ def getMedian(els, group):
 def computeSummary(summaryFile, ext, parsed1, parsed2, parsed3):
     with open(summaryFile, "w") as f:
         writer = csv.writer(f)
-        writer.writerow(["Image", "SFI sandbox", "Process sandbox"])
+        writer.writerow(["Image", "SFI", "Process"])
         for qual in ["best", "default", "none"]:
             for res, label in {"1920" : "\\n1280p", "480" : "{0}\\n320p", "240" : "\\n135p"}.items():
                 group_suffix = qual + "_" + res + "." + ext
