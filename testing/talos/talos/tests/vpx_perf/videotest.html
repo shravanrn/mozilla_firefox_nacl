@@ -32,18 +32,24 @@
 
         v.addEventListener("pause", function() {
             shouldMeasure = false;
-            TalosContentProfiler.pause("video test finish", true).then(() => {
-                var result = (1000 * delaySum/samples).toFixed(2);
-                tpRecordTime(result, start);
-                parent.reportResults(result, start);
-            });
+            if (TalosContentProfiler) {
+                TalosContentProfiler.pause("video test finish", true).then(() => {
+                    var result = (1000 * delaySum/samples).toFixed(2);
+                    tpRecordTime(result, start);
+                    parent.reportResults(result, start);
+                });
+            }
         });
 
         addEventListener("load", function() {
-            TalosContentProfiler.resume("video test start", true).then(() => {
-                start = new Date();
+            if (TalosContentProfiler) {
+                TalosContentProfiler.resume("video test start", true).then(() => {
+                    start = new Date();
+                    v.play();
+                });
+            } else {
                 v.play();
-            });
+            }
         });
     </script>
 </body>

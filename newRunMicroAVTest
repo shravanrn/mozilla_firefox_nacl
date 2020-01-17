@@ -1,0 +1,97 @@
+#!/bin/bash
+export MOZ_DISABLE_CONTENT_SANDBOX=1
+unset TALOS_PROCESS_START_RUNNER
+unset MOZ_RLBOX_SANDBOX_NOLIMIT
+
+# set -o xtrace
+
+if [ -z "$1" ]; then
+	echo "Expected argument $0 output_folder";
+	exit 1;
+fi
+
+if [[ -f "$1" ]]; then
+	echo "$1 already exists";
+	exit 1;
+fi
+
+OUTPUTPATH=$(cd "$(dirname "$1")"; pwd)/$(basename "$1")
+mkdir -p ${OUTPUTPATH}
+cd "$(dirname "$0")"
+
+FFVersionsDir=("./" "./" "../mozilla_firefox_stock/")
+FFVersionsSuffix=("" "" "_stock")
+FFVersions=("new_nacl_cpp" "new_ps_cpp" "static")
+FFPinCores=("1,3" "1" "1,3")
+
+#FFVersionsDir=("../mozilla_firefox_stock/")
+#FFVersionsSuffix=("_stock")
+#FFVersions=("static")
+#FFPinCores=("1")
+
+if [ ${#FFVersionsDir[@]} -ne ${#FFVersions[@]} ]; then
+	echo "Versions Dir and Versions do not match";
+	exit 1;
+fi
+
+if [ ${#FFVersionsSuffix[@]} -ne ${#FFVersions[@]} ]; then
+	echo "Versions Suffix and Versions do not match";
+	exit 1;
+fi
+
+if [ ${#FFPinCores[@]} -ne ${#FFVersions[@]} ]; then
+	echo "Pin Cores and Versions do not match";
+	exit 1;
+fi
+
+for (( i = 0; i < ${#FFVersions[@]}; i++ )); do
+	if [[ ! -d "../ffbuilds/firefox_64bit_optdebug_${FFVersions[$i]}" ]]; then
+		echo "Not all firefox versions found: ../ffbuilds/firefox_64bit_optdebug_${FFVersions[$i]}";
+		exit 1;
+	fi
+done
+
+echo "Starting. Make sure to isolate cpus 1 and 3 and then"
+echo "1. Disable scaling first with. sudo cpufreq-set -c 1,3 --min 2200MHz --max 2200MHz"
+
+# param: outputDir/prefix
+# param: cores
+function runTest(){
+	FINISHED=0
+	for (( l = 0; l < 3; l++ )); do
+		pkill -f ProcessSandbox_otherside
+		pkill -f WebContent
+		pkill -f firefox
+		rm -f ./testing/mozharness/build/local.json
+
+		taskset -c $2 ./mach talos-test --suite "rlbox_av" 2>&1 | tee "$1_terminal_output.txt"
+		retVal=${PIPESTATUS[0]}
+		if [ $retVal -eq 0 ]; then
+			FINISHED=1
+			break;
+		else
+			echo "Failed to run test rlbox_av for $1. Retrying..." | tee "$1_terminal_output.txt"
+		fi
+	done
+	if [ $FINISHED -eq 0 ]; then
+		echo "Failed to run test rlbox_av for $1." | tee "$1_terminal_output.txt"
+		exit 1
+	fi
+	sleep 10
+	mv ./testing/mozharness/build/local.json "$1_rlbox_test_page_render.json"
+}
+
+SAVEDDIR=$PWD
+
+for (( j = 0; j < ${#FFVersions[@]}; j++ )); do
+    cd ${FFVersionsDir[$j]}
+    cp "mozconfig64_${FFVersions[$j]}" mozconfig
+    runTest "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}" "${FFPinCores[$j]}"
+    cd $SAVEDDIR
+done
+
+for (( j = 0; j < ${#FFVersions[@]}; j++ )); do 
+	./newAnalyzePerf.py "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_output.txt" 2>&1 >> "${OUTPUTPATH}/${FFVersions[$j]}${FFVersionsSuffix[$j]}_terminal_analysis.json"
+done
+
+# ./newAnalyzeMicroImagesPart2.py "${OUTPUTPATH}/"

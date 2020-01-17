@@ -98,6 +98,9 @@
         "rlbox_image": {
             "tests": [ "jpeg_perf", "png_perf" ]
         },
+        "rlbox_av": {
+            "tests": [ "theora_perf", "vpx_perf", "vorbis_perf" ]
+        },
         "svgr-e10s": {
             "tests": ["tsvgx", "tsvgr_opacity", "tart", "tscrollx", "tsvg_static"]
         },
