@@ -9,7 +9,7 @@
 				run64_nacldebug run64_dynamicdebug \
 				clean
 
-.DEFAULT_GOAL: build64
+.DEFAULT_GOAL: minbuild64
 
 inithasrun:
 	cd .. && ./mach bootstrap --no-interactive --application-choice browser
@@ -28,11 +28,26 @@ inithasrun:
 .NOTPARALLEL: build32 build64 static32 static64 dynamic32 dynamic64 nacl32 nacl64 ps32 ps64 \
 							dynamic64_dbg nacl64_dbg ps64_dbg ps64_asan new_nacl64_cpp new_nacl64_cpp_dbg
 
+# Early prototyping done on 32 bit. No longer used.
 build32: static32 dynamic32 nacl32 ps32 nacl32_nosimd
+
+# Builds - Describing the various builds
+# --------------------------------------
+# new_nacl64_cpp - rlbox API + NaCl sandboxing.
+# new_ps64_cpp - rlbox API + Process sandboxing.
+
+# Older less used builds
+# static64 - Build without any sandboxing. This build is replaced with building a stock version of firefox from the "vanilla" branch in this repo
+# static64_buffcopy - Build to test just the cost of extra copies of data in sandboxing. This build does not actually sandbox.
+# dynamic64 - Same as previous, but uses a dynamic lib to test the overhead of using a dynamic lib in place of a static lib.
+# nacl64 - Initial use of nacl sandboxes without rlbox apis (used as a threshold to understand overhead of rlbox api alone compared to new_nacl64_cpp)
+# ps64 - Initial use of process sandboxes without rlbox apis.
+# nacl64_cpp - Early prototype of the rlbox API + NaCl sandboxing.
+# ps64_cpp - Early prototype of the rlbox API + Process sandboxing.
 
 build64: static64 static64_buffcopy dynamic64 nacl64 ps64 nacl64_cpp ps64_cpp new_nacl64_cpp new_ps64_cpp
 
-minbuild64: static64 static64_buffcopy nacl64 new_nacl64_cpp new_ps64_cpp
+minbuild64: new_nacl64_cpp new_ps64_cpp
 
 CP=./cpIfDifferent.sh
 
