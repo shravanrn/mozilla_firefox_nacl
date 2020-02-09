@@ -1,6 +1,7 @@
 #!/bin/bash
 export MOZ_DISABLE_CONTENT_SANDBOX=1
-export TALOS_PROCESS_START_RUNNER=$(realpath ../cgmemtime/cgmemtime)
+CGMEMTIME_DIR=$(realpath ../cgmemtime/)
+export TALOS_PROCESS_START_RUNNER=$CGMEMTIME_DIR/cgmemtime
 unset MOZ_RLBOX_SANDBOX_NOLIMIT
 
 # set -o xtrace
@@ -13,6 +14,11 @@ fi
 if [[ -f "$1" ]]; then
 	echo "$1 already exists";
 	exit 1;
+fi
+
+if  [ ! -e "/sys/fs/cgroup/memory/cgmemtime" ]; then
+	echo "cgmemtime not setup since comp restart. Setting up now."
+	sudo $CGMEMTIME_DIR/cgmemtime --setup -g $(USER) --perm 775;
 fi
 
 OUTPUTPATH=$(cd "$(dirname "$1")"; pwd)/$(basename "$1")
