@@ -1393,7 +1393,7 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
         auto output_scanline_verifier = [this](JDIMENSION val){
           if(val > m_output_height_shadow)
           {
-            printf("nsJPEGDecoder::nsJPEGDecoder: output_scanline > output_height\n");
+            printf("nsJPEGDecoder::nsJPEGDecoder: (2) output_scanline > output_height: %u, %u\n", val, m_output_height_shadow);
             abort();
           }
           return val;
@@ -1712,7 +1712,7 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
     auto output_scanline_verifier = [this](JDIMENSION val){
       if(val > m_output_height_shadow)
       {
-        printf("nsJPEGDecoder::nsJPEGDecoder: output_scanline > output_height\n");
+        printf("nsJPEGDecoder::nsJPEGDecoder: (1) output_scanline > output_height: %u, %u\n", val, m_output_height_shadow);
         abort();
       }
       return val;
