@@ -18,7 +18,7 @@ fi
 
 if  [ ! -e "/sys/fs/cgroup/memory/cgmemtime" ]; then
 	echo "cgmemtime not setup since comp restart. Setting up now."
-	sudo $CGMEMTIME_DIR/cgmemtime --setup -g $(USER) --perm 775;
+	sudo $CGMEMTIME_DIR/cgmemtime --setup -g $USER --perm 775;
 fi
 
 OUTPUTPATH=$(cd "$(dirname "$1")"; pwd)/$(basename "$1")
