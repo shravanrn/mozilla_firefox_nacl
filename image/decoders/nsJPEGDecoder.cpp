@@ -1394,7 +1394,8 @@ nsJPEGDecoder::ReadJPEGData(const char* aData, size_t aLength)
           if(val > m_output_height_shadow)
           {
             printf("nsJPEGDecoder::nsJPEGDecoder: (2) output_scanline > output_height: %u, %u\n", val, m_output_height_shadow);
-            abort();
+            // Just set it back inbounds. A corrupted image is better than taking down the site due to a bad parse
+            val = m_output_height_shadow;
           }
           return val;
         };
@@ -1713,7 +1714,8 @@ nsJPEGDecoder::OutputScanlines(bool* suspend)
       if(val > m_output_height_shadow)
       {
         printf("nsJPEGDecoder::nsJPEGDecoder: (1) output_scanline > output_height: %u, %u\n", val, m_output_height_shadow);
-        abort();
+        // Just set it back inbounds. A corrupted image is better than taking down the site due to a bad parse
+        val = m_output_height_shadow;
       }
       return val;
     };
