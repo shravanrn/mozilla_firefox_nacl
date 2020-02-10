@@ -59,16 +59,22 @@ echo "1. Disable scaling first with. sudo cpufreq-set -c 1,3 --min 2200MHz --max
 function runTest(){
 	FINISHED=0
 	for (( l = 0; l < 3; l++ )); do
-		pkill -f ProcessSandbox_otherside
-		pkill -f WebContent
-		pkill -f firefox
 		rm -f ./testing/mozharness/build/local.json
 
 		echo ""  | tee "$1_terminal_output.txt"
 
-		for (( l = 0; l < 5; l++ )); do
-			timeout 120s taskset -c $2 ./mach talos-test --activeTests "theora_perf" 2>&1 | tee -a "$1_terminal_output.txt"
+		for (( m = 0; m < 5; m++ )); do
+			pkill -f ProcessSandbox_otherside
+			pkill -f WebContent
+			pkill -f firefox
 			timeout 120s taskset -c $2 ./mach talos-test --activeTests "vpx_perf" 2>&1 | tee -a "$1_terminal_output.txt"
+			pkill -f ProcessSandbox_otherside
+			pkill -f WebContent
+			pkill -f firefox
+			timeout 120s taskset -c $2 ./mach talos-test --activeTests "theora_perf" 2>&1 | tee -a "$1_terminal_output.txt"
+			pkill -f ProcessSandbox_otherside
+			pkill -f WebContent
+			pkill -f firefox
 			timeout 120s taskset -c $2 ./mach talos-test --activeTests "vorbis_perf" 2>&1 | tee -a "$1_terminal_output.txt"
 		done
 	done
