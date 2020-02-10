@@ -67,15 +67,18 @@ function runTest(){
 			pkill -f ProcessSandbox_otherside
 			pkill -f WebContent
 			pkill -f firefox
-			timeout 120s taskset -c $2 ./mach talos-test --activeTests "vpx_perf" 2>&1 | tee -a "$1_terminal_output.txt"
+			sleep 5
+			timeout 90s taskset -c $2 ./mach talos-test --activeTests "vpx_perf" 2>&1 | tee -a "$1_terminal_output.txt"
 			pkill -f ProcessSandbox_otherside
 			pkill -f WebContent
 			pkill -f firefox
-			timeout 120s taskset -c $2 ./mach talos-test --activeTests "theora_perf" 2>&1 | tee -a "$1_terminal_output.txt"
+			sleep 5
+			timeout 90s taskset -c $2 ./mach talos-test --activeTests "theora_perf" 2>&1 | tee -a "$1_terminal_output.txt"
 			pkill -f ProcessSandbox_otherside
 			pkill -f WebContent
 			pkill -f firefox
-			timeout 120s taskset -c $2 ./mach talos-test --activeTests "vorbis_perf" 2>&1 | tee -a "$1_terminal_output.txt"
+			sleep 5
+			timeout 90s taskset -c $2 ./mach talos-test --activeTests "vorbis_perf" 2>&1 | tee -a "$1_terminal_output.txt"
 		done
 	done
 }
