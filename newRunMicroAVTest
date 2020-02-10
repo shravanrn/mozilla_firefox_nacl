@@ -64,21 +64,14 @@ function runTest(){
 		pkill -f firefox
 		rm -f ./testing/mozharness/build/local.json
 
-		taskset -c $2 ./mach talos-test --suite "rlbox_av" 2>&1 | tee "$1_terminal_output.txt"
-		retVal=${PIPESTATUS[0]}
-		if [ $retVal -eq 0 ]; then
-			FINISHED=1
-			break;
-		else
-			echo "Failed to run test rlbox_av for $1. Retrying..." | tee "$1_terminal_output.txt"
-		fi
+		echo ""  | tee "$1_terminal_output.txt"
+
+		for (( l = 0; l < 5; l++ )); do
+			timeout 120s taskset -c $2 ./mach talos-test --activeTests "theora_perf" 2>&1 | tee -a "$1_terminal_output.txt"
+			timeout 120s taskset -c $2 ./mach talos-test --activeTests "vpx_perf" 2>&1 | tee -a "$1_terminal_output.txt"
+			timeout 120s taskset -c $2 ./mach talos-test --activeTests "vorbis_perf" 2>&1 | tee -a "$1_terminal_output.txt"
+		done
 	done
-	if [ $FINISHED -eq 0 ]; then
-		echo "Failed to run test rlbox_av for $1." | tee "$1_terminal_output.txt"
-		exit 1
-	fi
-	sleep 10
-	mv ./testing/mozharness/build/local.json "$1_rlbox_test_page_render.json"
 }
 
 SAVEDDIR=$PWD
