@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 
 import os
+import os.path
 import sys
 import simplejson as json
 from statistics import mean, median, stdev
 
 def read(folder, filename):
     inputFileName1 = os.path.join(folder, filename)
+    if not os.path.isfile(inputFileName1):
+        return None
     with open(inputFileName1) as f:
         input1 = f.read()
     return input1
@@ -40,7 +43,9 @@ def getMedianTestValue(inputFolderName, fileTemplate):
 def getMedianIntValue(inputFolderName, fileTemplate):
     vals = []
     for i in range(1, 11):
-        vals.append(int(read(inputFolderName, fileTemplate.format(str(i)))))
+        contents = read(inputFolderName, fileTemplate.format(str(i)))
+        if contents:
+            vals.append(int())
     return median(vals)
 
 def main():
