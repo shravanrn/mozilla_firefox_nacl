@@ -68,14 +68,14 @@ function runTest(){
 
 	for (( m = 1; m < 11; m++ )); do
 		FINISHED=0
-		for (( l = 0; l < 3; l++ )); do
+		for (( l = 0; l < 5; l++ )); do
 			pkill -f ProcessSandbox_otherside
 			pkill -f WebContent
 			pkill -f firefox
 			rm -f ./testing/mozharness/build/local.json
 			rm -f /tmp/cgmemtime_out.txt
 
-			taskset -c $2 ./mach talos-test --activeTests "extern_page_load$3" 2>&1 | tee -a "$1_externalpage_output$3.txt"
+			timeout 240s taskset -c $2 ./mach talos-test --activeTests "extern_page_load$3" 2>&1 | tee -a "$1_externalpage_output$3.txt"
 			retVal=${PIPESTATUS[0]}
 			if [ $retVal -eq 0 ]; then
 				FINISHED=1
