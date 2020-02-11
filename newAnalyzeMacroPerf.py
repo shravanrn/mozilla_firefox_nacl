@@ -31,6 +31,18 @@ def writeMetrics(fileobj, label, arr):
     fileobj.write("Median {}: {}\n".format(label, median(arr)))
     fileobj.write("Std_Dev {}: {}\n".format(label, stdev(arr)))
 
+def getMedianTestValue(inputFolderName, fileTemplate):
+    vals = []
+    for i in range(1, 11):
+        vals.append(readJsonTestValue(inputFolderName, fileTemplate.format(str(i))))
+    return median(vals)
+
+def getMedianIntValue(inputFolderName, fileTemplate):
+    vals = []
+    for i in range(1, 11):
+        vals.append(int(read(inputFolderName, fileTemplate.format(str(i)))))
+    return median(vals)
+
 def main():
     if len(sys.argv) < 2:
         print("Expected " + sys.argv[0] + " inputFolderName")
@@ -66,9 +78,9 @@ def main():
         for i in range(1, len(sites)):
             siteobj = {
                 "name" : sites[i],
-                "value" :  readJsonTestValue(inputFolderName, build_output.format(str(i) + ".json"))
+                "value" : getMedianTestValue(inputFolderName, build_output.format(str(i) + "-{}.json"))
             }
-            latency_output[build].append(siteobj) 
+            latency_output[build].append(siteobj)
 
     writeJson(inputFolderName, "page_latency.json", latency_output)
 
@@ -76,8 +88,8 @@ def main():
         for build in other_builds:
             overheads = []
             for i in range(1, len(sites)):
-                stock_val = readJsonTestValue(inputFolderName, builds["stock"].format(str(i) + ".json"))
-                build_val = readJsonTestValue(inputFolderName, builds[build].format(str(i) + ".json"))
+                stock_val = getMedianTestValue(inputFolderName, builds["stock"].format(str(i) + "-{}.json"))
+                build_val = getMedianTestValue(inputFolderName, builds[build].format(str(i) + "-{}.json"))
                 overhead = 100.0 * ((build_val/stock_val) - 1.0)
                 overheads.append(overhead)
             writeMetrics(text_file, "{} latency".format(build), overheads)
@@ -88,9 +100,9 @@ def main():
         for i in range(1, len(sites)):
             siteobj = {
                 "name" : sites[i],
-                "value" :  int(read(inputFolderName, build_output.format(str(i) + "_mem.txt")))
+                "value" : getMedianIntValue(inputFolderName, build_output.format(str(i) + "_mem-{}.txt"))
             }
-            memory_output[build].append(siteobj) 
+            memory_output[build].append(siteobj)
 
     writeJson(inputFolderName, "page_memory_overhead.json", memory_output)
 
@@ -98,8 +110,8 @@ def main():
         for build in other_builds:
             overheads = []
             for i in range(1, len(sites)):
-                stock_val = int(read(inputFolderName, builds["stock"].format(str(i) + "_mem.txt")))
-                build_val = int(read(inputFolderName, builds[build].format(str(i) + "_mem.txt")))
+                stock_val = getMedianIntValue(inputFolderName, builds["stock"].format(str(i) + "_mem-{}.txt"))
+                build_val = getMedianIntValue(inputFolderName, builds[build].format(str(i) + "_mem-{}.txt"))
                 overhead = 100.0 * ((build_val/stock_val) - 1.0)
                 overheads.append(overhead)
             writeMetrics(text_file, "{} memory overhead".format(build), overheads)

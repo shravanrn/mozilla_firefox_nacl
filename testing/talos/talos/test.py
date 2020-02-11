@@ -856,7 +856,7 @@ class extern_page_load(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 1
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -872,7 +872,7 @@ class extern_page_load1(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load1.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 1
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -888,7 +888,7 @@ class extern_page_load2(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load2.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 1
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -904,7 +904,7 @@ class extern_page_load3(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load3.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 1
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -920,7 +920,7 @@ class extern_page_load4(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load4.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 1
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -936,7 +936,7 @@ class extern_page_load5(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load5.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 1
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -952,7 +952,7 @@ class extern_page_load6(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load6.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 1
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -968,7 +968,7 @@ class extern_page_load7(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load7.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 1
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -984,7 +984,7 @@ class extern_page_load8(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load8.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 1
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -1000,7 +1000,7 @@ class extern_page_load9(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load9.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 1
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -1016,7 +1016,7 @@ class extern_page_load10(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load10.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 1
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000
@@ -1032,7 +1032,7 @@ class extern_page_load11(PageloaderTest):
     tpmanifest = '${talos}/tests/extern_page_load/extern_page_load11.manifest'
     tpcycles = 1
     tploadnocache = True
-    tppagecycles = 10
+    tppagecycles = 1
     tpmozafterpaint = True
     gecko_profile_interval = 1
     gecko_profile_entries = 10000000

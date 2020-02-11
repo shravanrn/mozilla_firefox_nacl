@@ -64,30 +64,32 @@ echo "1. Disable scaling first with. sudo cpufreq-set -c 1,3 --min 2200MHz --max
 # param: cores
 # param: ext_site_num
 function runTest(){
-	FINISHED=0
-	for (( l = 0; l < 3; l++ )); do
-		pkill -f ProcessSandbox_otherside
-		pkill -f WebContent
-		pkill -f firefox
-		rm -f ./testing/mozharness/build/local.json
-		rm -f /tmp/cgmemtime_out.txt
+	for (( m = 1; m < 11; m++ )); do
+		FINISHED=0
+		for (( l = 0; l < 3; l++ )); do
+			pkill -f ProcessSandbox_otherside
+			pkill -f WebContent
+			pkill -f firefox
+			rm -f ./testing/mozharness/build/local.json
+			rm -f /tmp/cgmemtime_out.txt
 
-		taskset -c $2 ./mach talos-test --activeTests "extern_page_load$3" 2>&1 | tee "$1_externalpage_output$3.txt"
-		retVal=${PIPESTATUS[0]}
-		if [ $retVal -eq 0 ]; then
-			FINISHED=1
-			break;
-		else
-			echo "Failed to run test extern_page_load$3 for $1. Retrying..." | tee "$1_externalpage_output$3.txt"
+			taskset -c $2 ./mach talos-test --activeTests "extern_page_load$3" 2>&1 | tee "$1_externalpage_output$3.txt"
+			retVal=${PIPESTATUS[0]}
+			if [ $retVal -eq 0 ]; then
+				FINISHED=1
+				break;
+			else
+				echo "Failed to run test extern_page_load$3 for $1. Retrying..." | tee "$1_externalpage_output$3.txt"
+			fi
+		done
+		if [ $FINISHED -eq 0 ]; then
+			echo "Failed to run test extern_page_load$3 for $1." | tee "$1_externalpage_output$3.txt"
+			exit 1
 		fi
+		sleep 10
+		mv ./testing/mozharness/build/local.json "$1_external_page_render$3-$m.json"
+		mv /tmp/cgmemtime_out.txt "$1_external_page_render$3_mem-$m.txt"
 	done
-	if [ $FINISHED -eq 0 ]; then
-		echo "Failed to run test extern_page_load$3 for $1." | tee "$1_externalpage_output$3.txt"
-		exit 1
-	fi
-	sleep 10
-	mv ./testing/mozharness/build/local.json "$1_external_page_render$3.json"
-	mv /tmp/cgmemtime_out.txt "$1_external_page_render$3_mem.txt"
 }
 
 SAVEDDIR=$PWD
