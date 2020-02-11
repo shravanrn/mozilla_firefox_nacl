@@ -45,7 +45,7 @@ def getMedianIntValue(inputFolderName, fileTemplate):
     for i in range(1, 11):
         contents = read(inputFolderName, fileTemplate.format(str(i)))
         if contents:
-            vals.append(int())
+            vals.append(int(contents))
     return median(vals)
 
 def main():
