@@ -67,7 +67,7 @@ done
 
 echo "Starting."
 echo "Make sure to run the following command before starting"
-echo "sudo ../cgmemtime/cgmemtime --setup -g $USER --perm 775"
+echo "sudo ../cgmemtime/cgmemtime --setup -g $(id -gn) --perm 775"
 # param: parent pid
 # return: $waitForChildRet is the child pid
 waitForChildRet=0
