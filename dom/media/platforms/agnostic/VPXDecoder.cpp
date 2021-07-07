@@ -549,7 +549,7 @@ VPXDecoder::DecodeAlpha(vpx_image_t** aImgAlpha, const MediaRawData* aSample)
       memcpy(buff_copy, aData, aLength);
     #endif
   #else
-  unsigned char* buff_copy = aData;
+  unsigned char* buff_copy = (unsigned char*) aData;
   #endif
 
   #if defined(NACL_SANDBOX_USE_NEW_CPP_API) || defined(WASM_SANDBOX_USE_NEW_CPP_API) || defined(PS_SANDBOX_USE_NEW_CPP_API)
